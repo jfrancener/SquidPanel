@@ -162,3 +162,4 @@
 .zoho.com
 .hostinger.com
 .hostgator.com.br
+.locaweb.com.br
