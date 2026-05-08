@@ -137,7 +137,6 @@
 .reddit.com
 .run.app
 .santander.com.br
-.search.brave.com
 .search.com
 .search.yahoo.co.jp
 .sentry.io
@@ -150,7 +149,6 @@
 .soundcloud.com
 .startpage.com
 .stashbunny.com
-.static.omni.chat
 .stoodi.com.br
 .stripschat.com
 .superdownloads.com.br
@@ -178,7 +176,6 @@
 .voipwise.com
 .voipzoom.com
 .w3schools.com
-.web.whatsapp.com
 .whatsapp.com
 .wikimedia.org
 .wikipedia.org

@@ -30,7 +30,6 @@
 .translate.google.com
 .trimblecloud.com
 .ufsc.br
-.unicesumar.edu.br
 .videotecaead.com.br
 .vlibras.gov.br
 .woli.com.br
