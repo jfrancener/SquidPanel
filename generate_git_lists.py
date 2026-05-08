@@ -26,9 +26,21 @@ def create_blacklist():
     # Remover domínios permitidos da lista de bloqueados
     final_blacklist = blocked_domains - allowed_domains
     
+    # Remover subdomínios redundantes (ex: se tem .google.com, remove .gemini.google.com)
+    sorted_domains = sorted(list(final_blacklist), key=len)
+    unique_domains = []
+    for d in sorted_domains:
+        is_sub = False
+        for existing in unique_domains:
+            if d.endswith("." + existing) or d == existing:
+                is_sub = True
+                break
+        if not is_sub:
+            unique_domains.append(d)
+
     # Salvar blacklist.txt
     with open(blacklist_file, 'w', encoding='utf-8') as f:
-        for domain in sorted(list(final_blacklist)):
+        for domain in sorted(unique_domains):
             # Adiciona o ponto no início para bloquear subdomínios também (.dominio.com)
             if not domain.startswith("."):
                 f.write(f".{domain}\n")

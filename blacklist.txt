@@ -1,7 +1,6 @@
 .4shared.com
 .abril.com.br
 .advocaciarainov.com.br
-.ai.google.com
 .alibaba.com
 .amazon.com
 .amazon.com.br
@@ -15,7 +14,6 @@
 .baidu.com
 .baixaki.com.br
 .banrisul.com.br
-.bard.google.com
 .bb.com.br
 .bbc.com
 .bezoxo.com
@@ -30,7 +28,6 @@
 .caixa.gov.br
 .canaltech.com.br
 .chat.com.br
-.chat.openai.com
 .chatbase.co
 .chatgpt.com
 .chatgptbrasil.com.br
@@ -42,7 +39,6 @@
 .cloudflare.com
 .clubeadulto.net
 .cnnbrasil.com.br
-.copilot.microsoft.com
 .dailymotion.com
 .dataprev.gov.br
 .deepai.org
@@ -58,7 +54,6 @@
 .factbites.com
 .fastmail.com
 .fazenda.gov.br
-.gemini.google.com
 .getscreen.me
 .gibiru.com
 .globo.com
@@ -84,7 +79,6 @@
 .live.com
 .luzia.com
 .magnific.com
-.mail.google.com
 .manualdohomemmoderno.com.br
 .metropeloes.com.br
 .microsoft.com
@@ -115,7 +109,6 @@
 .rapidnet.de
 .reddit.com
 .santander.com.br
-.scholar.google.com
 .search.com
 .search.yahoo.co.jp
 .skype.com
