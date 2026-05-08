@@ -160,3 +160,4 @@
 .you.com
 .youtube.com
 .zoho.com
+.hostinger.com
