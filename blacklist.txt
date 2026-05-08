@@ -59,6 +59,8 @@
 .go.com
 .google.com
 .google.com.br
+.hostgator.com.br
+.hostinger.com
 .hotmail.com
 .hqbabes.net
 .hsbc.com.br
@@ -76,6 +78,7 @@
 .letras.mus.br
 .linkedin.com
 .live.com
+.locaweb.com.br
 .luzia.com
 .magnific.com
 .manualdohomemmoderno.com.br
@@ -108,8 +111,10 @@
 .rapidnet.de
 .reddit.com
 .santander.com.br
+.search.brave.com
 .search.com
 .search.yahoo.co.jp
+.sentry.io
 .skype.com
 .snap.com
 .snapchat.com
@@ -146,8 +151,10 @@
 .voipwise.com
 .voipzoom.com
 .w3schools.com
+.web.whatsapp.com
 .whatsapp.com
 .wikipedia.org
+.wix.com
 .wolframalpha.com
 .writesonic.com
 .x.com
@@ -159,7 +166,3 @@
 .you.com
 .youtube.com
 .zoho.com
-.hostinger.com
-.hostgator.com.br
-.locaweb.com.br
-.wix.com

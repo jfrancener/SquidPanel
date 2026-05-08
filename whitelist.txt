@@ -4,7 +4,9 @@
 .amplitude.com
 .censupegead.com.br
 .cloudflareinsights.com
+.cloudfront.net
 .dicio.com.br
+.displaycatalog.mp.microsoft.com
 .edu.br
 .freshworks.com
 .google-analytics.com
@@ -17,11 +19,11 @@
 .mktoresp.com
 .mplitude.com
 .portalava.com.br
+.sb-ssl.google.com
 .scholar.google.com.br
-.sentry.io
 .sites.google.com
 .sketchup.com
 .stendec.io
+.tas01.cwsapp.update.microsoft.com
 .trimble.com
 .trimblecloud.com
-.cloudfront.net
