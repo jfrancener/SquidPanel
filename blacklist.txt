@@ -1,5 +1,6 @@
 .4shared.com
 .abril.com.br
+.acrobat.com
 .advocaciarainov.com.br
 .alibaba.com
 .amazon.com
@@ -50,6 +51,7 @@
 .exame.com
 .excite.com
 .facebook.com
+.facebook.net
 .factbites.com
 .fastmail.com
 .fazenda.gov.br
