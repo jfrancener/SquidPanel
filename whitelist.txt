@@ -24,3 +24,4 @@
 .stendec.io
 .trimble.com
 .trimblecloud.com
+.cloudfront.net
