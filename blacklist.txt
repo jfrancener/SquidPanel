@@ -124,7 +124,7 @@
 .soundcloud.com
 .startpage.com
 .stashbunny.com
-.static.omni.chat
+.omni.chat
 .stoodi.com.br
 .stripschat.com
 .superdownloads.com.br
