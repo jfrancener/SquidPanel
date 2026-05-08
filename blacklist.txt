@@ -161,3 +161,4 @@
 .youtube.com
 .zoho.com
 .hostinger.com
+.hostgator.com.br
