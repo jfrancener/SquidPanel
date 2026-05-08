@@ -26,6 +26,7 @@
 .cade.com.br
 .caixa.gov.br
 .canaltech.com.br
+.capitalnews.com.br
 .chat.com.br
 .chatgpt.com
 .chatgptbrasil.com.br
@@ -36,6 +37,7 @@
 .clicrbs.com.br
 .clubeadulto.net
 .cnnbrasil.com.br
+.crwdcntrl.net
 .dailymotion.com
 .dataprev.gov.br
 .deepai.org
@@ -78,6 +80,7 @@
 .locaweb.com.br
 .luzia.com
 .manualdohomemmoderno.com.br
+.matterport.com
 .metropeloes.com.br
 .mojeek.com
 .msftncsi.com
@@ -95,6 +98,7 @@
 .oursehero.com
 .outlook.com
 .palcomp3.com.br
+.patreon.com
 .perplexity.ai
 .pexels.com
 .pinterest.com
@@ -141,6 +145,7 @@
 .uol.com.br
 .uptodown.com
 .vagalume.com.br
+.vidoomy.com
 .vimeo.com
 .vkvideo.ru
 .vlog.br
@@ -151,7 +156,6 @@
 .web.whatsapp.com
 .whatsapp.com
 .wikipedia.org
-.wix.com
 .wolframalpha.com
 .writesonic.com
 .x.com
