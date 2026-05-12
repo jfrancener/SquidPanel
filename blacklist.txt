@@ -74,7 +74,6 @@
 .github.io
 .globo.com
 .go.com
-.google.com
 .google.com.br
 .gumgum.com
 .hostinger.com
@@ -135,6 +134,7 @@
 .r7.com
 .rapidnet.de
 .reddit.com
+.ru
 .run.app
 .santander.com.br
 .search.com
@@ -170,7 +170,6 @@
 .vagalume.com.br
 .vidoomy.com
 .vimeo.com
-.vkvideo.ru
 .vlog.br
 .voipstunt.com
 .voipwise.com
@@ -184,7 +183,6 @@
 .writesonic.com
 .x.com
 .yandex.com
-.yandex.ru
 .yantex.com
 .yippiweb.com
 .you.com
