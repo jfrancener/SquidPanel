@@ -302,7 +302,8 @@ def sync_from_github(request):
     Isso garante que edições feitas direto no site do GitHub entrem no sistema.
     """
     if request.method == 'POST':
-        base_dir = "d:\\Projetos Code\\serv"
+        from django.conf import settings
+        base_dir = str(settings.BASE_DIR)
         black_path = os.path.join(base_dir, 'blacklist.txt')
         white_path = os.path.join(base_dir, 'whitelist.txt')
         
