@@ -1,11 +1,11 @@
 .2mdn.net
-.4dex.io
 .4shared.com
 .7gra.us
 .abril.com.br
 .acrobat.com
 .advocaciarainov.com.br
 .aedeiveleonardo.org
+.akamaized.net
 .alibaba.com
 .amazon.com
 .amazon.com.br
@@ -24,6 +24,8 @@
 .bb.com.br
 .bbc.com
 .bezoxo.com
+.bilibili.com
+.bilivideo.com
 .bing.net
 .bradesco.com.br
 .bradescopessoajuridica.com.br
@@ -57,6 +59,7 @@
 .duckduckgo.com
 .ebc.com.br
 .ecosia.org
+.envato.com
 .estadao.com.br
 .exame.com
 .excite.com
@@ -71,11 +74,11 @@
 .g.live.com
 .getscreen.me
 .gibiru.com
-.github.io
 .globo.com
 .go.com
 .google.com.br
 .gumgum.com
+.hdslb.com
 .hostinger.com
 .hotmail.com
 .hqbabes.net
@@ -83,6 +86,7 @@
 .hugedomains.com
 .icloud.com
 .instagram.com
+.io
 .itau.com.br
 .jota.info
 .jovempan.com.br
@@ -139,7 +143,6 @@
 .santander.com.br
 .search.com
 .search.yahoo.co.jp
-.sentry.io
 .skype.com
 .snap.com
 .snapchat.com
@@ -169,6 +172,7 @@
 .uptodown.com
 .vagalume.com.br
 .vidoomy.com
+.vigo.tech
 .vimeo.com
 .vlog.br
 .voipstunt.com
@@ -180,6 +184,7 @@
 .wikipedia.org
 .wolframalpha.com
 .wondershare.com
+.wp.com
 .writesonic.com
 .x.com
 .yandex.com
