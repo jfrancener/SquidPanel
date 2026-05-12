@@ -79,12 +79,21 @@
 
         <!-- Domains Table -->
         <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
-            <div class="p-6 border-b border-slate-700 flex justify-between items-center">
-                <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-list-ul text-indigo-400"></i> Logs Agrupados
-                </h2>
-                <div class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                    Baseado no arquivo completo ({{ total_logs }} registros)
+            <div class="p-6 border-b border-slate-700 flex flex-col gap-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-list-ul text-indigo-400"></i> Logs Agrupados
+                    </h2>
+                    <div class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                        Baseado no arquivo completo ({{ total_logs }} registros)
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap gap-2 items-center bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                    <span class="text-sm font-semibold text-slate-400 mr-2"><i class="fa-solid fa-layer-group"></i> Ações em Lote:</span>
+                    <button onclick="executeMassAction('verify')" class="px-3 py-1.5 bg-yellow-600/20 hover:bg-yellow-600 text-yellow-400 hover:text-white rounded-lg text-xs font-semibold transition-all shadow border border-yellow-500/20"><i class="fa-solid fa-check"></i> Verificar</button>
+                    <button onclick="executeMassAction('allow')" class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-lg text-xs font-semibold transition-all shadow border border-emerald-500/20"><i class="fa-solid fa-shield-halved"></i> Permitir</button>
+                    <button onclick="executeMassAction('block')" class="px-3 py-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg text-xs font-semibold transition-all shadow border border-red-500/20"><i class="fa-solid fa-ban"></i> Bloquear</button>
                 </div>
             </div>
             
@@ -92,6 +101,9 @@
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-800/50 text-slate-300 text-sm">
+                            <th class="p-4 font-semibold w-10 text-center">
+                                <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)" class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-indigo-500 focus:ring-indigo-500 cursor-pointer">
+                            </th>
                             <th class="p-4 font-semibold w-16 text-center">Hits</th>
                             <th class="p-4 font-semibold">Domínio</th>
                             <th class="p-4 font-semibold w-32">Status Atual (Log)</th>
@@ -109,6 +121,9 @@
                             data-log-status="{{ item.last_status }}"
                             data-verified="{{ item.is_verified|yesno:'true,false' }}">
                             
+                            <td class="p-4 text-center">
+                                <input type="checkbox" class="domain-checkbox w-4 h-4 rounded bg-slate-700 border-slate-600 text-indigo-500 focus:ring-indigo-500 cursor-pointer" value="{{ item.domain }}">
+                            </td>
                             <td class="p-4 text-center">
                                 <span class="bg-indigo-600/30 text-indigo-300 text-xs font-bold px-2 py-1 rounded-md border border-indigo-500/20">{{ item.count }}</span>
                             </td>
@@ -190,7 +205,9 @@
                                 data-hidden="{{ sub.is_hidden|yesno:'true,false' }}"
                                 data-log-status="{{ sub.last_status }}"
                                 data-verified="{{ sub.is_verified|yesno:'true,false' }}">
-                                
+                                <td class="p-3 text-center">
+                                    <input type="checkbox" class="domain-checkbox w-4 h-4 rounded bg-slate-700 border-slate-600 text-indigo-500 focus:ring-indigo-500 cursor-pointer" value="{{ sub.domain }}">
+                                </td>
                                 <td class="p-3 text-center">
                                     <span class="bg-slate-800 text-slate-400 text-[10px] font-bold px-2 py-1 rounded-md">{{ sub.count }}</span>
                                 </td>
@@ -610,6 +627,45 @@
             } finally {
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
+            }
+        }
+        function toggleSelectAll(source) {
+            const checkboxes = document.querySelectorAll('.domain-checkbox');
+            checkboxes.forEach(cb => {
+                // Only select if the row is visible
+                const row = cb.closest('tr');
+                if (!row.classList.contains('hidden')) {
+                    cb.checked = source.checked;
+                }
+            });
+        }
+
+        async function executeMassAction(action) {
+            const checkboxes = document.querySelectorAll('.domain-checkbox:checked');
+            const domains = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (domains.length === 0) {
+                showToast('error', 'Nenhum selecionado', 'Selecione pelo menos um domínio para aplicar a ação.');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/mass-action/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ action, domains })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    location.reload();
+                } else {
+                    showToast('error', 'Erro', data.error || 'Falha ao processar ação em massa');
+                }
+            } catch (err) {
+                showToast('error', 'Erro', 'Erro de conexão com o servidor');
             }
         }
     </script>

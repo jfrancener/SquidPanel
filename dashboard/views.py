@@ -203,6 +203,40 @@ def domain_action(request):
     return JsonResponse({'success': False})
 
 @csrf_exempt
+def mass_domain_action(request):
+    if request.method == 'POST':
+        import json
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+            domains = data.get('domains', [])
+            
+            if not domains or not action:
+                return JsonResponse({'success': False, 'error': 'Dados invalidos'})
+                
+            for domain in domains:
+                clean_domain = domain.lstrip('.')
+                
+                if action == 'verify':
+                    rule, _ = DomainRule.objects.get_or_create(domain=clean_domain)
+                    rule.is_verified = True
+                    rule.save()
+                elif action == 'allow':
+                    rule, _ = DomainRule.objects.get_or_create(domain=clean_domain)
+                    rule.rule_type = 'allow'
+                    rule.save()
+                elif action == 'block':
+                    rule, _ = DomainRule.objects.get_or_create(domain=clean_domain)
+                    rule.rule_type = 'block'
+                    rule.save()
+                    
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+            
+    return JsonResponse({'success': False})
+
+@csrf_exempt
 def save_and_sync(request):
     """
     Gera blacklist e whitelist baseado no DB, commita e faz push.
