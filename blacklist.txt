@@ -69,6 +69,7 @@
 .factbites.com
 .fastmail.com
 .fazenda.gov.br
+.fedoq.com
 .footprintdns.com
 .freshworks.com
 .g.live.com
