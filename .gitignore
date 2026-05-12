@@ -1,0 +1,14 @@
+db.sqlite3
+*.pyc
+__pycache__/
+venv/
+.env
+.vscode/
+*.log
+deploy_vps.py
+deploy_finish.py
+setup_services.py
+check_*.py
+setup_git_vps*.py
+configure_ssh_vps.py
+test_ssh443.py

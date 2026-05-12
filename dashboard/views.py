@@ -251,10 +251,7 @@ def save_and_sync(request):
         rules = DomainRule.objects.all()
         
         try:
-            # Puxa as atualizações do GitHub primeiro para não dar conflito (rejeição de push)
-            subprocess.run(["git", "fetch", "origin", "main"], cwd=base_dir)
-            subprocess.run(["git", "reset", "--hard", "origin/main"], cwd=base_dir)
-            
+            # Sincroniza arquivos de texto
             def filter_redundant(domain_list):
                 # Sort by length so parents come first
                 sorted_domains = sorted(domain_list, key=len)
