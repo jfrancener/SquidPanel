@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador Squid - Blacklist & Whitelist</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f1f5f9; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .btn-hover-effect { transition: all 0.3s ease; }
+        .btn-hover-effect:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-10 glass-panel p-6 rounded-2xl shadow-xl">
+            <div class="flex items-center gap-4">
+                <div class="bg-indigo-600 p-3 rounded-lg shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-shield-halved text-2xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Squid Guard Pro</h1>
+                    <p class="text-slate-400 text-sm mt-1">Monitoramento em tempo real e Gestão de ACLs</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="pullFromGithub()" id="btn-pull" class="btn-hover-effect px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold flex items-center gap-2" title="Baixa as listas do GitHub e atualiza o Banco de Dados">
+                    <i class="fa-solid fa-cloud-arrow-down"></i> Baixar do GitHub
+                </button>
+                <button onclick="syncLists()" id="btn-sync" class="btn-hover-effect px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold flex items-center gap-2" title="Gera arquivos do BD e envia para o GitHub e Firewall">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Salvar e Enviar
+                </button>
+                <button onclick="location.reload()" class="btn-hover-effect px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> Atualizar Logs
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Overview & Filters -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="glass-panel p-6 rounded-2xl border-l-4 border-l-indigo-500">
+                <h3 class="text-slate-400 text-sm font-semibold mb-1">Domínios Únicos Identificados</h3>
+                <p class="text-3xl font-bold">{{ domains|length }}</p>
+            </div>
+            
+            <div class="glass-panel p-6 rounded-2xl border-l-4 border-l-slate-600 col-span-2 flex items-center gap-4">
+                <div class="w-full">
+                    <label class="text-slate-400 text-sm font-semibold mb-2 block"><i class="fa-solid fa-filter"></i> Filtrar Visão</label>
+                    <select id="domainFilter" onchange="applyFilter()" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                        <option value="all">Ver Tudo (Menos Ocultos)</option>
+                        <option value="blocked">Apenas Bloqueados</option>
+                        <option value="allowed">Apenas Permitidos</option>
+                        <option value="unverified">Apenas Não Verificados</option>
+                        <option value="hidden">Ver Itens Ocultos</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="glass-panel p-6 rounded-2xl border-l-4 border-l-sky-500 flex flex-col justify-center gap-3">
+                <button onclick="toggleModal('blacklist-modal')" class="w-full btn-hover-effect px-4 py-2 bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white border border-red-500/30 rounded-lg text-sm font-semibold transition-all">
+                    <i class="fa-solid fa-ban"></i> Ver Blacklist ({{ full_blacklist|length }})
+                </button>
+                <button onclick="toggleModal('whitelist-modal')" class="w-full btn-hover-effect px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-white border border-emerald-500/30 rounded-lg text-sm font-semibold transition-all">
+                    <i class="fa-solid fa-check"></i> Ver Whitelist ({{ full_whitelist|length }})
+                </button>
+            </div>
+        </div>
+
+        <!-- Domains Table -->
+        <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
+            <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-list-ul text-indigo-400"></i> Logs Agrupados
+                </h2>
+                <div class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                    Baseado no arquivo completo ({{ total_logs }} registros)
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-800/50 text-slate-300 text-sm">
+                            <th class="p-4 font-semibold w-16 text-center">Hits</th>
+                            <th class="p-4 font-semibold">Domínio</th>
+                            <th class="p-4 font-semibold w-32">Status Atual (Log)</th>
+                            <th class="p-4 font-semibold w-32">Nas Listas</th>
+                            <th class="p-4 font-semibold w-64 text-right">Ações Rápidas</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50" id="domainTableBody">
+                        {% for item in domains %}
+                        
+                        <!-- ROOT DOMAIN ROW -->
+                        <tr class="domain-row hover:bg-slate-800/30 transition-colors {% if item.is_hidden %}hidden{% endif %}" 
+                            id="row-{{ item.domain|slugify }}"
+                            data-hidden="{{ item.is_hidden|yesno:'true,false' }}"
+                            data-log-status="{{ item.last_status }}"
+                            data-verified="{{ item.is_verified|yesno:'true,false' }}">
+                            
+                            <td class="p-4 text-center">
+                                <span class="bg-indigo-600/30 text-indigo-300 text-xs font-bold px-2 py-1 rounded-md border border-indigo-500/20">{{ item.count }}</span>
+                            </td>
+                            <td class="p-4 font-mono text-sm {% if item.is_hidden %}text-slate-500 line-through{% elif item.is_verified %}text-white font-bold{% else %}text-yellow-400 font-bold{% endif %}">
+                                {% if not item.is_single %}
+                                <button onclick="toggleGroup('group-{{ item.domain|slugify }}', this)" class="mr-2 text-slate-400 hover:text-white transition-transform duration-200">
+                                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                                </button>
+                                {% endif %}
+                                <a href="https://{{ item.domain }}" target="_blank" class="hover:text-sky-300 hover:underline transition-all" title="Abrir site em nova aba">
+                                    {{ item.domain }}
+                                </a>
+                            </td>
+                            <td class="p-4">
+                                {% if item.last_status == 'Bloqueado' %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                                    <i class="fa-solid fa-ban text-[10px]"></i> Bloqueado
+                                </span>
+                                {% elif item.last_status == 'Liberado' %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    <i class="fa-solid fa-check text-[10px]"></i> Liberado
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    <i class="fa-solid fa-circle-half-stroke text-[10px]"></i> Misto
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4">
+                                {% if item.in_blacklist %}
+                                    <span class="text-xs font-semibold text-red-400 border-b border-dashed border-red-400/50 cursor-help" title="Aplica-se a todos os subdomínios">Blacklist (Geral)</span>
+                                {% elif item.in_whitelist %}
+                                    <span class="text-xs font-semibold text-emerald-400 border-b border-dashed border-emerald-400/50 cursor-help" title="Aplica-se a todos os subdomínios">Whitelist (Geral)</span>
+                                {% else %}
+                                    <span class="text-xs text-slate-500">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4 text-right flex justify-end gap-2">
+                                {% if item.is_hidden %}
+                                    <button onclick="executeAction('unhide', '{{ item.domain }}')" class="btn-hover-effect px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-600/30 rounded-lg text-xs font-semibold transition-all" title="Desocultar todos">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                {% else %}
+                                    {% if item.is_verified %}
+                                        <button onclick="executeAction('unverify', '{{ item.domain }}')" class="btn-hover-effect px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-400 hover:text-white border border-sky-600/30 rounded-lg text-xs font-semibold transition-all" title="Desmarcar verificação">
+                                            <i class="fa-solid fa-check-double"></i>
+                                        </button>
+                                    {% else %}
+                                        <button onclick="executeAction('verify', '{{ item.domain }}')" class="btn-hover-effect px-3 py-1.5 bg-yellow-600/20 hover:bg-yellow-600 text-yellow-400 hover:text-white border border-yellow-600/30 rounded-lg text-xs font-semibold transition-all" title="Marcar como verificado (Seguro)">
+                                            <i class="fa-solid fa-check"></i>
+                                        </button>
+                                    {% endif %}
+                                    
+                                    {% if not item.in_whitelist %}
+                                    <button onclick="executeAction('allow', '{{ item.domain }}')" class="btn-hover-effect px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-600/30 rounded-lg text-xs font-semibold transition-all" title="Liberar todos os subdomínios">
+                                        <i class="fa-solid fa-unlock"></i> Tudo
+                                    </button>
+                                    {% endif %}
+                                    
+                                    {% if not item.in_blacklist %}
+                                    <button onclick="executeAction('block', '{{ item.domain }}')" class="btn-hover-effect px-3 py-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 rounded-lg text-xs font-semibold transition-all" title="Bloquear todos os subdomínios">
+                                        <i class="fa-solid fa-lock"></i> Tudo
+                                    </button>
+                                    {% endif %}
+                                    
+                                    <button onclick="executeAction('hide', '{{ item.domain }}')" class="btn-hover-effect px-3 py-1.5 bg-slate-700/50 hover:bg-slate-600 text-slate-300 border border-slate-600/50 rounded-lg text-xs transition-all" title="Ocultar toda a família">
+                                        <i class="fa-regular fa-eye-slash"></i>
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        <!-- SUBDOMAINS -->
+                        {% if not item.is_single %}
+                            {% for sub in item.subdomains %}
+                            <tr class="domain-row group-{{ item.domain|slugify }} bg-slate-900/40 hidden hover:bg-slate-800/40 transition-colors {% if sub.is_hidden %}opacity-50{% endif %}" 
+                                id="row-{{ sub.domain|slugify }}"
+                                data-parent-group="group-{{ item.domain|slugify }}"
+                                data-hidden="{{ sub.is_hidden|yesno:'true,false' }}"
+                                data-log-status="{{ sub.last_status }}"
+                                data-verified="{{ sub.is_verified|yesno:'true,false' }}">
+                                
+                                <td class="p-3 text-center">
+                                    <span class="bg-slate-800 text-slate-400 text-[10px] font-bold px-2 py-1 rounded-md">{{ sub.count }}</span>
+                                </td>
+                                <td class="p-3 font-mono text-xs pl-8 {% if sub.is_hidden %}text-slate-500 line-through{% elif sub.is_verified %}text-white{% else %}text-yellow-400{% endif %} flex items-center gap-2">
+                                    <i class="fa-solid fa-level-up fa-rotate-90 text-slate-600"></i>
+                                    <a href="https://{{ sub.domain }}" target="_blank" class="hover:text-cyan-300 hover:underline transition-all" title="Abrir site em nova aba">
+                                        {{ sub.domain }}
+                                    </a>
+                                </td>
+                                <td class="p-3">
+                                    {% if sub.last_status == 'Bloqueado' %}
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/5 text-red-400/80 border border-red-500/10">Bloqueado</span>
+                                    {% else %}
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/5 text-emerald-400/80 border border-emerald-500/10">Liberado</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3">
+                                    {% if sub.in_blacklist %}
+                                        <span class="text-[10px] text-red-400/80">Específico</span>
+                                    {% elif sub.in_whitelist %}
+                                        <span class="text-[10px] text-emerald-400/80">Específico</span>
+                                    {% else %}
+                                        <span class="text-xs text-slate-600">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3 text-right flex justify-end gap-1.5">
+                                    {% if sub.is_hidden %}
+                                        <button onclick="executeAction('unhide', '{{ sub.domain }}')" class="px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded text-[10px] transition-all">Desocultar</button>
+                                    {% else %}
+                                        {% if not sub.in_whitelist %}
+                                        <button onclick="executeAction('allow', '{{ sub.domain }}')" class="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded text-[10px] transition-all">Permitir</button>
+                                        {% endif %}
+                                        {% if not sub.in_blacklist %}
+                                        <button onclick="executeAction('block', '{{ sub.domain }}')" class="px-2 py-1 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded text-[10px] transition-all">Bloquear</button>
+                                        {% endif %}
+                                        <button onclick="executeAction('hide', '{{ sub.domain }}')" class="px-2 py-1 bg-slate-700/50 hover:bg-slate-600 text-slate-400 hover:text-white rounded text-[10px] transition-all">Ocultar</button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-slate-500">
+                                <i class="fa-solid fa-inbox text-3xl mb-3 opacity-50"></i>
+                                <p>Nenhum log encontrado.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="blacklist-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+        <div class="glass-panel w-full max-w-2xl rounded-2xl shadow-2xl p-6 m-4 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <h3 class="text-xl font-bold text-red-400"><i class="fa-solid fa-ban"></i> Blacklist Completa</h3>
+                <button onclick="toggleModal('blacklist-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="new-blacklist-domain" placeholder="Ex: google.com" class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-red-500 focus:border-red-500 block p-2">
+                <button onclick="addNewDomain('block')" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-semibold transition-all">Adicionar</button>
+            </div>
+            <div class="overflow-y-auto flex-1 pr-2">
+                <ul class="divide-y divide-slate-700/50">
+                    {% for domain in full_blacklist %}
+                    <li class="py-2 text-sm text-slate-300 font-mono flex justify-between items-center group">
+                        {{ domain }}
+                        <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                            <button onclick="editDomain('{{ domain }}', 'block')" class="text-sky-400 hover:text-sky-300"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="removeDomain('{{ domain }}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="py-4 text-center text-slate-500">A lista está vazia.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="whitelist-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+        <div class="glass-panel w-full max-w-2xl rounded-2xl shadow-2xl p-6 m-4 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <h3 class="text-xl font-bold text-emerald-400"><i class="fa-solid fa-check"></i> Whitelist Completa</h3>
+                <button onclick="toggleModal('whitelist-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="new-whitelist-domain" placeholder="Ex: site-confiavel.com" class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2">
+                <button onclick="addNewDomain('allow')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-semibold transition-all">Adicionar</button>
+            </div>
+            <div class="overflow-y-auto flex-1 pr-2">
+                <ul class="divide-y divide-slate-700/50">
+                    {% for domain in full_whitelist %}
+                    <li class="py-2 text-sm text-slate-300 font-mono flex justify-between items-center group">
+                        {{ domain }}
+                        <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                            <button onclick="editDomain('{{ domain }}', 'allow')" class="text-sky-400 hover:text-sky-300"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="removeDomain('{{ domain }}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="py-4 text-center text-slate-500">A lista está vazia.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 bg-slate-800 border border-slate-700 shadow-2xl rounded-lg p-4 z-50">
+        <div id="toast-icon" class="text-xl"></div>
+        <div>
+            <h4 id="toast-title" class="font-bold text-sm text-white"></h4>
+            <p id="toast-message" class="text-xs text-slate-400"></p>
+        </div>
+    </div>
+
+    <script>
+        // Restaura o estado expandido ao carregar a página
+        document.addEventListener('DOMContentLoaded', () => {
+            // Restore filter state
+            const savedFilter = sessionStorage.getItem('domainFilterState');
+            if (savedFilter) {
+                document.getElementById('domainFilter').value = savedFilter;
+            }
+            
+            // Reapply filter visually first
+            applyFilter();
+            
+            const expanded = JSON.parse(sessionStorage.getItem('expandedGroups') || '[]');
+            expanded.forEach(groupId => {
+                const rows = document.querySelectorAll('.' + groupId);
+                rows.forEach(row => {
+                    const filterValue = document.getElementById('domainFilter').value;
+                    const isHidden = row.getAttribute('data-hidden') === 'true';
+                    const isVerified = row.getAttribute('data-verified') === 'true';
+                    const logStatus = row.getAttribute('data-log-status');
+                    
+                    let show = false;
+                    if (filterValue === 'all') {
+                        show = !isHidden;
+                    } else if (filterValue === 'blocked') {
+                        show = !isHidden && logStatus === 'Bloqueado';
+                    } else if (filterValue === 'allowed') {
+                        show = !isHidden && logStatus === 'Liberado';
+                    } else if (filterValue === 'unverified') {
+                        show = !isHidden && !isVerified;
+                    } else if (filterValue === 'hidden') {
+                        show = isHidden;
+                    }
+                    
+                    if (show) {
+                        row.classList.remove('hidden');
+                    }
+                });
+                const btn = document.querySelector(`button[onclick*="${groupId}"]`);
+                if (btn) {
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.classList.remove('fa-chevron-right');
+                        icon.classList.add('fa-chevron-down');
+                        btn.classList.add('text-indigo-400');
+                    }
+                }
+            });
+        });
+
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function toggleGroup(groupClass, btnElement) {
+            const rows = document.querySelectorAll('.' + groupClass);
+            const icon = btnElement.querySelector('i');
+            let expandedGroups = JSON.parse(sessionStorage.getItem('expandedGroups') || '[]');
+            
+            let isExpanding = false;
+            if (icon.classList.contains('fa-chevron-right')) {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-down');
+                btnElement.classList.add('text-indigo-400');
+                isExpanding = true;
+                if (!expandedGroups.includes(groupClass)) expandedGroups.push(groupClass);
+            } else {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-right');
+                btnElement.classList.remove('text-indigo-400');
+                expandedGroups = expandedGroups.filter(g => g !== groupClass);
+            }
+            
+            sessionStorage.setItem('expandedGroups', JSON.stringify(expandedGroups));
+            
+            rows.forEach(row => {
+                if (isExpanding) {
+                    const filterValue = document.getElementById('domainFilter').value;
+                    const isHidden = row.getAttribute('data-hidden') === 'true';
+                    const isVerified = row.getAttribute('data-verified') === 'true';
+                    const logStatus = row.getAttribute('data-log-status');
+                    
+                    let show = false;
+                    if (filterValue === 'all') {
+                        show = !isHidden;
+                    } else if (filterValue === 'blocked') {
+                        show = !isHidden && logStatus === 'Bloqueado';
+                    } else if (filterValue === 'allowed') {
+                        show = !isHidden && logStatus === 'Liberado';
+                    } else if (filterValue === 'unverified') {
+                        show = !isHidden && !isVerified;
+                    } else if (filterValue === 'hidden') {
+                        show = isHidden;
+                    }
+                    
+                    if(show) row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+        }
+
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            
+            if(type === 'success') {
+                icon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+                toast.classList.add('border-emerald-500/30');
+            } else {
+                icon.innerHTML = '<i class="fa-solid fa-circle-exclamation text-red-400"></i>';
+                toast.classList.add('border-red-500/30');
+            }
+            
+            document.getElementById('toast-title').textContent = title;
+            document.getElementById('toast-message').textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function addNewDomain(actionType) {
+            let inputId = actionType === 'block' ? 'new-blacklist-domain' : 'new-whitelist-domain';
+            let domain = document.getElementById(inputId).value.trim();
+            if(domain) {
+                executeAction(actionType, domain);
+            }
+        }
+
+        function editDomain(oldDomain, actionType) {
+            let newDomain = prompt('Editar domínio:', oldDomain);
+            if(newDomain && newDomain.trim() !== '' && newDomain !== oldDomain) {
+                // Send edit request
+                fetch('/action/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `action=edit_rule&domain=${encodeURIComponent(newDomain.trim())}&old_domain=${encodeURIComponent(oldDomain)}`
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        showToast('success', 'Editado', `Domínio editado com sucesso.`);
+                        setTimeout(() => location.reload(), 800);
+                    }
+                });
+            }
+        }
+
+        function removeDomain(domain) {
+            if(confirm(`Tem certeza que deseja remover ${domain} da lista?`)) {
+                fetch('/action/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `action=remove_rule&domain=${encodeURIComponent(domain)}`
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        showToast('success', 'Removido', `Domínio removido com sucesso.`);
+                        setTimeout(() => location.reload(), 800);
+                    }
+                });
+            }
+        }
+        
+        function applyFilter() {
+            const filterValue = document.getElementById('domainFilter').value;
+            
+            // Persist the filter selection
+            sessionStorage.setItem('domainFilterState', filterValue);
+            
+            const expandedGroups = JSON.parse(sessionStorage.getItem('expandedGroups') || '[]');
+            const rows = document.querySelectorAll('.domain-row');
+            
+            rows.forEach(row => {
+                const isHidden = row.getAttribute('data-hidden') === 'true';
+                const isVerified = row.getAttribute('data-verified') === 'true';
+                const logStatus = row.getAttribute('data-log-status');
+                const parentGroup = row.getAttribute('data-parent-group');
+                
+                let show = false;
+                
+                if (filterValue === 'all') {
+                    show = !isHidden;
+                } else if (filterValue === 'blocked') {
+                    show = !isHidden && logStatus === 'Bloqueado';
+                } else if (filterValue === 'allowed') {
+                    show = !isHidden && logStatus === 'Liberado';
+                } else if (filterValue === 'unverified') {
+                    show = !isHidden && !isVerified;
+                } else if (filterValue === 'hidden') {
+                    show = isHidden;
+                }
+                
+                // Se é um subdomínio, ele só pode aparecer se o grupo pai dele estiver expandido!
+                if (show && parentGroup && !expandedGroups.includes(parentGroup)) {
+                    show = false;
+                }
+                
+                if (show) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+        }
+
+        async function executeAction(action, domain) {
+            const row = document.getElementById(`row-${domain.replace(/\./g, '-')}`);
+            if (row) row.style.opacity = '0.5';
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', action);
+                formData.append('domain', domain);
+                
+                const response = await fetch('/action/', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if(data.success) {
+                    if(action === 'hide') {
+                        showToast('success', 'Ocultado', `${domain} foi marcado como oculto.`);
+                        setTimeout(() => location.reload(), 800);
+                    } else if (action === 'unhide') {
+                        showToast('success', 'Visível', `${domain} não está mais oculto.`);
+                        setTimeout(() => location.reload(), 800);
+                    } else {
+                        showToast('success', 'Salvo no Banco', `Ação para ${domain} registrada.`);
+                        setTimeout(() => location.reload(), 800);
+                    }
+                } else {
+                    if (row) row.style.opacity = '1';
+                    showToast('error', 'Falha', data.error || 'Erro ao processar ação.');
+                }
+            } catch (err) {
+                if (row) row.style.opacity = '1';
+                showToast('error', 'Erro de Conexão', 'Não foi possível falar com o servidor.');
+            }
+        }
+
+        async function syncLists() {
+
+            const btn = document.getElementById('btn-sync');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/sync/', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('success', 'Enviado!', data.message);
+                } else {
+                    showToast('error', 'Erro no Envio', data.error || 'Falha desconhecida.');
+                }
+            } catch (err) {
+                showToast('error', 'Erro de Conexão', 'Não foi possível enviar para o servidor.');
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        }
+
+        async function pullFromGithub() {
+            const btn = document.getElementById('btn-pull');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Baixando...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/sync-github/', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('success', 'Atualizado!', data.message);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('error', 'Erro no Download', data.error || 'Falha desconhecida ao baixar do GitHub.');
+                }
+            } catch (err) {
+                showToast('error', 'Erro de Conexão', 'Não foi possível baixar do servidor.');
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
