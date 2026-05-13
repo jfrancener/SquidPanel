@@ -18,6 +18,7 @@
 .an.com.br
 .anthropic.com
 .aol.com
+.applovin.com
 .archive.org
 .ask.com
 .ask.fm
@@ -67,6 +68,7 @@
 .clnmde.com
 .clubeadulto.net
 .cnnbrasil.com.br
+.cnpq.br
 .conditionfuneral.com
 .convertexperiments.com
 .cookielaw.org
@@ -150,6 +152,7 @@
 .locaweb.com.br
 .loopme.me
 .luzia.com
+.madmuscles.com
 .mandua.com.br
 .manualdohomemmoderno.com.br
 .matterport.com
@@ -217,7 +220,6 @@
 .simplesvg.com
 .simpli.fi
 .skinnycrawlinglax.com
-.skype.com
 .snap.com
 .snapchat.com
 .socratic.org
@@ -254,6 +256,7 @@
 .twitch.tv
 .twitter.com
 .tzegilo.com
+.unimealplan.com
 .unisvg.com
 .unpkg.com
 .unrulymedia.com
