@@ -18,6 +18,7 @@
 .elibro.net
 .fe2cr.update.microsoft.com
 .fe3cr.delivery.mp.microsoft.com
+.ftech.srv.br
 .graphisoft.com
 .grupoa.education
 .jquery.com
