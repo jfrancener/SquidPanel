@@ -54,7 +54,7 @@
                 <p class="text-3xl font-bold">{{ domains|length }}</p>
             </div>
             
-            <div class="glass-panel p-6 rounded-2xl border-l-4 border-l-slate-600 col-span-2 flex items-center gap-4">
+            <div class="glass-panel p-6 rounded-2xl border-l-4 border-l-slate-600 col-span-2 flex flex-col md:flex-row items-center gap-4">
                 <div class="w-full">
                     <label class="text-slate-400 text-sm font-semibold mb-2 block"><i class="fa-solid fa-filter"></i> Filtrar Visão</label>
                     <select id="domainFilter" onchange="applyFilter()" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
@@ -63,6 +63,19 @@
                         <option value="allowed">Apenas Permitidos</option>
                         <option value="unverified">Apenas Não Verificados</option>
                         <option value="hidden">Ver Itens Ocultos</option>
+                    </select>
+                </div>
+                <div class="w-full">
+                    <label class="text-slate-400 text-sm font-semibold mb-2 block"><i class="fa-solid fa-clock-rotate-left"></i> Fonte de Logs</label>
+                    <select id="logFileSelect" onchange="changeLogFile(this.value)" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-sky-500 focus:border-sky-500 block p-2.5">
+                        <option value="access.log" {% if selected_log == 'access.log' %}selected{% endif %}>Log Atual (access.log)</option>
+                        <option value="all" {% if selected_log == 'all' %}selected{% endif %}>Todos os 7 dias</option>
+                        <hr class="border-slate-700 my-1">
+                        {% for log in available_logs %}
+                            {% if log != 'access.log' %}
+                                <option value="{{ log }}" {% if selected_log == log %}selected{% endif %}>{{ log }}</option>
+                            {% endif %}
+                        {% endfor %}
                     </select>
                 </div>
             </div>
@@ -331,6 +344,12 @@
     </div>
 
     <script>
+        function changeLogFile(filename) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('log_file', filename);
+            window.location.href = url.toString();
+        }
+
         // Restaura o estado expandido ao carregar a página
         document.addEventListener('DOMContentLoaded', () => {
             // Restore filter state

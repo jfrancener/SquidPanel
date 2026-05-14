@@ -10,7 +10,22 @@ from django.views.decorators.csrf import csrf_exempt
 
 import tldextract
 
-def get_squid_logs():
+def get_available_logs():
+    hostname = "10.40.88.3"
+    username = "root"
+    password = "@info win 123"
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname, username=username, password=password, timeout=5)
+        stdin, stdout, stderr = client.exec_command('ls -1 /var/squid/logs/access.log*')
+        files = [f.split('/')[-1] for f in stdout.read().decode().splitlines()]
+        client.close()
+        return sorted(files)
+    except:
+        return ["access.log"]
+
+def get_squid_logs(filename=None):
     hostname = "10.40.88.3"
     username = "root"
     password = "@info win 123"
@@ -20,8 +35,14 @@ def get_squid_logs():
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(hostname, username=username, password=password, timeout=5)
         
-        # Lê o log atual e os rotacionados (até 7 dias)
-        stdin, stdout, stderr = client.exec_command('cat /var/squid/logs/access.log /var/squid/logs/access.log.[0-6] 2>/dev/null')
+        if filename == 'all':
+            cmd = 'cat /var/squid/logs/access.log /var/squid/logs/access.log.[0-6] 2>/dev/null'
+        elif filename:
+            cmd = f'cat /var/squid/logs/{filename}'
+        else:
+            cmd = 'cat /var/squid/logs/access.log'
+            
+        stdin, stdout, stderr = client.exec_command(cmd)
         logs = stdout.read().decode('utf-8', errors='ignore').splitlines()
         client.close()
         return logs
@@ -37,7 +58,9 @@ def extract_domain(url_or_domain):
     return None
 
 def dashboard(request):
-    logs = get_squid_logs()
+    selected_log = request.GET.get('log_file', 'access.log')
+    logs = get_squid_logs(selected_log)
+    available_logs = get_available_logs()
     
     # Busca todas as regras salvas no banco
     rules = DomainRule.objects.all()
@@ -145,7 +168,9 @@ def dashboard(request):
         'domains': context_domains, 
         'total_logs': len(logs),
         'full_blacklist': sorted(list(blacklist)),
-        'full_whitelist': sorted(list(whitelist))
+        'full_whitelist': sorted(list(whitelist)),
+        'available_logs': available_logs,
+        'selected_log': selected_log
     })
 
 @csrf_exempt
