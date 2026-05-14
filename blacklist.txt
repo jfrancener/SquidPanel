@@ -86,6 +86,7 @@
 .bilibili.com
 .biliimg.com
 .bilivideo.com
+.bing.com
 .bing.net
 .blismedia.com
 .bolavip.com
