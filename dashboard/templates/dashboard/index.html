@@ -136,6 +136,7 @@
                         <!-- ROOT DOMAIN ROW -->
                         <tr class="domain-row hover:bg-slate-800/30 transition-colors {% if item.is_hidden %}hidden{% endif %}" 
                             id="row-{{ item.domain|slugify }}"
+                            data-domain="{{ item.domain }}"
                             data-hidden="{{ item.is_hidden|yesno:'true,false' }}"
                             data-log-status="{{ item.last_status }}"
                             data-verified="{{ item.is_verified|yesno:'true,false' }}">
@@ -220,6 +221,7 @@
                             {% for sub in item.subdomains %}
                             <tr class="domain-row group-{{ item.domain|slugify }} bg-slate-900/40 hidden hover:bg-slate-800/40 transition-colors {% if sub.is_hidden %}opacity-50{% endif %}" 
                                 id="row-{{ sub.domain|slugify }}"
+                                data-domain="{{ sub.domain }}"
                                 data-parent-group="group-{{ item.domain|slugify }}"
                                 data-hidden="{{ sub.is_hidden|yesno:'true,false' }}"
                                 data-log-status="{{ sub.last_status }}"
