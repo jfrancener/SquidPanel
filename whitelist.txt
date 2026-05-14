@@ -6,6 +6,7 @@
 .cdnfonts.com
 .censupeg.com.br
 .censupegead.com.br
+.cesumar.br
 .cqloud.com
 .curatoriaeditora.com.br
 .dicio.com.br
