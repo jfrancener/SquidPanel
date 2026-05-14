@@ -354,6 +354,7 @@
 .msauth.net
 .msftauth.net
 .msftncsi.com
+.msn.com
 .musicopolis.com.br
 .mxptint.net
 .mychannels.video
