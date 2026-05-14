@@ -246,6 +246,7 @@
 .geolocation-db.com
 .getscreen.me
 .gettyimages.com
+.gettyimages.com.br
 .gibiru.com
 .gladly.com
 .globo.com
