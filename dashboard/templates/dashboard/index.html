@@ -288,11 +288,14 @@
                 <input type="text" id="new-blacklist-domain" placeholder="Ex: google.com" class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-red-500 focus:border-red-500 block p-2">
                 <button onclick="addNewDomain('block')" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-semibold transition-all">Adicionar</button>
             </div>
+            <div class="mb-4 relative">
+                <input type="text" onkeyup="filterModalList('blacklist-ul', this.value)" placeholder="🔍 Buscar na lista..." class="w-full bg-slate-900/50 border border-slate-700 text-slate-300 text-xs rounded-lg p-2 pl-8 focus:ring-indigo-500">
+            </div>
             <div class="overflow-y-auto flex-1 pr-2">
-                <ul class="divide-y divide-slate-700/50">
+                <ul class="divide-y divide-slate-700/50" id="blacklist-ul">
                     {% for domain in full_blacklist %}
                     <li class="py-2 text-sm text-slate-300 font-mono flex justify-between items-center group">
-                        {{ domain }}
+                        <span class="domain-text">{{ domain }}</span>
                         <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                             <button onclick="editDomain('{{ domain }}', 'block')" class="text-sky-400 hover:text-sky-300"><i class="fa-solid fa-pen-to-square"></i></button>
                             <button onclick="removeDomain('{{ domain }}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
@@ -316,11 +319,14 @@
                 <input type="text" id="new-whitelist-domain" placeholder="Ex: site-confiavel.com" class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2">
                 <button onclick="addNewDomain('allow')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-semibold transition-all">Adicionar</button>
             </div>
+            <div class="mb-4 relative">
+                <input type="text" onkeyup="filterModalList('whitelist-ul', this.value)" placeholder="🔍 Buscar na lista..." class="w-full bg-slate-900/50 border border-slate-700 text-slate-300 text-xs rounded-lg p-2 pl-8 focus:ring-emerald-500">
+            </div>
             <div class="overflow-y-auto flex-1 pr-2">
-                <ul class="divide-y divide-slate-700/50">
+                <ul class="divide-y divide-slate-700/50" id="whitelist-ul">
                     {% for domain in full_whitelist %}
                     <li class="py-2 text-sm text-slate-300 font-mono flex justify-between items-center group">
-                        {{ domain }}
+                        <span class="domain-text">{{ domain }}</span>
                         <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                             <button onclick="editDomain('{{ domain }}', 'allow')" class="text-sky-400 hover:text-sky-300"><i class="fa-solid fa-pen-to-square"></i></button>
                             <button onclick="removeDomain('{{ domain }}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
@@ -344,6 +350,24 @@
     </div>
 
     <script>
+        function filterModalList(ulId, query) {
+            const ul = document.getElementById(ulId);
+            const li = ul.getElementsByTagName('li');
+            const lowerQuery = query.toLowerCase();
+
+            for (let i = 0; i < li.length; i++) {
+                const domainSpan = li[i].querySelector('.domain-text');
+                if (domainSpan) {
+                    const textValue = domainSpan.textContent || domainSpan.innerText;
+                    if (textValue.toLowerCase().indexOf(lowerQuery) > -1) {
+                        li[i].style.display = "";
+                    } else {
+                        li[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
         function changeLogFile(filename) {
             const url = new URL(window.location.href);
             url.searchParams.set('log_file', filename);
