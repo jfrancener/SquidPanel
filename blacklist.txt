@@ -251,6 +251,7 @@
 .go-mpulse.net
 .go.com
 .godaddy.com
+.google.com
 .google.com.br
 .googleblog.com
 .googlevideo.com
