@@ -93,12 +93,18 @@
         <!-- Domains Table -->
         <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
             <div class="p-6 border-b border-slate-700 flex flex-col gap-4">
-                <div class="flex justify-between items-center">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <h2 class="text-xl font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-list-ul text-indigo-400"></i> Logs Agrupados
                     </h2>
-                    <div class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                        Baseado no arquivo completo ({{ total_logs }} registros)
+                    <div class="flex items-center gap-4 w-full md:w-auto">
+                        <div class="relative w-full md:w-64">
+                            <input type="text" id="tableSearch" onkeyup="applyFilter()" placeholder="Buscar domínio..." class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 pl-9">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-sm"></i>
+                        </div>
+                        <div class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 whitespace-nowrap">
+                            Based on {{ total_logs }} records
+                        </div>
                     </div>
                 </div>
                 
@@ -548,6 +554,7 @@
         
         function applyFilter() {
             const filterValue = document.getElementById('domainFilter').value;
+            const searchQuery = document.getElementById('tableSearch').value.toLowerCase().trim();
             
             // Persist the filter selection
             sessionStorage.setItem('domainFilterState', filterValue);
@@ -555,14 +562,30 @@
             const expandedGroups = JSON.parse(sessionStorage.getItem('expandedGroups') || '[]');
             const rows = document.querySelectorAll('.domain-row');
             
+            // First pass: identify which groups have matching subdomains
+            const matchingGroups = new Set();
+            if (searchQuery) {
+                rows.forEach(row => {
+                    const domain = row.getAttribute('data-domain').toLowerCase();
+                    const parentGroup = row.getAttribute('data-parent-group');
+                    if (domain.includes(searchQuery)) {
+                        if (parentGroup) matchingGroups.add(parentGroup);
+                        else matchingGroups.add(row.getAttribute('data-domain'));
+                    }
+                });
+            }
+
             rows.forEach(row => {
+                const domain = row.getAttribute('data-domain').toLowerCase();
                 const isHidden = row.getAttribute('data-hidden') === 'true';
                 const isVerified = row.getAttribute('data-verified') === 'true';
                 const logStatus = row.getAttribute('data-log-status');
                 const parentGroup = row.getAttribute('data-parent-group');
+                const isRoot = !parentGroup;
                 
                 let show = false;
                 
+                // Status filtering
                 if (filterValue === 'all') {
                     show = !isHidden;
                 } else if (filterValue === 'blocked') {
@@ -575,9 +598,20 @@
                     show = isHidden;
                 }
                 
-                // Se é um subdomínio, ele só pode aparecer se o grupo pai dele estiver expandido!
+                // Search filtering
+                if (show && searchQuery) {
+                    const matchesSearch = domain.includes(searchQuery) || matchingGroups.has(domain);
+                    if (!matchesSearch) show = false;
+                }
+                
+                // Expansion filtering (for subdomains)
                 if (show && parentGroup && !expandedGroups.includes(parentGroup)) {
-                    show = false;
+                    // Only hide if it's not a direct search match that should be forced visible? 
+                    // No, let's keep it consistent: subdomains only show if parent expanded OR if they match search?
+                    // Actually, if they match search, we should probably expand the parent automatically.
+                    if (!searchQuery || !domain.includes(searchQuery)) {
+                        show = false;
+                    }
                 }
                 
                 if (show) {
