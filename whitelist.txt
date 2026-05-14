@@ -24,6 +24,7 @@
 .jquery.com
 .khanacademy.org
 .languagetool.org
+.microsoft.microsoftofficehub
 .minhabiblioteca.com.br
 .mplitude.com
 .portalava.com.br

@@ -117,6 +117,7 @@
 .cdnpk.net
 .cdnwidget.com
 .ceenaija.com
+.chaos.com
 .chat.ai
 .chat.com.br
 .chatgpt.com
@@ -192,6 +193,7 @@
 .doubleverify.com
 .douyinstatic.com
 .drcalc.net
+.dreamstime.com
 .ds-cdn.com
 .duckduckgo.com
 .dynatrace.com
@@ -242,6 +244,7 @@
 .geek.com
 .geolocation-db.com
 .getscreen.me
+.gettyimages.com
 .gibiru.com
 .gladly.com
 .globo.com
@@ -262,10 +265,12 @@
 .hotmail.com
 .hqbabes.net
 .hsbc.com.br
+.hsprotect.net
 .html-load.com
 .hubspotusercontent30.net
 .hugedomains.com
 .hulkapps.com
+.hyros.com
 .icloud.com
 .iconify.design
 .imgix.net
@@ -345,6 +350,8 @@
 .moloco.com
 .monetixads.com
 .mookie1.com
+.msauth.net
+.msftauth.net
 .msftncsi.com
 .musicopolis.com.br
 .mxptint.net
@@ -401,10 +408,13 @@
 .pingdom.net
 .pinimg.com
 .pinterest.com
+.pixabay.com
 .pixad.com.tr
 .playhubconnect.com
 .playvideos.com
 .plu.mx
+.pluto.tv
+.plutotv.net
 .pm-serv.co
 .pornhub.com
 .portalinsights.com.br
@@ -433,6 +443,7 @@
 .reddit.com
 .redditstatic.com
 .redfast.com
+.redraw.pro
 .reportingly.com
 .resetdigital.co
 .responservbzh.icu
@@ -473,6 +484,8 @@
 .shinystat.com
 .shop.app
 .shopconvert.com.br
+.shopee.com.br
+.shopeemobile.com
 .shopify.com
 .shopifysvc.com
 .show-sb.com
@@ -623,6 +636,7 @@
 .yimg.com
 .yippiweb.com
 .you.com
+.youboranqs01.com
 .youtu.be
 .youtube-nocookie.com
 .youtube.com
