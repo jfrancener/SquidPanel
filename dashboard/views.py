@@ -20,8 +20,9 @@ def get_squid_logs():
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(hostname, username=username, password=password, timeout=5)
         
-        stdin, stdout, stderr = client.exec_command('cat /var/squid/logs/access.log')
-        logs = stdout.read().decode('utf-8').splitlines()
+        # Lê o log atual e os rotacionados (até 7 dias)
+        stdin, stdout, stderr = client.exec_command('cat /var/squid/logs/access.log /var/squid/logs/access.log.[0-6] 2>/dev/null')
+        logs = stdout.read().decode('utf-8', errors='ignore').splitlines()
         client.close()
         return logs
     except Exception as e:
