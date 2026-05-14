@@ -31,6 +31,7 @@
 .ads-twitter.com
 .adskeeper.com
 .adtech.ink
+.adtelligent.com
 .advertising.com
 .advocaciarainov.com.br
 .adyen.com
@@ -39,6 +40,7 @@
 .agkn.com
 .ahrefs.com
 .ai-pro.org
+.ajleiloes.com.br
 .akamaihd.net
 .akamaized.net
 .alibaba.com
@@ -226,6 +228,7 @@
 .footprintdns.com
 .fortune.com
 .framerusercontent.com
+.freitasleiloeiro.com.br
 .freshworks.com
 .ftcdn.net
 .ftech.srv.br
@@ -238,6 +241,7 @@
 .gameswaka.com
 .gandi.net
 .geek.com
+.geolocation-db.com
 .getscreen.me
 .gibiru.com
 .gladly.com
@@ -299,6 +303,7 @@
 .lifesonics.com
 .lifetechadviser.com
 .liftdsp.com
+.liggavc.com.br
 .lijit.com
 .linkedin.com
 .linximpulse.net
@@ -372,6 +377,7 @@
 .onenote.net
 .openai.com
 .openstreetmap.org
+.openwebmp.com
 .openxcdn.net
 .opera.com
 .opta.net
@@ -422,6 +428,7 @@
 .r7.com
 .rapidnet.de
 .rbstsystems.live
+.rdstation.com.br
 .readspeaker.com
 .recaptcha.net
 .reddit.com
@@ -450,6 +457,7 @@
 .santander.com.br
 .sascdn.com
 .sc-static.net
+.scdn.co
 .scienceopen.com
 .scite.ai
 .scorecardresearch.com
@@ -485,12 +493,18 @@
 .snap.com
 .snapchat.com
 .soclminer.com.br
+.sodresantoro.com.br
 .softonic.com.br
 .sogou.com
 .sonobi.com
 .soundcloud.com
 .sourshaped.com
+.sparteo.com
 .sportradarserving.com
+.spot.im
+.spotify.com
+.spotifycdn.com
+.spotim.market
 .spotxchange.com
 .springserve.com
 .sscdn.co
@@ -502,6 +516,7 @@
 .stripe.com
 .stripe.network
 .stripschat.com
+.suamusica.com.br
 .substackcdn.com
 .sundaysky.com
 .superdownloads.com.br
@@ -572,6 +587,7 @@
 .vistarsagency.com
 .visualwebsiteoptimizer.com
 .vital.ai
+.vitrinebradesco.com.br
 .vk.com
 .vkuser.net
 .vlog.br
