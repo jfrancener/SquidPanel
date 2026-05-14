@@ -87,13 +87,11 @@
 .bing.net
 .blismedia.com
 .bolavip.com
-.bootstrapcdn.com
 .bounceexchange.com
 .bouncex.net
 .bqstreamer.com
 .bradesco.com.br
 .bradescopessoajuridica.com.br
-.brainly.com.br
 .brainlyads.com
 .brand-display.com
 .brave.com
@@ -250,10 +248,8 @@
 .google.com.br
 .googleblog.com
 .googlevideo.com
-.graphisoft.com
 .gravatar.com
 .grok.com
-.grupoa.education
 .gtranslate.net
 .gumgum.com
 .gvt3.com
@@ -285,13 +281,11 @@
 .jjbatidos.com.br
 .jota.info
 .jovempan.com.br
-.jquery.com
 .jus.br
 .k2ponto.com.br
 .kadaza.com.br
 .kargo.com
 .kettledroopingcontinuation.com
-.khanacademy.org
 .klaviyo.com
 .krushmedia.com
 .krxd.net
@@ -456,7 +450,6 @@
 .santander.com.br
 .sascdn.com
 .sc-static.net
-.scielo.br
 .scienceopen.com
 .scite.ai
 .scorecardresearch.com
@@ -479,7 +472,6 @@
 .shutterstock.com
 .simplesvg.com
 .simpli.fi
-.sinonimos.com.br
 .sistema.gov.br
 .site-config.com
 .site.com
@@ -493,7 +485,6 @@
 .snap.com
 .snapchat.com
 .soclminer.com.br
-.socratic.org
 .softonic.com.br
 .sogou.com
 .sonobi.com
@@ -508,14 +499,12 @@
 .stashbunny.com
 .static.microsoft
 .stickyadstv.com
-.stoodi.com.br
 .stripe.com
 .stripe.network
 .stripschat.com
 .substackcdn.com
 .sundaysky.com
 .superdownloads.com.br
-.superprof.com.br
 .survicate.com
 .swisscows.com
 .syncingbridge.com
@@ -554,7 +543,6 @@
 .tsdtocl.com
 .turn.com
 .tutanota.com
-.tutormundi.com
 .twimg.com
 .twitch.tv
 .twitter.com
@@ -565,8 +553,6 @@
 .unimealplan.com
 .unirioja.es
 .unisvg.com
-.universoead.com.br
-.unpkg.com
 .unrulymedia.com
 .uol.com.br
 .uptodown.com
@@ -594,7 +580,6 @@
 .voipzoom.com
 .voltaxam.com
 .vsveiculos.com
-.w3schools.com
 .w55c.net
 .webmotors.com.br
 .website-files.com
@@ -606,7 +591,6 @@
 .windows.net
 .wired.com
 .wm1.com.br
-.wolframalpha.com
 .wondershare.com
 .wordpress.com
 .workdeadlinededicate.com
