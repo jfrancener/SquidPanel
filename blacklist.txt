@@ -70,6 +70,7 @@
 .avo.app
 .awswaf.com
 .azioncdn.net
+.azure.com
 .azureedge.net
 .b-cdn.net
 .baidu.com
@@ -88,6 +89,7 @@
 .bilivideo.com
 .bing.com
 .bing.net
+.bjcathay.com
 .blismedia.com
 .bolavip.com
 .bounceexchange.com
@@ -97,6 +99,7 @@
 .bradescopessoajuridica.com.br
 .brainlyads.com
 .brand-display.com
+.brandmetrics.com
 .brave.com
 .btloader.com
 .bttrack.com
@@ -111,9 +114,12 @@
 .casalemedia.com
 .cashroadster.com
 .ccgateway.net
+.cctv.com
+.cctvpic.com
 .cdn-apple.com
 .cdn-cookieyes.com
 .cdn-fileserver.com
+.cdn20.com
 .cdnbasket.net
 .cdnpk.net
 .cdnwidget.com
@@ -144,6 +150,7 @@
 .cnevids.com
 .cnnbrasil.com.br
 .cnpq.br
+.cntv.cn
 .cognitivlabs.com
 .colossusssp.com
 .company-target.com
@@ -243,6 +250,7 @@
 .gameswaka.com
 .gandi.net
 .geek.com
+.geoedge.be
 .geolocation-db.com
 .getscreen.me
 .gettyimages.com
@@ -369,6 +377,8 @@
 .newsroom.bi
 .nextmillmedia.com
 .nsctotal.com.br
+.nyt.com
+.nytimes.com
 .ocmhood.com
 .ocmtag.com
 .ocmthood.com
@@ -434,6 +444,7 @@
 .protrafficinspector.com
 .pub.network
 .px-cloud.net
+.qcloud.com
 .qualtrics.com
 .questionpro.com
 .quora.com
@@ -591,6 +602,7 @@
 .useinsider.com
 .uservoice.com
 .userway.org
+.vagalume.com
 .vagalume.com.br
 .vanlett.com
 .vecteezy.com

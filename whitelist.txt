@@ -20,6 +20,7 @@
 .fe3cr.delivery.mp.microsoft.com
 .ftech.srv.br
 .graphisoft.com
+.grupoa.com.br
 .grupoa.education
 .jquery.com
 .khanacademy.org
