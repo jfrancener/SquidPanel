@@ -92,6 +92,7 @@
 .bjcathay.com
 .blismedia.com
 .bolavip.com
+.booking.com
 .bounceexchange.com
 .bouncex.net
 .bqstreamer.com
@@ -101,6 +102,7 @@
 .brand-display.com
 .brandmetrics.com
 .brave.com
+.bstatic.com
 .btloader.com
 .bttrack.com
 .bydata.com
@@ -135,6 +137,7 @@
 .chegg.com
 .chob88888.com
 .ck-ie.com
+.claud.com
 .claude.ai
 .cleantalk.org
 .cleverwebserver.com
@@ -182,6 +185,7 @@
 .dd133.com
 .deepai.org
 .deepintent.com
+.deepseek.com
 .deliverimp.com
 .delivrdsp.ai
 .demandbase.com
@@ -232,6 +236,7 @@
 .fbcdn.net
 .fedoq.com
 .flashscore.com
+.flickr.com
 .flippingbook.com
 .folksfaucetmuscle.com
 .fontawesome.com
@@ -256,6 +261,7 @@
 .gettyimages.com
 .gettyimages.com.br
 .gibiru.com
+.githubassets.com
 .gladly.com
 .globo.com
 .go-mpulse.net
@@ -272,12 +278,16 @@
 .gvt3.com
 .hadronid.net
 .hdslb.com
+.hkg-gc-staging.agoda.local
 .hostinger.com
 .hotmail.com
 .hqbabes.net
 .hsbc.com.br
+.hscollectedforms.net
+.hsforms.com
 .hsprotect.net
 .html-load.com
+.hubspot.com
 .hubspotusercontent30.net
 .hugedomains.com
 .hulkapps.com
@@ -298,6 +308,7 @@
 .istockphoto.com
 .itau.com.br
 .jjbatidos.com.br
+.jogos.com
 .jota.info
 .jovempan.com.br
 .jus.br
@@ -341,7 +352,10 @@
 .meli.com
 .mercadoclics.com
 .mercadolibre.com
+.mercadolivre.com
 .mercadolivre.com.br
+.merchant-center-analytics.goog
+.metal.com
 .metropeloes.com.br
 .meutimao.com.br
 .mfadsrvr.com
@@ -371,7 +385,10 @@
 .mygaru.com
 .napista.com.br
 .naver.com
+.nbcnews.com
+.nbcuni.com
 .netflix.com
+.netshoes.com.br
 .newmarkhotels.com
 .newsbreak.com
 .newsroom.bi
@@ -418,6 +435,7 @@
 .perplexity.ai
 .pexels.com
 .phncdn.com
+.photofolio.com
 .picdn.net
 .pingdom.net
 .pinimg.com
@@ -425,6 +443,7 @@
 .pixabay.com
 .pixad.com.tr
 .playhubconnect.com
+.playstation.com
 .playvideos.com
 .plu.mx
 .pluto.tv
@@ -474,6 +493,7 @@
 .rtmark.net
 .ru
 .run.app
+.s-nbcnews.com
 .s-onetag.com
 .sail-personalize.com
 .salesforce-scrt.com
@@ -505,6 +525,7 @@
 .shopifysvc.com
 .show-sb.com
 .shutterstock.com
+.silverchair-cdn.com
 .simplesvg.com
 .simpli.fi
 .sistema.gov.br
@@ -539,6 +560,7 @@
 .startpage.com
 .stashbunny.com
 .static.microsoft
+.staticflickr.com
 .stickyadstv.com
 .stripe.com
 .stripe.network
@@ -595,6 +617,7 @@
 .unimealplan.com
 .unirioja.es
 .unisvg.com
+.unrealengine.com
 .unrulymedia.com
 .uol.com.br
 .uptodown.com
