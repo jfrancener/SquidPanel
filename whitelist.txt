@@ -1,4 +1,5 @@
 .academia.edu
+.academicum.com.br
 .accountcontabilidade.com.br
 .adservice.google.com
 .bootstrapcdn.com

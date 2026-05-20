@@ -136,6 +136,7 @@
 .chatx.ai
 .chegg.com
 .chob88888.com
+.cifraclub.com.br
 .ck-ie.com
 .claud.com
 .claude.ai
@@ -219,6 +220,7 @@
 .envatousercontent.com
 .equalweb.com
 .eskimi.com
+.espn.com
 .estadao.com.br
 .eu-1-id5-sync.com
 .euronews.com
@@ -255,6 +257,9 @@
 .gameswaka.com
 .gandi.net
 .geek.com
+.gemini.com
+.geminichatgpt.com
+.geminigoogle.com
 .geoedge.be
 .geolocation-db.com
 .getscreen.me
@@ -270,6 +275,8 @@
 .google.com
 .google.com.br
 .googleblog.com
+.googlegemini.com
+.googlegeminiai.com
 .googlevideo.com
 .gravatar.com
 .grok.com
@@ -292,6 +299,7 @@
 .hugedomains.com
 .hulkapps.com
 .hyros.com
+.iagemini.com
 .icloud.com
 .iconify.design
 .imgix.net
@@ -334,6 +342,7 @@
 .linkedin.com
 .linximpulse.net
 .liquidplatform.com
+.livechatinc.com
 .locaweb.com.br
 .loopme.me
 .loopnet.com
@@ -481,6 +490,7 @@
 .reportingly.com
 .resetdigital.co
 .responservbzh.icu
+.reuters.com
 .revcontent.com
 .rfihub.com
 .rkdms.com
@@ -589,6 +599,7 @@
 .tips-and-tricks.co
 .todaysnyc.com
 .tomorrowland.com
+.torrossa.com
 .tq-tungsten.com
 .trafficguard.ai
 .travelaudience.com
@@ -653,6 +664,7 @@
 .whatsapp.net
 .wikimedia.org
 .wikipedia.org
+.wiley.com
 .windows.com
 .windows.net
 .wired.com
@@ -666,6 +678,7 @@
 .www.gov.br
 .x.com
 .xfreehub.com
+.yandex.by
 .yandex.com
 .yandex.net
 .yantex.com
