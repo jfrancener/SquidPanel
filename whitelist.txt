@@ -29,6 +29,7 @@
 .minhabiblioteca.com.br
 .mplitude.com
 .portalava.com.br
+.rnp.br
 .sb-ssl.google.com
 .scholar.google.com.br
 .scielo.br
