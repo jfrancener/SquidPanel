@@ -26,6 +26,7 @@
 .admatic.de
 .adobecc.com
 .adobedc.net
+.adobedtm.com
 .adroll.com
 .adrta.com
 .ads-twitter.com
@@ -39,6 +40,7 @@
 .agkn.com
 .ahrefs.com
 .ai-pro.org
+.aichat.org
 .ajleiloes.com.br
 .akamaihd.net
 .akamaized.net
@@ -48,6 +50,7 @@
 .amazon.com
 .amazon.com.br
 .amazon.dev
+.amplitude.com
 .ampproject.org
 .amx1.net
 .an.com.br
@@ -56,6 +59,7 @@
 .aol.com
 .api-taboola.com
 .appier.net
+.apple.com
 .applovin.com
 .appsflyer.com
 .archive.org
@@ -86,6 +90,7 @@
 .bilibili.com
 .biliimg.com
 .bilivideo.com
+.bing.com
 .bing.net
 .bjcathay.com
 .blismedia.com
@@ -127,8 +132,10 @@
 .chaos.com
 .chat.ai
 .chat.com.br
+.chatbase.co
 .chatgpt.com
 .chatgptbrasil.com.br
+.chattide.ai
 .chatwithai.app
 .chatwoot.com
 .chatx.ai
@@ -251,7 +258,6 @@
 .fwmrm.net
 .fwpixel.com
 .fwpub1.com
-.g.live.com
 .gameswaka.com
 .gandi.net
 .geek.com
@@ -325,6 +331,7 @@
 .krushmedia.com
 .krxd.net
 .kueezrtb.com
+.kurupira.net
 .kwai.com
 .lenovomm.com
 .letras.mus.br
@@ -339,6 +346,7 @@
 .linkedin.com
 .linximpulse.net
 .liquidplatform.com
+.live.com
 .livechatinc.com
 .locaweb.com.br
 .loopme.me
@@ -369,6 +377,7 @@
 .mgid.com
 .microsoft.net
 .microsoft365.com
+.microsoftonline.com
 .migalhas.com.br
 .minutemedia-prebid.com
 .minutemediaservices.com
@@ -405,7 +414,6 @@
 .ocmtag.com
 .ocmthood.com
 .octadesk.services
-.odc.officeapps.live.com
 .odysee.com
 .office.com
 .office.net
@@ -461,6 +469,7 @@
 .presearch.com
 .primevideo.com
 .primis.tech
+.privacytools.com.br
 .profitorapi.com
 .promptwatch.com
 .proquest.com
@@ -516,6 +525,7 @@
 .search-domainparking.com
 .search.com
 .search.yahoo.co.jp
+.securebrowser.com
 .secureserver.net
 .semasio.net
 .servenobid.com
@@ -605,6 +615,7 @@
 .trendmd.com
 .tribalfusion.com
 .trinitymedia.ai
+.trom.tf
 .trustedstack.com
 .trustpilot.com
 .trustpilot.net
