@@ -9,5 +9,6 @@ services:
       - "1080:8080"
     volumes:
       - ./data:/app/data
+      - /root/.ssh:/root/.ssh:ro
     environment:
       - DEBUG=True
