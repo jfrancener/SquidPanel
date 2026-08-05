@@ -2,6 +2,7 @@
 .academicum.com.br
 .accountcontabilidade.com.br
 .adservice.google.com
+.aedeiveleonardo.org
 .bootstrapcdn.com
 .brainly.com.br
 .bvirtual.com.br

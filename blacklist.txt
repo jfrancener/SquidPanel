@@ -35,7 +35,6 @@
 .advertising.com
 .advocaciarainov.com.br
 .adyen.com
-.aedeiveleonardo.org
 .afternic.com
 .agkn.com
 .ahrefs.com
@@ -87,7 +86,6 @@
 .bilibili.com
 .biliimg.com
 .bilivideo.com
-.bing.com
 .bing.net
 .bjcathay.com
 .blismedia.com
@@ -272,7 +270,6 @@
 .go-mpulse.net
 .go.com
 .godaddy.com
-.google.com
 .google.com.br
 .googleblog.com
 .googlegemini.com
@@ -387,7 +384,6 @@
 .msauth.net
 .msftauth.net
 .msftncsi.com
-.msn.com
 .musicopolis.com.br
 .mxptint.net
 .mychannels.video
@@ -544,6 +540,7 @@
 .skimresources.com
 .skinnycrawlinglax.com
 .skynetoapi.com
+.skype.com
 .smaato.net
 .smartlify.com
 .smilewanted.com
