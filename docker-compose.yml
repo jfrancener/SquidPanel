@@ -8,6 +8,6 @@ services:
     ports:
       - "1080:8080"
     volumes:
-      - ./db.sqlite3:/app/db.sqlite3
+      - ./data:/app/data
     environment:
       - DEBUG=True
