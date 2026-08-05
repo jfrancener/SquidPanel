@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    container_name: squid-dashboard
+    restart: always
+    ports:
+      - "1080:8080"
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+    environment:
+      - DEBUG=True
