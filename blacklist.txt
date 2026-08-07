@@ -301,6 +301,7 @@
 .googlegeminiai.com
 .googlesyndication.com
 .googletagservices.com
+.googleusercontent.com
 .googlevideo.com
 .gravatar.com
 .grok.com
@@ -417,6 +418,7 @@
 .monetixads.com
 .mookie1.com
 .mozilla.com
+.mozilla.net
 .mozilla.org
 .msauth.net
 .msftauth.net
@@ -711,6 +713,7 @@
 .vigo.tech
 .vimeo.com
 .viralize.tv
+.virtualearth.net
 .vistarsagency.com
 .visualwebsiteoptimizer.com
 .vital.ai
