@@ -24,6 +24,7 @@
 .admanmedia.com
 .admaster.cc
 .admatic.de
+.adnxs.com
 .adobecc.com
 .adobedc.net
 .adobedtm.com
@@ -152,7 +153,9 @@
 .clipcentric.com
 .clmbtech.com
 .clnmde.com
+.close.fans
 .cloud.microsoft
+.cloudflareinsights.com
 .cloudnexcore.com.br
 .clubeadulto.net
 .clvrads.com
@@ -169,6 +172,7 @@
 .confiant-integrations.net
 .conmebol.com
 .connatix.com
+.consentframework.com
 .contextweb.com
 .convertexperiments.com
 .cookie-script.com
@@ -177,6 +181,7 @@
 .cookieyes.com
 .cootlogix.com
 .crazyegg.com
+.criteo.com
 .criteo.net
 .crunchyroll.com
 .crwdcntrl.net
@@ -186,12 +191,14 @@
 .cvaultx.com
 .dailymotion.com
 .darada.co
+.datacentro.me
 .datadoghq-browser-agent.com
 .dataprev.gov.br
 .dd133.com
 .deepai.org
 .deepintent.com
 .deepseek.com
+.deezer.com
 .deliverimp.com
 .delivrdsp.ai
 .demandbase.com
@@ -250,6 +257,7 @@
 .footprintdns.com
 .fortune.com
 .framerusercontent.com
+.freemusicas.com
 .freitasleiloeiro.com.br
 .freshworks.com
 .ftcdn.net
@@ -280,6 +288,7 @@
 .googleblog.com
 .googlegemini.com
 .googlegeminiai.com
+.googlesyndication.com
 .googlevideo.com
 .gravatar.com
 .grok.com
@@ -323,6 +332,7 @@
 .jota.info
 .jovempan.com.br
 .jus.br
+.jusbr.com
 .k2ponto.com.br
 .kadaza.com.br
 .kargo.com
@@ -404,6 +414,7 @@
 .netflix.com
 .netshoes.com.br
 .newmarkhotels.com
+.newrelic.com
 .newsbreak.com
 .newsroom.bi
 .nextmillmedia.com
@@ -478,6 +489,7 @@
 .pub.network
 .px-cloud.net
 .qcloud.com
+.qhupdate.com
 .qualtrics.com
 .questionpro.com
 .quora.com
@@ -506,6 +518,7 @@
 .rtbwise.com
 .rtmark.net
 .ru
+.rubiconproject.com
 .run.app
 .s-nbcnews.com
 .s-onetag.com
@@ -522,14 +535,17 @@
 .scorecardresearch.com
 .scribd.com
 .scribdassets.com
+.sddan.com
 .search-domainparking.com
 .search.com
 .search.yahoo.co.jp
 .securebrowser.com
 .secureserver.net
+.segmentapis.com
 .semasio.net
 .servenobid.com
 .servicesadmedia.com
+.sharethrough.com
 .shb-sync.com
 .shinystat.com
 .shop.app
@@ -552,10 +568,12 @@
 .skynetoapi.com
 .skype.com
 .smaato.net
+.smartadserver.com
 .smartlify.com
 .smilewanted.com
 .snap.com
 .snapchat.com
+.so.com
 .soclminer.com.br
 .sodresantoro.com.br
 .softonic.com.br
@@ -571,6 +589,8 @@
 .spotim.market
 .spotxchange.com
 .springserve.com
+.srmdata.com
+.srvif.com
 .sscdn.co
 .stackadapt.com
 .startpage.com
@@ -605,6 +625,7 @@
 .tiktok.com
 .tips-and-tricks.co
 .todaysnyc.com
+.tokyvideo.com
 .tomorrowland.com
 .torrossa.com
 .tq-tungsten.com
@@ -666,6 +687,7 @@
 .voltaxam.com
 .vsveiculos.com
 .w55c.net
+.webcindario.com
 .webmotors.com.br
 .website-files.com
 .whatsapp.com
@@ -686,6 +708,7 @@
 .www.gov.br
 .x.com
 .xfreehub.com
+.yahoo.com
 .yandex.by
 .yandex.com
 .yandex.net
