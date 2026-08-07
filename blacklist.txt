@@ -25,6 +25,7 @@
 .admaster.cc
 .admatic.de
 .adnxs.com
+.adnxs.net
 .adobecc.com
 .adobedc.net
 .adobedtm.com
@@ -32,6 +33,7 @@
 .adrta.com
 .ads-twitter.com
 .adskeeper.com
+.adsrvr.org
 .adtech.ink
 .adtelligent.com
 .advertising.com
@@ -48,6 +50,7 @@
 .alibaba.com
 .alpixtrack.com
 .altmetric.com
+.amagi.tv
 .amazon.com
 .amazon.com.br
 .amazon.dev
@@ -97,6 +100,7 @@
 .blismedia.com
 .bolavip.com
 .booking.com
+.botnation.ai
 .bounceexchange.com
 .bouncex.net
 .bqstreamer.com
@@ -106,6 +110,7 @@
 .brand-display.com
 .brandmetrics.com
 .brave.com
+.braze.com
 .bstatic.com
 .btloader.com
 .bttrack.com
@@ -119,6 +124,7 @@
 .carsandyachts.com
 .casalemedia.com
 .cashroadster.com
+.casteldigital.com.br
 .ccgateway.net
 .cctv.com
 .cctvpic.com
@@ -140,6 +146,7 @@
 .chatwithai.app
 .chatwoot.com
 .chatx.ai
+.chavesnamao.com.br
 .chegg.com
 .chob88888.com
 .cifraclub.com.br
@@ -180,6 +187,7 @@
 .cookielaw.org
 .cookieyes.com
 .cootlogix.com
+.copart.com.br
 .crazyegg.com
 .criteo.com
 .criteo.net
@@ -289,6 +297,7 @@
 .googlegemini.com
 .googlegeminiai.com
 .googlesyndication.com
+.googletagservices.com
 .googlevideo.com
 .gravatar.com
 .grok.com
@@ -297,6 +306,7 @@
 .gvt3.com
 .hadronid.net
 .hdslb.com
+.hiperselect.com.br
 .hkg-gc-staging.agoda.local
 .hostinger.com
 .hotmail.com
@@ -333,6 +343,7 @@
 .jovempan.com.br
 .jus.br
 .jusbr.com
+.jusbrasil.com.br
 .k2ponto.com.br
 .kadaza.com.br
 .kargo.com
@@ -343,6 +354,7 @@
 .kueezrtb.com
 .kurupira.net
 .kwai.com
+.leilo.com.br
 .lenovomm.com
 .letras.mus.br
 .liadm.com
@@ -392,6 +404,7 @@
 .minutemedia-prebid.com
 .minutemediaservices.com
 .missventro.info
+.mixcloud.com
 .mktoresp.com
 .ml314.com
 .mlstatic.com
@@ -400,14 +413,19 @@
 .moloco.com
 .monetixads.com
 .mookie1.com
+.mozilla.com
+.mozilla.org
 .msauth.net
 .msftauth.net
 .msftncsi.com
+.msftstatic.com
+.mundodasmensagens.com
 .musicopolis.com.br
 .mxptint.net
 .mychannels.video
 .mygaru.com
 .napista.com.br
+.nation.fr
 .naver.com
 .nbcnews.com
 .nbcuni.com
@@ -436,19 +454,23 @@
 .on.aws
 .onaudience.com
 .onenote.net
+.onetag-sys.com
 .openai.com
 .openstreetmap.org
 .openwebmp.com
 .openxcdn.net
 .opera.com
 .opta.net
+.opti-digital.com
 .optimise.net
 .optimizely.com
 .org.br
+.osuper.com.br
 .oursehero.com
 .outbrain.com
 .outbrainimg.com
 .outlook.com
+.ouvir-musica.com
 .p7cloud.net
 .palcomp3.com.br
 .parastorage.com
@@ -476,10 +498,12 @@
 .pornhub.com
 .portalinsights.com.br
 .postrelease.com
+.potelo.com.br
 .preferencenail.com
 .presearch.com
 .primevideo.com
 .primis.tech
+.principeimoveisjoinville.com.br
 .privacytools.com.br
 .profitorapi.com
 .promptwatch.com
@@ -487,10 +511,13 @@
 .protonmail.com
 .protrafficinspector.com
 .pub.network
+.pubmatic.com
 .px-cloud.net
 .qcloud.com
+.qhres2.com
 .qhupdate.com
 .qualtrics.com
+.quantserve.com
 .questionpro.com
 .quora.com
 .qwant.com
@@ -504,6 +531,7 @@
 .redditstatic.com
 .redfast.com
 .redraw.pro
+.refinery89.com
 .reportingly.com
 .resetdigital.co
 .responservbzh.icu
@@ -535,18 +563,22 @@
 .scorecardresearch.com
 .scribd.com
 .scribdassets.com
+.sctd.com.br
+.sd-rtn.com
 .sddan.com
 .search-domainparking.com
 .search.com
 .search.yahoo.co.jp
 .securebrowser.com
 .secureserver.net
+.segment.com
 .segmentapis.com
 .semasio.net
 .servenobid.com
 .servicesadmedia.com
 .sharethrough.com
 .shb-sync.com
+.shein.com
 .shinystat.com
 .shop.app
 .shopconvert.com.br
@@ -612,6 +644,7 @@
 .t.co
 .taboola-display.com
 .taboola.com
+.tacdn.com
 .talkai.info
 .tapad.com
 .teads.tv
@@ -636,6 +669,7 @@
 .trendmd.com
 .tribalfusion.com
 .trinitymedia.ai
+.tripadvisor.com
 .trom.tf
 .trustedstack.com
 .trustpilot.com
@@ -685,6 +719,7 @@
 .voipwise.com
 .voipzoom.com
 .voltaxam.com
+.voxtvhd.com.br
 .vsveiculos.com
 .w55c.net
 .webcindario.com
@@ -699,6 +734,7 @@
 .windows.net
 .wired.com
 .wm1.com.br
+.wonderpush.com
 .wondershare.com
 .wordpress.com
 .workdeadlinededicate.com
