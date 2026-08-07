@@ -188,6 +188,7 @@
 .cookieyes.com
 .cootlogix.com
 .copart.com.br
+.copilot.microsoft.com
 .crazyegg.com
 .criteo.com
 .criteo.net
@@ -291,7 +292,9 @@
 .globo.com
 .go-mpulse.net
 .go.com
+.go.microsoft.com
 .godaddy.com
+.google.com
 .google.com.br
 .googleblog.com
 .googlegemini.com

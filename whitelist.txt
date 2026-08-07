@@ -3,6 +3,8 @@
 .accountcontabilidade.com.br
 .adservice.google.com
 .aedeiveleonardo.org
+.analytics.google.com
+.apis.google.com
 .bootstrapcdn.com
 .brainly.com.br
 .bvirtual.com.br
@@ -30,9 +32,12 @@
 .microsoft.microsoftofficehub
 .minhabiblioteca.com.br
 .mplitude.com
+.ogads-pa.clients6.google.com
+.ogs.google.com
 .portalava.com.br
 .rnp.br
 .sb-ssl.google.com
+.scholar.google.com
 .scholar.google.com.br
 .scielo.br
 .sinonimos.com.br
