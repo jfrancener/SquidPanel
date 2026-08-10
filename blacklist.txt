@@ -423,7 +423,9 @@
 .mxptint.net
 .mychannels.video
 .mygaru.com
+.myth.dev
 .napista.com.br
+.nation.es
 .nation.fr
 .naver.com
 .nbcnews.com
