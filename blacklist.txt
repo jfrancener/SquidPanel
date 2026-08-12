@@ -153,6 +153,7 @@
 .cleverwebserver.com
 .clicrbs.com.br
 .clientgear.com
+.clip.place
 .clipcentric.com
 .clmbtech.com
 .clnmde.com
@@ -346,6 +347,7 @@
 .kadaza.com.br
 .kargo.com
 .kettledroopingcontinuation.com
+.killarny.net
 .klaviyo.com
 .krushmedia.com
 .krxd.net
@@ -356,6 +358,7 @@
 .lenovomm.com
 .letras.mus.br
 .liadm.com
+.liberta.vip
 .licdn.com
 .licensebuttons.net
 .lifesonics.com
@@ -373,6 +376,7 @@
 .loopnet.com
 .luzia.com
 .madmuscles.com
+.magnific.com
 .mandua.com.br
 .manualdohomemmoderno.com.br
 .marphezis.com
@@ -478,6 +482,7 @@
 .parsely.com
 .patreon.com
 .pbxai.com
+.peertube.wtf
 .permutive.com
 .pexels.com
 .phncdn.com
@@ -675,6 +680,7 @@
 .trvdp.com
 .trx-hub.com
 .tsdtocl.com
+.tube
 .turn.com
 .tutanota.com
 .twimg.com
@@ -698,6 +704,7 @@
 .vagalume.com
 .vagalume.com.br
 .vanlett.com
+.vc
 .vecteezy.com
 .vetob.com
 .vidazoo.com
@@ -718,6 +725,7 @@
 .voltaxam.com
 .voxtvhd.com.br
 .vsveiculos.com
+.w.org
 .w55c.net
 .webcindario.com
 .webmotors.com.br
