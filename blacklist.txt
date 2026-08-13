@@ -51,6 +51,7 @@
 .alibaba.com
 .alpixtrack.com
 .altmetric.com
+.am4.com.br
 .amagi.tv
 .amazon.com
 .amazon.com.br
@@ -323,6 +324,7 @@
 .iagemini.com
 .icloud.com
 .iconify.design
+.imageprompt.org
 .imgix.net
 .in.gov.br
 .indexww.com
