@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 import json
 
 class SystemSetting(models.Model):
@@ -47,7 +48,7 @@ class ProxyGroup(models.Model):
     description = models.CharField(max_length=255, blank=True)
     default_policy = models.CharField(max_length=30, choices=POLICY_CHOICES, default='WHITELIST_STRICT')
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return self.name
@@ -70,7 +71,7 @@ class ProxyPort(models.Model):
     current_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='WHITELIST')
     temp_allowed_until = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -88,7 +89,7 @@ class RoomSchedule(models.Model):
     end_time = models.TimeField()
     action = models.CharField(max_length=20, default='ALLOW_ALL')
     is_enabled = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"{self.port.name} - {self.days_of_week} ({self.start_time} - {self.end_time})"
@@ -108,7 +109,7 @@ class DomainRule(models.Model):
     rule_type = models.CharField(max_length=10, choices=RULE_TYPE_CHOICES, default='allow')
     is_verified = models.BooleanField(default=False)
     description = models.CharField(max_length=255, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"{self.domain} ({self.rule_type})"
@@ -127,7 +128,7 @@ class UserProfile(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='OPERATOR')
     allowed_groups = models.ManyToManyField(ProxyGroup, blank=True, related_name='authorized_users')
     allowed_ports = models.ManyToManyField(ProxyPort, blank=True, related_name='authorized_users')
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
