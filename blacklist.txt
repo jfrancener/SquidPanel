@@ -454,7 +454,6 @@
 .mozilla.org
 .msauth.net
 .msftauth.net
-.msftncsi.com
 .msftstatic.com
 .mujrozhlas.cz
 .mundodasmensagens.com
