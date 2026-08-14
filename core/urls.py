@@ -1,23 +1,17 @@
 from django.contrib import admin
-from django.urls import path
-from dashboard import views
+from django.urls import path, include
+from django.views.generic import RedirectView
+from dashboard import views as dashboard_views
 
 urlpatterns = [
-    # Autenticação
-    path('login/', views.login_view, name='login'),
-    path('logout/', views.logout_view, name='logout'),
+    # Favicon para eliminar 404
+    path('favicon.ico', RedirectView.as_view(url='/static/favicon.svg', permanent=True)),
 
-    # Painel Principal
-    path('', views.dashboard_view, name='dashboard'),
+    # App Users (Autenticação e Gestão de Usuários)
+    path('', include('users.urls')),
 
-    # Configurações com Sublinks
-    path('settings/general/', views.settings_general_view, name='settings_general'),
-    path('settings/session/', views.settings_session_view, name='settings_session'),
-
-    # Gestão de Usuários e Permissões (RBAC)
-    path('users/', views.user_list_view, name='user_list'),
-    path('users/create/', views.user_create_view, name='user_create'),
-    path('users/<int:user_id>/edit/', views.user_edit_view, name='user_edit'),
-    path('users/<int:user_id>/toggle-status/', views.user_toggle_status_view, name='user_toggle_status'),
-    path('users/<int:user_id>/delete/', views.user_delete_view, name='user_delete'),
+    # App Dashboard (Painel Principal e Configurações)
+    path('', dashboard_views.dashboard_view, name='dashboard'),
+    path('settings/general/', dashboard_views.settings_general_view, name='settings_general'),
+    path('settings/session/', dashboard_views.settings_session_view, name='settings_session'),
 ]

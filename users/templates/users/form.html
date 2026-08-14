@@ -81,7 +81,7 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     
-                    {% if profile.is_admin %}
+                    {% if request.user.profile.is_admin %}
                     <label class="bg-[#111422] p-4 rounded-xl border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all flex flex-col justify-between">
                         <div>
                             <div class="flex items-center justify-between mb-2">

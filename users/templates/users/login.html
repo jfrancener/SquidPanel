@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - SquidPanel</title>
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="alternate icon" href="/favicon.ico">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +26,7 @@
 </head>
 <body class="h-full bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
 
-    <!-- Efeitos de iluminação de fundo (Glows sutis) -->
+    <!-- Efeitos de iluminação de fundo -->
     <div class="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -50,7 +54,7 @@
         </div>
         {% endif %}
 
-        <!-- Mensagens do Django (Erro / Logout) -->
+        <!-- Mensagens do Django -->
         {% if messages %}
         <div class="mb-6 space-y-2">
             {% for message in messages %}
