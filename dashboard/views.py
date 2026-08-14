@@ -1,5 +1,6 @@
 import os
 import re
+import datetime
 import paramiko
 import subprocess
 from collections import defaultdict
@@ -59,6 +60,42 @@ def extract_domain(url_or_domain):
 
 def dashboard(request):
     selected_log = request.GET.get('log_file', 'access.log')
+    start_time_str = request.GET.get('start_time', '').strip()
+    end_time_str = request.GET.get('end_time', '').strip()
+    quick_time = request.GET.get('quick_time', '').strip()
+
+    now = datetime.datetime.now()
+    start_dt = None
+    end_dt = None
+
+    if quick_time == '15m':
+        start_dt = now - datetime.timedelta(minutes=15)
+    elif quick_time == '30m':
+        start_dt = now - datetime.timedelta(minutes=30)
+    elif quick_time == '1h':
+        start_dt = now - datetime.timedelta(hours=1)
+    elif quick_time == '4h':
+        start_dt = now - datetime.timedelta(hours=4)
+    elif quick_time == 'today':
+        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif quick_time == 'yesterday':
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_dt = today_start - datetime.timedelta(days=1)
+        end_dt = today_start
+    elif start_time_str:
+        try:
+            clean_start = start_time_str.replace(' ', 'T')
+            start_dt = datetime.datetime.fromisoformat(clean_start)
+        except Exception:
+            pass
+
+    if not end_dt and end_time_str:
+        try:
+            clean_end = end_time_str.replace(' ', 'T')
+            end_dt = datetime.datetime.fromisoformat(clean_end)
+        except Exception:
+            pass
+
     logs = get_squid_logs(selected_log)
     available_logs = get_available_logs()
     
@@ -78,9 +115,30 @@ def dashboard(request):
         'is_verified': False
     })
     
+    filtered_logs_count = 0
+    earliest_dt = None
+    latest_dt = None
+
     for line in logs:
         parts = line.split()
         if len(parts) >= 7:
+            try:
+                log_epoch = float(parts[0])
+                log_dt = datetime.datetime.fromtimestamp(log_epoch)
+
+                if earliest_dt is None or log_dt < earliest_dt:
+                    earliest_dt = log_dt
+                if latest_dt is None or log_dt > latest_dt:
+                    latest_dt = log_dt
+
+                if start_dt and log_dt < start_dt:
+                    continue
+                if end_dt and log_dt > end_dt:
+                    continue
+            except (ValueError, OSError):
+                pass
+
+            filtered_logs_count += 1
             status = parts[3]
             url = parts[6]
             domain = extract_domain(url)
@@ -167,6 +225,14 @@ def dashboard(request):
     return render(request, 'dashboard/index.html', {
         'domains': context_domains, 
         'total_logs': len(logs),
+        'filtered_logs_count': filtered_logs_count,
+        'start_time': start_dt.strftime('%Y-%m-%dT%H:%M') if start_dt else '',
+        'end_time': end_dt.strftime('%Y-%m-%dT%H:%M') if end_dt else '',
+        'formatted_start': start_dt.strftime('%d/%m/%Y %H:%M') if start_dt else None,
+        'formatted_end': end_dt.strftime('%d/%m/%Y %H:%M') if end_dt else None,
+        'quick_time': quick_time,
+        'earliest_dt': earliest_dt.strftime('%d/%m/%Y %H:%M:%S') if earliest_dt else None,
+        'latest_dt': latest_dt.strftime('%d/%m/%Y %H:%M:%S') if latest_dt else None,
         'full_blacklist': sorted(list(blacklist)),
         'full_whitelist': sorted(list(whitelist)),
         'available_logs': available_logs,
@@ -312,7 +378,9 @@ def save_and_sync(request):
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect("10.40.88.3", username="root", password="@info win 123", timeout=10)
-            client.exec_command("/root/update_lists.sh")
+            stdin, stdout, stderr = client.exec_command("/root/update_lists.sh")
+            out = stdout.read().decode('utf-8', errors='ignore')
+            err = stderr.read().decode('utf-8', errors='ignore')
             client.close()
             
             return JsonResponse({'success': True, 'message': 'Listas salvas, enviadas ao GitHub e atualizadas no Firewall!'})

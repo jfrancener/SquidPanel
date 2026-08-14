@@ -48,10 +48,16 @@
         </header>
 
         <!-- Stats Overview & Filters -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div class="glass-panel p-6 rounded-2xl border-l-4 border-l-indigo-500">
-                <h3 class="text-slate-400 text-sm font-semibold mb-1">Domínios Únicos Identificados</h3>
-                <p class="text-3xl font-bold">{{ domains|length }}</p>
+                <h3 class="text-slate-400 text-sm font-semibold mb-1">Domínios no Período</h3>
+                <div class="flex items-baseline gap-2">
+                    <p class="text-3xl font-bold text-white">{{ domains|length }}</p>
+                    <span class="text-xs text-slate-400">famílias</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <i class="fa-solid fa-server text-indigo-400"></i> {{ filtered_logs_count }} de {{ total_logs }} logs analisados
+                </div>
             </div>
             
             <div class="glass-panel p-6 rounded-2xl border-l-4 border-l-slate-600 col-span-2 flex flex-col md:flex-row items-center gap-4">
@@ -66,7 +72,7 @@
                     </select>
                 </div>
                 <div class="w-full">
-                    <label class="text-slate-400 text-sm font-semibold mb-2 block"><i class="fa-solid fa-clock-rotate-left"></i> Fonte de Logs</label>
+                    <label class="text-slate-400 text-sm font-semibold mb-2 block"><i class="fa-solid fa-clock-rotate-left"></i> Arquivo de Log</label>
                     <select id="logFileSelect" onchange="changeLogFile(this.value)" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:ring-sky-500 focus:border-sky-500 block p-2.5">
                         <option value="access.log" {% if selected_log == 'access.log' %}selected{% endif %}>Log Atual (access.log)</option>
                         <option value="all" {% if selected_log == 'all' %}selected{% endif %}>Todos os 7 dias</option>
@@ -88,6 +94,74 @@
                     <i class="fa-solid fa-check"></i> Ver Whitelist ({{ full_whitelist|length }})
                 </button>
             </div>
+        </div>
+
+        <!-- Date & Time Filter Bar -->
+        <div class="glass-panel p-5 rounded-2xl mb-8 border border-slate-700/80 shadow-xl">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                        <i class="fa-solid fa-calendar-clock text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            Filtro por Data e Horário <span class="text-[11px] font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">Fuso: Horário de Brasília (UTC-3)</span>
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            {% if earliest_dt and latest_dt %}
+                                Logs disponíveis no arquivo: <span class="text-slate-300 font-mono">{{ earliest_dt }}</span> até <span class="text-slate-300 font-mono">{{ latest_dt }}</span>
+                            {% else %}
+                                Filtre requisições por intervalo de tempo preciso
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Quick Presets -->
+                <div class="flex flex-wrap items-center gap-1.5 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+                    <span class="text-xs font-semibold text-slate-400 px-2">Atalhos:</span>
+                    <button onclick="setQuickTime('all')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all {% if not quick_time and not start_time %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">Todos</button>
+                    <button onclick="setQuickTime('15m')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all {% if quick_time == '15m' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">15 min</button>
+                    <button onclick="setQuickTime('30m')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all {% if quick_time == '30m' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">30 min</button>
+                    <button onclick="setQuickTime('1h')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all {% if quick_time == '1h' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">1 hora</button>
+                    <button onclick="setQuickTime('4h')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all {% if quick_time == '4h' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">4 horas</button>
+                    <button onclick="setQuickTime('today')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all {% if quick_time == 'today' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">Hoje</button>
+                    <button onclick="setQuickTime('yesterday')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all {% if quick_time == 'yesterday' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">Ontem</button>
+                </div>
+            </div>
+
+            <!-- Custom Date/Time Inputs Form -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end pt-3 border-t border-slate-800/80">
+                <div class="md:col-span-4">
+                    <label for="startTimeInput" class="text-xs font-semibold text-slate-300 block mb-1">
+                        <i class="fa-regular fa-clock text-indigo-400 mr-1"></i> A partir de (Data e Hora inicial):
+                    </label>
+                    <input type="datetime-local" id="startTimeInput" value="{{ start_time }}" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 font-mono">
+                </div>
+                <div class="md:col-span-4">
+                    <label for="endTimeInput" class="text-xs font-semibold text-slate-300 block mb-1">
+                        <i class="fa-regular fa-clock text-cyan-400 mr-1"></i> Até (Data e Hora final - Opcional):
+                    </label>
+                    <input type="datetime-local" id="endTimeInput" value="{{ end_time }}" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 font-mono">
+                </div>
+                <div class="md:col-span-4 flex gap-2">
+                    <button onclick="applyCustomTimeFilter()" class="flex-1 btn-hover-effect px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass"></i> Filtrar Horário
+                    </button>
+                    {% if start_time or end_time or quick_time %}
+                    <button onclick="clearTimeFilter()" class="btn-hover-effect px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg text-xs font-semibold" title="Limpar filtro de horário e ver todos">
+                        <i class="fa-solid fa-xmark"></i> Limpar
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if start_time or end_time or quick_time %}
+            <div class="mt-3 pt-2 flex items-center gap-2 text-xs text-indigo-300">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Filtro de tempo ativo: <strong>{% if quick_time == '15m' %}Últimos 15 minutos{% elif quick_time == '30m' %}Últimos 30 minutos{% elif quick_time == '1h' %}Última 1 hora{% elif quick_time == '4h' %}Últimas 4 horas{% elif quick_time == 'today' %}Hoje desde 00:00{% elif quick_time == 'yesterday' %}Ontem{% else %}{{ formatted_start|default:'Início' }} até {{ formatted_end|default:'Agora' }}{% endif %}</strong> ({{ filtered_logs_count }} registros encontrados)</span>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Domains Table -->
@@ -379,6 +453,49 @@
         function changeLogFile(filename) {
             const url = new URL(window.location.href);
             url.searchParams.set('log_file', filename);
+            window.location.href = url.toString();
+        }
+
+        function setQuickTime(preset) {
+            const url = new URL(window.location.href);
+            if (preset === 'all') {
+                url.searchParams.delete('quick_time');
+                url.searchParams.delete('start_time');
+                url.searchParams.delete('end_time');
+            } else {
+                url.searchParams.set('quick_time', preset);
+                url.searchParams.delete('start_time');
+                url.searchParams.delete('end_time');
+            }
+            window.location.href = url.toString();
+        }
+
+        function applyCustomTimeFilter() {
+            const startVal = document.getElementById('startTimeInput').value.trim();
+            const endVal = document.getElementById('endTimeInput').value.trim();
+            
+            if (!startVal && !endVal) {
+                showToast('error', 'Atenção', 'Selecione pelo menos uma data/hora inicial.');
+                return;
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.delete('quick_time');
+            
+            if (startVal) url.searchParams.set('start_time', startVal);
+            else url.searchParams.delete('start_time');
+            
+            if (endVal) url.searchParams.set('end_time', endVal);
+            else url.searchParams.delete('end_time');
+
+            window.location.href = url.toString();
+        }
+
+        function clearTimeFilter() {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('quick_time');
+            url.searchParams.delete('start_time');
+            url.searchParams.delete('end_time');
             window.location.href = url.toString();
         }
 
