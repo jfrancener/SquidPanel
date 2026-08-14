@@ -1,5 +1,22 @@
 [
 {
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$sRBW9wtYgjTRby6k30FtCz$I4Dussq9OAXUIO3virLhszeKnklly8+fs0MU2M3+itQ=",
+    "last_login": "2026-08-14T19:30:52.563Z",
+    "is_superuser": true,
+    "username": "informatica",
+    "first_name": "Juliano",
+    "last_name": "Francener",
+    "email": "pij_ti@solucoesterceirizadas.com.br",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-08-14T17:53:32.267Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
   "model": "dashboard.systemsetting",
   "pk": 1,
   "fields": {
