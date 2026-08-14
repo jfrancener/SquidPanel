@@ -136,8 +136,28 @@ class UserProfile(models.Model):
 
     @property
     def is_admin(self):
-        return self.role == 'ADMIN' or self.user.is_superuser
+        return self.role == 'ADMIN' or self.user.is_superuser or self.user.is_staff
 
     @property
     def is_manager(self):
-        return self.role in ['ADMIN', 'MANAGER'] or self.user.is_superuser
+        return self.role in ['ADMIN', 'MANAGER'] or self.user.is_superuser or self.user.is_staff
+
+    @property
+    def role_display_name(self):
+        if self.user.is_superuser or self.user.is_staff or self.role == 'ADMIN':
+            return 'Administrador Geral (TI)'
+        elif self.role == 'MANAGER':
+            return 'Coordenador / Gestor'
+        return 'Operador / Professor'
+
+
+# Garante que todo usuário Django criado tenha um UserProfile automático
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=User)
+def create_or_update_user_profile(sender, instance, created, **kwargs):
+    profile, _ = UserProfile.objects.get_or_create(user=instance)
+    if instance.is_superuser and profile.role != 'ADMIN':
+        profile.role = 'ADMIN'
+        profile.save()

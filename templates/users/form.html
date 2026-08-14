@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{% if is_edit %}Editar Usuário - {{ target_user.username }}{% else %}Novo Usuário - SquidPanel{% endblock %}{% endblock %}
+{% block title %}{% if is_edit %}Editar Usuário - {{ target_user.username }}{% else %}Novo Usuário - SquidPanel{% endif %}{% endblock %}
 {% block page_title %}Gestão de Acesso / {% if is_edit %}Editar Usuário{% else %}Novo Usuário{% endif %}{% endblock %}
 
 {% block content %}
