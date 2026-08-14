@@ -76,10 +76,7 @@ class DomainItem(models.Model):
         elif d.startswith('https://'):
             d = d[8:]
         d = d.split('/')[0].split(':')[0]
-        # Adiciona ponto inicial se for domínio coringa
-        if not d.startswith('.') and not d.startswith('*.'):
-            d = f".{d}"
-        elif d.startswith('*.'):
+        if d.startswith('*.'):
             d = f".{d[2:]}"
         return d
 
