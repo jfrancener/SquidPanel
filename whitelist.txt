@@ -3,8 +3,10 @@
 .accountcontabilidade.com.br
 .adservice.google.com
 .aedeiveleonardo.org
+.amorporlivros.com.br
 .analytics.google.com
 .apis.google.com
+.baixelivros.com.br
 .bootstrapcdn.com
 .brainly.com.br
 .bvirtual.com.br
@@ -34,6 +36,7 @@
 .mplitude.com
 .ogads-pa.clients6.google.com
 .ogs.google.com
+.omelhorlivro.com.br
 .portalava.com.br
 .rnp.br
 .sb-ssl.google.com
