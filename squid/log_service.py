@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timezone as dt_timezone, timedelta
 from urllib.parse import urlparse
 from django.utils import timezone
 from django.conf import settings
@@ -37,10 +37,6 @@ def cleanup_old_logs():
 def parse_squid_log_line(line, port_map):
     """
     Faz o parsing de uma linha do /var/log/squid/access.log no formato nativo do Squid / SquidPanel.
-    Exemplos:
-    1786730000.123 45 10.40.90.101 TCP_TUNNEL/200 4520 CONNECT scielo.br:443 - HIER_DIRECT/142.250.191.14 - 9020
-    ou formato nativo sem porta no final:
-    1786730000.123 45 10.40.90.101 TCP_TUNNEL/200 4520 CONNECT scielo.br:443 - HIER_DIRECT/142.250.191.14 -
     """
     parts = line.strip().split()
     if len(parts) < 7:
@@ -49,7 +45,7 @@ def parse_squid_log_line(line, port_map):
     try:
         # 1. Timestamp UNIX
         ts_float = float(parts[0])
-        log_time = datetime.fromtimestamp(ts_float, tz=timezone.utc)
+        log_time = datetime.fromtimestamp(ts_float, tz=dt_timezone.utc)
 
         # 2. Latência
         response_time_ms = int(parts[1]) if parts[1].isdigit() else 0
@@ -116,7 +112,7 @@ def parse_squid_log_line(line, port_map):
             response_time_ms=response_time_ms,
             mime_type=mime_type
         )
-    except Exception:
+    except Exception as e:
         return None
 
 
@@ -162,5 +158,4 @@ def sync_logs_from_squid_file():
         SystemSetting.set_value('squid_log_file_offset', str(new_offset), 'Offset do arquivo access.log')
         return len(new_logs)
     except Exception as e:
-        print(f"Erro ao sincronizar logs do Squid: {e}")
         return 0
