@@ -245,6 +245,47 @@ def port_delete_view(request, port_id):
 
 
 @login_required
+def check_port_availability_view(request):
+    """
+    Verificação em tempo real via AJAX se um número de porta já está em uso no Squid.
+    """
+    port_str = request.GET.get('port', '').strip()
+    exclude_id = request.GET.get('exclude_id')
+
+    if not port_str:
+        return JsonResponse({'valid': False, 'message': 'Digite um número de porta.'})
+
+    try:
+        port_number = int(port_str)
+        if port_number < 1024 or port_number > 65535:
+            return JsonResponse({'valid': False, 'available': False, 'message': 'A porta deve estar entre 1024 e 65535.'})
+    except ValueError:
+        return JsonResponse({'valid': False, 'available': False, 'message': 'Número de porta inválido.'})
+
+    query = ProxyPort.objects.filter(port_number=port_number)
+    if exclude_id:
+        query = query.exclude(id=exclude_id)
+
+    existing_port = query.select_related('group').first()
+    if existing_port:
+        return JsonResponse({
+            'valid': True,
+            'available': False,
+            'port_number': port_number,
+            'room_name': existing_port.name,
+            'group_name': existing_port.group.name,
+            'message': f"A porta {port_number} já está em uso pela sala '{existing_port.name}' ({existing_port.group.name})."
+        })
+
+    return JsonResponse({
+        'valid': True,
+        'available': True,
+        'port_number': port_number,
+        'message': f"Porta {port_number} disponível!"
+    })
+
+
+@login_required
 def port_toggle_status_view(request, port_id):
     """
     Altera o modo de liberação de uma porta específica (Liberada Total, Whitelist ou Bloqueada).

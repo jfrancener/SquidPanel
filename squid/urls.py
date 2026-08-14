@@ -9,6 +9,7 @@ urlpatterns = [
     path('groups/<int:group_id>/delete/', views.group_delete_view, name='group_delete'),
     
     # Portas / Salas
+    path('ports/check/', views.check_port_availability_view, name='check_port_availability'),
     path('groups/<int:group_id>/ports/create/', views.port_create_view, name='port_create'),
     path('ports/<int:port_id>/edit/', views.port_edit_view, name='port_edit'),
     path('ports/<int:port_id>/delete/', views.port_delete_view, name='port_delete'),

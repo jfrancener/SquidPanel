@@ -513,8 +513,10 @@
                 <label for="port_number" class="block text-xs font-semibold text-white mb-1.5">
                     Número da Porta Proxy (Squid) <span class="text-red-400">*</span>
                 </label>
-                <input type="number" id="port_number" name="port_number" required min="1024" max="65535" placeholder="ex: 9020, 9021, 9030" class="w-full bg-[#0f121e] border border-slate-700 text-white font-mono text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
-                <p class="text-[10px] text-slate-500 mt-1">Defina a porta TCP onde as máquinas desta sala serão apontadas.</p>
+                <input type="number" id="port_number" name="port_number" required min="1024" max="65535" placeholder="ex: 9020, 9021, 9030" oninput="checkPortAvailable(this.value)" class="w-full bg-[#0f121e] border border-slate-700 text-white font-mono text-xs rounded-xl p-3 focus:border-indigo-500 outline-none transition-all">
+                <div id="port-check-feedback" class="text-[11px] mt-1.5 font-medium min-h-[18px]">
+                    <span class="text-slate-500 text-[10px]">Defina a porta TCP onde as máquinas desta sala serão apontadas.</span>
+                </div>
             </div>
 
             <div>
@@ -532,7 +534,7 @@
                 <button type="button" onclick="document.getElementById('modal-add-port').classList.add('hidden')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold">
                     Cancelar
                 </button>
-                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20">
+                <button type="submit" id="btn-submit-port" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     Cadastrar Sala/Porta
                 </button>
             </div>
@@ -554,11 +556,71 @@ function toggleGroupLists(groupId) {
     }
 }
 
+let portCheckTimeout = null;
+
+function checkPortAvailable(portValue) {
+    const input = document.getElementById('port_number');
+    const feedback = document.getElementById('port-check-feedback');
+    const submitBtn = document.getElementById('btn-submit-port');
+
+    if (portCheckTimeout) clearTimeout(portCheckTimeout);
+
+    const val = portValue ? portValue.trim() : '';
+
+    if (!val) {
+        input.classList.remove('border-rose-500', 'border-emerald-500');
+        input.classList.add('border-slate-700');
+        feedback.innerHTML = '<span class="text-slate-500 text-[10px]">Defina a porta TCP onde as máquinas desta sala serão apontadas.</span>';
+        submitBtn.disabled = false;
+        return;
+    }
+
+    const portNum = parseInt(val);
+    if (isNaN(portNum) || portNum < 1024 || portNum > 65535) {
+        input.classList.remove('border-emerald-500', 'border-slate-700');
+        input.classList.add('border-rose-500');
+        feedback.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><i class="fa-solid fa-circle-xmark"></i> Porta inválida (deve estar entre 1024 e 65535).</span>';
+        submitBtn.disabled = true;
+        return;
+    }
+
+    feedback.innerHTML = '<span class="text-slate-400 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin"></i> Verificando disponibilidade da porta...</span>';
+
+    portCheckTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`/proxy/ports/check/?port=${portNum}`);
+            const data = await res.json();
+
+            if (data.available) {
+                input.classList.remove('border-rose-500', 'border-slate-700');
+                input.classList.add('border-emerald-500');
+                feedback.innerHTML = `<span class="text-emerald-400 flex items-center gap-1 font-semibold"><i class="fa-solid fa-circle-check"></i> ${data.message}</span>`;
+                submitBtn.disabled = false;
+            } else {
+                input.classList.remove('border-emerald-500', 'border-slate-700');
+                input.classList.add('border-rose-500');
+                feedback.innerHTML = `<span class="text-rose-400 flex items-center gap-1 font-semibold"><i class="fa-solid fa-circle-exmark"></i> ${data.message}</span>`;
+                submitBtn.disabled = true;
+            }
+        } catch (err) {
+            console.error('Erro na checagem da porta:', err);
+        }
+    }, 250);
+}
+
 function openAddPortModal(groupId, groupName) {
     document.getElementById('form-add-port').action = `/proxy/groups/${groupId}/ports/create/`;
     document.getElementById('port-modal-group-name').textContent = `Grupo: ${groupName}`;
     document.getElementById('port_name').value = '';
-    document.getElementById('port_number').value = '';
+    
+    const portInput = document.getElementById('port_number');
+    portInput.value = '';
+    portInput.classList.remove('border-rose-500', 'border-emerald-500');
+    portInput.classList.add('border-slate-700');
+    
+    document.getElementById('port-check-feedback').innerHTML = '<span class="text-slate-500 text-[10px]">Defina a porta TCP onde as máquinas desta sala serão apontadas.</span>';
+    document.getElementById('btn-submit-port').disabled = false;
+    
     document.getElementById('modal-add-port').classList.remove('hidden');
 }
 
