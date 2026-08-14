@@ -47,6 +47,8 @@ class ProxyGroup(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True)
     default_policy = models.CharField(max_length=30, choices=POLICY_CHOICES, default='WHITELIST_STRICT')
+    whitelists = models.ManyToManyField('squid.ProxyList', blank=True, related_name='applied_groups_whitelist')
+    blacklists = models.ManyToManyField('squid.ProxyList', blank=True, related_name='applied_groups_blacklist')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
 

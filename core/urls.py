@@ -10,6 +10,9 @@ urlpatterns = [
     # App Users (Autenticação e Gestão de Usuários)
     path('', include('users.urls')),
 
+    # App Squid (Proxy, Whitelists e Regras)
+    path('proxy/', include('squid.urls')),
+
     # App Dashboard (Painel Principal e Configurações)
     path('', dashboard_views.dashboard_view, name='dashboard'),
     path('settings/general/', dashboard_views.settings_general_view, name='settings_general'),

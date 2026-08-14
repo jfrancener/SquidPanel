@@ -105,6 +105,19 @@
                 </nav>
             </div>
 
+            <!-- PROXY -->
+            {% if request.user.profile.is_manager %}
+            <div>
+                <span class="px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Proxy</span>
+                <nav class="space-y-1">
+                    <a href="{% url 'whitelists' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all {% if active_menu == 'whitelists' %}bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+                        <i class="fa-solid fa-shield-halved w-4 text-center text-sm {% if active_menu == 'whitelists' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
+                        <span>Whitelists</span>
+                    </a>
+                </nav>
+            </div>
+            {% endif %}
+
             <!-- CONFIGURAÇÃO (Com Sublinks) -->
             {% if request.user.profile.is_admin %}
             <div>
