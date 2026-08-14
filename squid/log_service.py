@@ -1,10 +1,22 @@
-import random
-from datetime import timedelta
+import os
+import sys
+from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from django.utils import timezone
-from django.db import models
+from django.conf import settings
 
 from .models import AccessLog, ProxyList, DomainItem
 from dashboard.models import ProxyGroup, ProxyPort, SystemSetting
+
+
+def get_squid_log_path():
+    """
+    Retorna o caminho do arquivo de access.log do Squid.
+    """
+    if sys.platform == 'win32':
+        mock_path = os.path.join(settings.BASE_DIR, 'scratch', 'squid_config', 'access.log')
+        return mock_path
+    return '/var/log/squid/access.log'
 
 
 def cleanup_old_logs():
@@ -22,73 +34,133 @@ def cleanup_old_logs():
     return deleted_count, retention_days
 
 
-def generate_mock_initial_logs_if_empty():
+def parse_squid_log_line(line, port_map):
     """
-    Gera um lote inicial de logs realistas caso a tabela AccessLog esteja vazia.
+    Faz o parsing de uma linha do /var/log/squid/access.log no formato nativo do Squid / SquidPanel.
+    Exemplos:
+    1786730000.123 45 10.40.90.101 TCP_TUNNEL/200 4520 CONNECT scielo.br:443 - HIER_DIRECT/142.250.191.14 - 9020
+    ou formato nativo sem porta no final:
+    1786730000.123 45 10.40.90.101 TCP_TUNNEL/200 4520 CONNECT scielo.br:443 - HIER_DIRECT/142.250.191.14 -
     """
-    if AccessLog.objects.exists():
-        return
+    parts = line.strip().split()
+    if len(parts) < 7:
+        return None
 
-    ports = list(ProxyPort.objects.select_related('group').filter(is_active=True))
-    if not ports:
-        return
+    try:
+        # 1. Timestamp UNIX
+        ts_float = float(parts[0])
+        log_time = datetime.fromtimestamp(ts_float, tz=timezone.utc)
 
-    sample_domains = [
-        # Educacionais / Permitidos
-        ('scielo.br', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 45200, 'text/html'),
-        ('academia.edu', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 128400, 'application/json'),
-        ('khanacademy.org', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 350200, 'text/html'),
-        ('translate.google.com', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 15800, 'application/json'),
-        ('scholar.google.com', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 42100, 'text/html'),
-        ('github.com', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 98400, 'text/html'),
-        ('cloudflare.com', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 8400, 'text/plain'),
-        ('dicio.com.br', 'GET', 'TCP_TUNNEL/200', 'ALLOWED', 31200, 'text/html'),
-        ('minhabiblioteca.com.br', 'CONNECT', 'TCP_TUNNEL/200', 'ALLOWED', 189000, 'text/html'),
-        
-        # Bloqueados comuns
-        ('facebook.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 3840, 'text/html'),
-        ('instagram.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 4120, 'text/html'),
-        ('tiktok.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 3910, 'text/html'),
-        ('bet365.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 2900, 'text/html'),
-        ('netflix.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 5120, 'text/html'),
-        ('shopee.com.br', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 4300, 'text/html'),
-        ('twitter.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 3700, 'text/html'),
-        ('globo.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 4800, 'text/html'),
-        ('chatgpt.com', 'CONNECT', 'TCP_DENIED/403', 'BLOCKED', 3600, 'text/html'),
-    ]
+        # 2. Latência
+        response_time_ms = int(parts[1]) if parts[1].isdigit() else 0
 
-    client_ips = [
-        '10.40.90.101', '10.40.90.102', '10.40.90.105', '10.40.90.110',
-        '10.40.90.115', '10.40.90.120', '10.40.90.133', '10.40.90.145'
-    ]
+        # 3. IP do Cliente
+        client_ip = parts[2]
 
-    now = timezone.now()
-    logs_to_create = []
+        # 4. Status HTTP / Squid
+        http_status = parts[3]
 
-    # Cria 120 logs distribuídos nas últimas 48 horas
-    for i in range(120):
-        port = random.choice(ports)
-        domain_info = random.choice(sample_domains)
-        client_ip = random.choice(client_ips)
-        
-        # Minutos atrás
-        mins_ago = random.randint(1, 2880) # até 2 dias
-        log_time = now - timedelta(minutes=mins_ago)
+        # 5. Bytes Trafegados
+        bytes_sent = int(parts[4]) if parts[4].isdigit() else 0
 
-        logs_to_create.append(AccessLog(
+        # 6. Método HTTP
+        method = parts[5].upper()
+
+        # 7. URL ou Host requisitado
+        raw_url = parts[6]
+        full_url = raw_url
+
+        # Extrai o domínio limpo
+        if '://' in raw_url:
+            parsed = urlparse(raw_url)
+            domain = parsed.hostname or raw_url
+        else:
+            domain = raw_url.split(':')[0]
+
+        domain = domain.lstrip('.').lower()
+
+        # 8. Mime Type
+        mime_type = parts[9] if len(parts) > 9 else '-'
+
+        # 9. Porta local de escuta (se presente na última posição)
+        port_number = None
+        if len(parts) >= 11 and parts[-1].isdigit():
+            port_number = int(parts[-1])
+        elif len(parts) >= 10 and parts[-1].isdigit():
+            port_number = int(parts[-1])
+
+        # Se não vier a porta na linha, tenta associar pela primeira porta cadastrada ou 9020
+        if not port_number:
+            first_port = next(iter(port_map.values()), None)
+            port_number = first_port.port_number if first_port else 9020
+
+        # Ação (ALLOWED / BLOCKED)
+        is_blocked = 'DENIED' in http_status or '403' in http_status or 'ERR' in http_status
+        action = 'BLOCKED' if is_blocked else 'ALLOWED'
+
+        proxy_port = port_map.get(port_number)
+        proxy_group = proxy_port.group if proxy_port else None
+
+        return AccessLog(
             timestamp=log_time,
             client_ip=client_ip,
-            port_number=port.port_number,
-            port=port,
-            group=port.group,
-            method=domain_info[1],
-            domain=domain_info[0],
-            full_url=f"https://{domain_info[0]}/",
-            http_status=domain_info[2],
-            action=domain_info[3],
-            bytes_sent=domain_info[4] + random.randint(100, 5000),
-            response_time_ms=random.randint(15, 350),
-            mime_type=domain_info[5]
-        ))
+            port_number=port_number,
+            port=proxy_port,
+            group=proxy_group,
+            method=method,
+            domain=domain,
+            full_url=full_url,
+            http_status=http_status,
+            action=action,
+            bytes_sent=bytes_sent,
+            response_time_ms=response_time_ms,
+            mime_type=mime_type
+        )
+    except Exception:
+        return None
 
-    AccessLog.objects.bulk_create(logs_to_create)
+
+def sync_logs_from_squid_file():
+    """
+    Lê incrementalmente as novas linhas do arquivo /var/log/squid/access.log
+    e insere os registros reais no banco de dados.
+    """
+    log_file_path = get_squid_log_path()
+    if not os.path.exists(log_file_path):
+        return 0
+
+    # Carrega mapa de portas em memória
+    port_map = {p.port_number: p for p in ProxyPort.objects.select_related('group').filter(is_active=True)}
+
+    # Pega offset anterior
+    offset_str = SystemSetting.get_value('squid_log_file_offset', '0')
+    try:
+        last_offset = int(offset_str)
+    except Exception:
+        last_offset = 0
+
+    current_size = os.path.getsize(log_file_path)
+
+    # Se o arquivo foi rotacionado (tamanho menor que o offset), recomeça do início
+    if current_size < last_offset:
+        last_offset = 0
+
+    new_logs = []
+
+    try:
+        with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            f.seek(last_offset)
+            for line in f:
+                parsed_log = parse_squid_log_line(line, port_map)
+                if parsed_log:
+                    new_logs.append(parsed_log)
+            new_offset = f.tell()
+
+        if new_logs:
+            AccessLog.objects.bulk_create(new_logs)
+
+        SystemSetting.set_value('squid_log_file_offset', str(new_offset), 'Offset do arquivo access.log')
+        return len(new_logs)
+    except Exception as e:
+        print(f"Erro ao sincronizar logs do Squid: {e}")
+        return 0

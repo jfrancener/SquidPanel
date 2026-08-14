@@ -666,7 +666,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from django.core.paginator import Paginator
 from .models import AccessLog, DeviceHost
-from .log_service import cleanup_old_logs, generate_mock_initial_logs_if_empty
+from .log_service import cleanup_old_logs, sync_logs_from_squid_file
 from dashboard.models import SystemSetting
 
 
@@ -674,9 +674,10 @@ from dashboard.models import SystemSetting
 def logs_view(request):
     """
     Tela completa de Logs de Acesso com filtros por Data, Hora, Grupo, Porta, Status, Domínio, IP e Hostname.
+    Lê os dados reais diretamente de /var/log/squid/access.log.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    generate_mock_initial_logs_if_empty()
+    sync_logs_from_squid_file()
 
     query_term = request.GET.get('q', '').strip()
     group_id = request.GET.get('group')
@@ -822,6 +823,7 @@ def logs_live_stream_view(request):
     Endpoint AJAX para o Monitor em Tempo Real (Live Stream) de uma porta ou grupo específico.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    sync_logs_from_squid_file()
     last_id = request.GET.get('last_id')
     port_id = request.GET.get('port_id')
     group_id = request.GET.get('group_id')

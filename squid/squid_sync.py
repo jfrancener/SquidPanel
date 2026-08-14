@@ -193,7 +193,8 @@ def generate_squid_config_and_lists():
 
     # Logs e Otimizações
     conf_lines.append("# --- Configuracoes de Log e Cache ---")
-    conf_lines.append("access_log /var/log/squid/access.log squid")
+    conf_lines.append("logformat squidpanel %ts.%03tu %6tr %>a %Ss/%03>Hs %<st %rm %ru %[un %Sh/%<a %mt %lp")
+    conf_lines.append("access_log /var/log/squid/access.log squidpanel")
     conf_lines.append("logfile_rotate 10")
     conf_lines.append("coredump_dir /var/spool/squid")
     conf_lines.append("visible_hostname SquidPanel")
