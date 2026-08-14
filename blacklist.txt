@@ -11,7 +11,6 @@
 .above.com
 .abril.com.br
 .acexedge.com
-.acrobat.com
 .activeview.app
 .acuityplatform.com
 .ad-delivery.net
@@ -67,6 +66,7 @@
 .andbeyond.media
 .aniview.com
 .anthropic.com
+.anydesk.com
 .aol.com
 .api-taboola.com
 .appier.net
@@ -315,7 +315,6 @@
 .googleblog.com
 .googlegemini.com
 .googlegeminiai.com
-.googlesyndication.com
 .googletagservices.com
 .googleusercontent.com
 .googlevideo.com
@@ -455,6 +454,7 @@
 .msauth.net
 .msftauth.net
 .msftstatic.com
+.msn.com
 .mujrozhlas.cz
 .mundodasmensagens.com
 .muscache.com
