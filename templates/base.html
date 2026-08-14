@@ -114,6 +114,10 @@
                         <i class="fa-solid fa-layer-group w-4 text-center text-sm {% if active_menu == 'groups' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
                         <span>Grupos & Portas</span>
                     </a>
+                    <a href="{% url 'logs' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all {% if active_menu == 'logs' %}bg-indigo-600/20 text-cyan-300 border border-cyan-500/30 font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+                        <i class="fa-solid fa-scroll w-4 text-center text-sm {% if active_menu == 'logs' %}text-cyan-400{% else %}text-slate-500{% endif %}"></i>
+                        <span>Logs de Acesso</span>
+                    </a>
                     <a href="{% url 'whitelists' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all {% if active_menu == 'whitelists' %}bg-indigo-600/20 text-emerald-300 border border-emerald-500/30 font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
                         <i class="fa-solid fa-shield-halved w-4 text-center text-sm {% if active_menu == 'whitelists' %}text-emerald-400{% else %}text-slate-500{% endif %}"></i>
                         <span>Whitelists</span>
@@ -138,6 +142,10 @@
                     <a href="{% url 'settings_session' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all {% if active_menu == 'settings_session' %}bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
                         <i class="fa-solid fa-lock w-4 text-center text-sm {% if active_menu == 'settings_session' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
                         <span>Sessão & Segurança</span>
+                    </a>
+                    <a href="{% url 'settings_logs' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all {% if active_menu == 'settings_logs' %}bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+                        <i class="fa-solid fa-database w-4 text-center text-sm {% if active_menu == 'settings_logs' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
+                        <span>Logs & Retenção</span>
                     </a>
                 </nav>
             </div>

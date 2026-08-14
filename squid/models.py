@@ -84,3 +84,57 @@ class DomainItem(models.Model):
     def save(self, *args, **kwargs):
         self.domain = self.clean_domain()
         super().save(*args, **kwargs)
+
+
+class AccessLog(models.Model):
+    """
+    Registro histórico de requisições processadas pelo Proxy Squid.
+    Permite consultas avançadas por data, hora, porta, grupo, status e monitoramento em tempo real.
+    """
+    ACTION_CHOICES = [
+        ('ALLOWED', 'Permitido (Liberado)'),
+        ('BLOCKED', 'Bloqueado (Negado)'),
+        ('DIRECT', 'Acesso Direto'),
+    ]
+
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Data / Hora")
+    client_ip = models.CharField(max_length=45, verbose_name="IP do Cliente")
+    port_number = models.PositiveIntegerField(db_index=True, verbose_name="Porta Proxy")
+    port = models.ForeignKey('dashboard.ProxyPort', on_delete=models.SET_NULL, null=True, blank=True, related_name='access_logs')
+    group = models.ForeignKey('dashboard.ProxyGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='access_logs')
+    
+    method = models.CharField(max_length=15, default='CONNECT', verbose_name="Método")
+    domain = models.CharField(max_length=255, db_index=True, verbose_name="Domínio Requisitado")
+    full_url = models.CharField(max_length=1000, blank=True, verbose_name="URL Completa")
+    
+    http_status = models.CharField(max_length=50, default='TCP_TUNNEL/200', verbose_name="Código / Status Squid")
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, default='ALLOWED', verbose_name="Ação")
+    bytes_sent = models.BigIntegerField(default=0, verbose_name="Bytes Trafegados")
+    response_time_ms = models.IntegerField(default=0, verbose_name="Latência (ms)")
+    mime_type = models.CharField(max_length=100, default='-', verbose_name="Tipo MIME")
+
+    class Meta:
+        verbose_name = "Log de Acesso"
+        verbose_name_plural = "Logs de Acesso"
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp', 'port_number']),
+            models.Index(fields=['domain']),
+            models.Index(fields=['action']),
+        ]
+
+    def __str__(self):
+        return f"[{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {self.client_ip} -> {self.domain} ({self.action})"
+
+    @property
+    def is_blocked(self):
+        return self.action == 'BLOCKED' or 'DENIED' in self.http_status or '403' in self.http_status
+
+    @property
+    def formatted_bytes(self):
+        if self.bytes_sent < 1024:
+            return f"{self.bytes_sent} B"
+        elif self.bytes_sent < 1024 * 1024:
+            return f"{self.bytes_sent / 1024:.1f} KB"
+        return f"{self.bytes_sent / (1024 * 1024):.1f} MB"
+

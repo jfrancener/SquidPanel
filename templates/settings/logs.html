@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuração de Retenção de Logs - SquidPanel{% endblock %}
+{% block page_title %}Configurações / Logs & Retenção{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    
+    <!-- Cabeçalho -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-database text-cyan-400"></i>
+                <span>Retenção & Armazenamento de Logs</span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Defina o tempo de permanência dos registros de acesso do Squid e políticas de limpeza de histórico.
+            </p>
+        </div>
+
+        <a href="{% url 'logs' %}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all border border-slate-700">
+            <i class="fa-solid fa-scroll text-cyan-400"></i>
+            <span>Ver Logs de Acesso</span>
+        </a>
+    </div>
+
+    <!-- Estatísticas de Armazenamento -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total de Registros</span>
+                <span class="text-xl font-bold text-white font-mono">{{ total_logs_count }}</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <i class="fa-solid fa-table-list"></i>
+            </div>
+        </div>
+
+        <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Tempo de Retenção</span>
+                <span class="text-xl font-bold text-indigo-400 font-mono">{{ log_retention_days }} dias</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <i class="fa-solid fa-calendar-days"></i>
+            </div>
+        </div>
+
+        <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Registro Mais Antigo</span>
+                <span class="text-xs font-bold text-slate-300 font-mono block">
+                    {% if oldest_log %}
+                        {{ oldest_log.timestamp|date:"d/m/Y H:i" }}
+                    {% else %}
+                        Nenhum registro
+                    {% endif %}
+                </span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário de Configuração -->
+    <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+        <form method="POST" action="{% url 'settings_logs' %}" class="p-6 space-y-6">
+            {% csrf_token %}
+
+            <div class="space-y-5">
+                
+                <!-- Retenção de Dias -->
+                <div>
+                    <label for="log_retention_days" class="block text-xs font-semibold text-white mb-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-check text-indigo-400"></i>
+                        <span>Período de Retenção dos Logs (dias de histórico guardados)</span>
+                    </label>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                        <button type="button" onclick="document.getElementById('log_retention_days').value = 7" class="p-2.5 rounded-xl border border-slate-700 bg-[#111422] hover:border-indigo-500 text-xs font-semibold text-slate-300 transition-all text-center">
+                            7 dias (1 sem)
+                        </button>
+                        <button type="button" onclick="document.getElementById('log_retention_days').value = 15" class="p-2.5 rounded-xl border border-slate-700 bg-[#111422] hover:border-indigo-500 text-xs font-semibold text-slate-300 transition-all text-center">
+                            15 dias
+                        </button>
+                        <button type="button" onclick="document.getElementById('log_retention_days').value = 30" class="p-2.5 rounded-xl border border-slate-700 bg-[#111422] hover:border-indigo-500 text-xs font-semibold text-slate-300 transition-all text-center">
+                            30 dias (1 mês)
+                        </button>
+                        <button type="button" onclick="document.getElementById('log_retention_days').value = 90" class="p-2.5 rounded-xl border border-slate-700 bg-[#111422] hover:border-indigo-500 text-xs font-semibold text-slate-300 transition-all text-center">
+                            90 dias (3 meses)
+                        </button>
+                    </div>
+
+                    <div class="relative">
+                        <input type="number" id="log_retention_days" name="log_retention_days" min="1" max="365" required value="{{ log_retention_days }}" class="w-full bg-[#111422] border border-slate-700 text-white font-mono text-xs rounded-xl p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                        <span class="absolute right-3.5 top-3 text-xs text-slate-500 font-semibold">dias</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1.5">
+                        Registros com data anterior a este número de dias serão rotacionados e descartados automaticamente.
+                    </p>
+                </div>
+
+                <!-- Limpeza Automática -->
+                <div class="p-4 bg-[#111422] rounded-xl border border-slate-800">
+                    <label class="flex items-start gap-3 cursor-pointer select-none">
+                        <input type="checkbox" name="auto_cleanup" {% if auto_cleanup %}checked{% endif %} class="mt-0.5 w-4 h-4 rounded bg-[#181c30] border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                        <div>
+                            <span class="text-xs font-bold text-white block">Ativar Rotação e Limpeza Automática Noturna</span>
+                            <span class="text-[11px] text-slate-400 block mt-0.5">Executa a rotina de descarte de registros antigos diariamente durante a madrugada para manter a performance ideal do banco.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Ação de Limpeza Manual Imediata -->
+                <div class="p-4 bg-amber-500/10 rounded-xl border border-amber-500/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                        <span class="text-xs font-bold text-amber-300 block flex items-center gap-1.5">
+                            <i class="fa-solid fa-broom"></i>
+                            <span>Limpeza Manual Imediata</span>
+                        </span>
+                        <span class="text-[11px] text-slate-400 block mt-0.5">
+                            Exclui agora todos os registros com mais de {{ log_retention_days }} dias.
+                        </span>
+                    </div>
+
+                    <a href="{% url 'logs_cleanup' %}" onclick="return confirm('Deseja realmente excluir agora todos os logs com mais de {{ log_retention_days }} dias?')" class="px-4 py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 rounded-xl text-xs font-bold transition-all border border-amber-500/30 whitespace-nowrap">
+                        Limpar Agora
+                    </a>
+                </div>
+
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end">
+                <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Salvar Parâmetros de Retenção</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

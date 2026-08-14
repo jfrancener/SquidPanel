@@ -655,3 +655,247 @@ def domain_bulk_add_view(request, list_id):
         messages.success(request, f"Importação concluída: {added_count} domínios adicionados! ({duplicate_count} já existiam ou eram inválidos).")
 
     return redirect('list_detail', list_id=proxy_list.id)
+
+
+# ==========================================
+# 6. LOGS DE ACESSO, AUDITORIA & MONITOR AO VIVO
+# ==========================================
+
+from datetime import datetime, timedelta
+from django.utils import timezone
+from django.core.paginator import Paginator
+from .models import AccessLog
+from .log_service import cleanup_old_logs, generate_mock_initial_logs_if_empty
+from dashboard.models import SystemSetting
+
+
+@login_required
+def logs_view(request):
+    """
+    Tela completa de Logs de Acesso com filtros por Data, Hora, Grupo, Porta, Status, Domínio e IP.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    generate_mock_initial_logs_if_empty()
+
+    query_term = request.GET.get('q', '').strip()
+    group_id = request.GET.get('group')
+    port_id = request.GET.get('port')
+    action_filter = request.GET.get('action', 'ALL')
+    quick_time = request.GET.get('quick_time', '')
+    
+    date_from = request.GET.get('date_from', '')
+    time_from = request.GET.get('time_from', '')
+    date_to = request.GET.get('date_to', '')
+    time_to = request.GET.get('time_to', '')
+
+    logs_qs = AccessLog.objects.select_related('port', 'group').all()
+
+    # RBAC: Se não for Admin, restringe aos grupos/portas autorizados
+    if not profile.is_admin:
+        allowed_ports = profile.allowed_ports.all()
+        allowed_groups = profile.allowed_groups.all()
+        logs_qs = logs_qs.filter(
+            models.Q(port__in=allowed_ports) |
+            models.Q(group__in=allowed_groups)
+        )
+
+    # Filtro por Termo (Domínio ou IP)
+    if query_term:
+        logs_qs = logs_qs.filter(
+            models.Q(domain__icontains=query_term) |
+            models.Q(client_ip__icontains=query_term) |
+            models.Q(full_url__icontains=query_term)
+        )
+
+    # Filtro por Grupo
+    if group_id:
+        logs_qs = logs_qs.filter(group_id=group_id)
+
+    # Filtro por Porta
+    if port_id:
+        logs_qs = logs_qs.filter(port_id=port_id)
+
+    # Filtro por Ação (Permitido / Bloqueado)
+    if action_filter == 'ALLOWED':
+        logs_qs = logs_qs.filter(action='ALLOWED')
+    elif action_filter == 'BLOCKED':
+        logs_qs = logs_qs.filter(action='BLOCKED')
+
+    # Filtro por Tempo Rápido
+    now = timezone.now()
+    if quick_time == '15m':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(minutes=15))
+    elif quick_time == '30m':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(minutes=30))
+    elif quick_time == '1h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=1))
+    elif quick_time == '4h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=4))
+    elif quick_time == 'today':
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        logs_qs = logs_qs.filter(timestamp__gte=start_of_day)
+    elif quick_time == 'yesterday':
+        start_of_yesterday = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_yesterday = start_of_yesterday + timedelta(days=1)
+        logs_qs = logs_qs.filter(timestamp__gte=start_of_yesterday, timestamp__lt=end_of_yesterday)
+    elif quick_time == '7d':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(days=7))
+
+    # Filtro Personalizado de Data e Hora
+    if date_from:
+        try:
+            t_from = time_from if time_from else '00:00'
+            dt_from_str = f"{date_from} {t_from}"
+            dt_from = timezone.make_aware(datetime.strptime(dt_from_str, '%Y-%m-%d %H:%M'))
+            logs_qs = logs_qs.filter(timestamp__gte=dt_from)
+        except Exception:
+            pass
+
+    if date_to:
+        try:
+            t_to = time_to if time_to else '23:59'
+            dt_to_str = f"{date_to} {t_to}"
+            dt_to = timezone.make_aware(datetime.strptime(dt_to_str, '%Y-%m-%d %H:%M'))
+            logs_qs = logs_qs.filter(timestamp__lte=dt_to)
+        except Exception:
+            pass
+
+    # Estatísticas dos logs filtrados
+    total_filtered_count = logs_qs.count()
+    allowed_count = logs_qs.filter(action='ALLOWED').count()
+    blocked_count = logs_qs.filter(action='BLOCKED').count()
+
+    # Paginação
+    paginator = Paginator(logs_qs, 50)
+    page_number = request.GET.get('page', 1)
+    logs_page = paginator.get_page(page_number)
+
+    # Dados para os dropdowns de filtro
+    all_groups = ProxyGroup.objects.filter(is_active=True).order_by('name')
+    all_ports = ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number')
+    
+    # Listas ativas para o modal rápido de adicionar domínio
+    whitelists = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).order_by('name')
+    blacklists = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).order_by('name')
+
+    retention_days = SystemSetting.get_value('log_retention_days', '30')
+
+    return render(request, 'squid/logs_index.html', {
+        'profile': profile,
+        'logs': logs_page,
+        'total_filtered_count': total_filtered_count,
+        'allowed_count': allowed_count,
+        'blocked_count': blocked_count,
+        'query_term': query_term,
+        'selected_group': group_id,
+        'selected_port': port_id,
+        'action_filter': action_filter,
+        'quick_time': quick_time,
+        'date_from': date_from,
+        'time_from': time_from,
+        'date_to': date_to,
+        'time_to': time_to,
+        'all_groups': all_groups,
+        'all_ports': all_ports,
+        'whitelists': whitelists,
+        'blacklists': blacklists,
+        'retention_days': retention_days,
+        'active_menu': 'logs'
+    })
+
+
+@login_required
+def logs_live_stream_view(request):
+    """
+    Endpoint AJAX para o Monitor em Tempo Real (Live Stream) de uma porta ou grupo específico.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    last_id = request.GET.get('last_id')
+    port_id = request.GET.get('port_id')
+    group_id = request.GET.get('group_id')
+
+    logs_qs = AccessLog.objects.select_related('port', 'group').order_by('-id')
+
+    if port_id:
+        logs_qs = logs_qs.filter(port_id=port_id)
+    elif group_id:
+        logs_qs = logs_qs.filter(group_id=group_id)
+
+    if last_id and last_id.isdigit():
+        new_logs = list(logs_qs.filter(id__gt=int(last_id))[:30])
+    else:
+        new_logs = list(logs_qs[:20])
+
+    data = []
+    for l in reversed(new_logs):
+        data.append({
+            'id': l.id,
+            'timestamp': l.timestamp.strftime('%H:%M:%S'),
+            'date': l.timestamp.strftime('%d/%m/%Y'),
+            'client_ip': l.client_ip,
+            'port_number': l.port_number,
+            'port_name': l.port.name if l.port else f"Porta {l.port_number}",
+            'group_name': l.group.name if l.group else '-',
+            'domain': l.domain,
+            'full_url': l.full_url,
+            'method': l.method,
+            'action': l.action,
+            'http_status': l.http_status,
+            'bytes': l.formatted_bytes,
+            'latency': f"{l.response_time_ms}ms"
+        })
+
+    return JsonResponse({'success': True, 'logs': data})
+
+
+@login_required
+def log_add_to_list_view(request):
+    """
+    Endpoint AJAX para adicionar diretamente um domínio requisitado a uma Whitelist ou Blacklist.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado'}, status=403)
+
+    if request.method == 'POST':
+        domain_str = request.POST.get('domain', '').strip()
+        list_id = request.POST.get('list_id')
+        description = request.POST.get('description', '').strip()
+
+        if not domain_str or not list_id:
+            return JsonResponse({'success': False, 'error': 'Domínio e Lista são obrigatórios.'})
+
+        proxy_list = get_object_or_404(ProxyList, id=list_id)
+        item = DomainItem(proxy_list=proxy_list, domain=domain_str, description=description or f"Adicionado a partir dos Logs ({timezone.now().strftime('%d/%m/%Y')})")
+        cleaned = item.clean_domain()
+
+        if proxy_list.domains.filter(domain=cleaned).exists():
+            return JsonResponse({'success': False, 'error': f"O domínio '{cleaned}' já está cadastrado na lista '{proxy_list.name}'."})
+
+        item.domain = cleaned
+        item.save()
+
+        return JsonResponse({
+            'success': True,
+            'domain': cleaned,
+            'list_name': proxy_list.name,
+            'list_type': proxy_list.get_list_type_display(),
+            'message': f"Domínio '{cleaned}' adicionado com sucesso à {proxy_list.get_list_type_display()} '{proxy_list.name}'!"
+        })
+
+    return JsonResponse({'success': False, 'error': 'Método inválido.'}, status=405)
+
+
+@login_required
+def logs_cleanup_view(request):
+    """
+    Executa a limpeza de logs antigos com base na regra de retenção.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Apenas Administradores podem executar a limpeza de logs.")
+
+    deleted_count, retention_days = cleanup_old_logs()
+    messages.success(request, f"Limpeza concluída com sucesso: {deleted_count} registros de logs com mais de {retention_days} dias foram removidos.")
+    return redirect(request.META.get('HTTP_REFERER', 'logs'))
+

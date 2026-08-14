@@ -15,6 +15,12 @@ urlpatterns = [
     path('ports/<int:port_id>/delete/', views.port_delete_view, name='port_delete'),
     path('ports/<int:port_id>/toggle-status/', views.port_toggle_status_view, name='port_toggle_status'),
 
+    # Logs de Acesso & Monitor em Tempo Real
+    path('logs/', views.logs_view, name='logs'),
+    path('logs/live-stream/', views.logs_live_stream_view, name='logs_live_stream'),
+    path('logs/add-to-list/', views.log_add_to_list_view, name='log_add_to_list'),
+    path('logs/cleanup/', views.logs_cleanup_view, name='logs_cleanup'),
+
     # Listagens White e Black
     path('whitelists/', views.whitelists_view, name='whitelists'),
     path('blacklists/', views.blacklists_view, name='blacklists'),

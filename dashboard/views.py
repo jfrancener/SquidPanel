@@ -143,3 +143,45 @@ def settings_session_view(request):
         'expire_browser_close': expire_browser_close,
         'active_menu': 'settings_session'
     })
+
+
+@login_required
+def settings_logs_view(request):
+    """
+    Sublink: Configuração de Retenção & Armazenamento de Logs (Apenas Admin).
+    Permite definir quantos dias os logs do Squid ficam armazenados no sistema.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Acesso negado: apenas Administradores de TI podem alterar as configurações.")
+
+    from squid.models import AccessLog
+
+    if request.method == 'POST':
+        try:
+            log_retention_days = int(request.POST.get('log_retention_days', 30))
+            log_retention_days = max(1, min(365, log_retention_days))
+            auto_cleanup = request.POST.get('auto_cleanup') == 'on'
+
+            SystemSetting.set_value('log_retention_days', log_retention_days, 'Dias de retenção dos logs de acesso')
+            SystemSetting.set_value('log_auto_cleanup', 'true' if auto_cleanup else 'false', 'Limpeza automática periódica')
+
+            messages.success(request, f'Configurações de retenção de logs atualizadas para {log_retention_days} dias com sucesso!')
+            return redirect('settings_logs')
+        except ValueError:
+            messages.error(request, 'Número de dias inválido.')
+
+    log_retention_days = int(SystemSetting.get_value('log_retention_days', '30'))
+    auto_cleanup = SystemSetting.get_value('log_auto_cleanup', 'true') == 'true'
+    total_logs_count = AccessLog.objects.count()
+    oldest_log = AccessLog.objects.order_by('timestamp').first()
+
+    return render(request, 'settings/logs.html', {
+        'profile': profile,
+        'log_retention_days': log_retention_days,
+        'auto_cleanup': auto_cleanup,
+        'total_logs_count': total_logs_count,
+        'oldest_log': oldest_log,
+        'active_menu': 'settings_logs'
+    })
+

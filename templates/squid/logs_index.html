@@ -1,0 +1,708 @@
+{% extends 'base.html' %}
+
+{% block title %}Logs de Acesso & Auditoria - SquidPanel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Topo / Cabeçalho -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-scroll text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span>Logs de Acesso & Auditoria</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 font-mono">
+                            {{ total_filtered_count }} registros
+                        </span>
+                    </h1>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Histórico completo de navegação, auditoria e monitoramento em tempo real das salas e portas.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Informação de Retenção -->
+            <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
+                <i class="fa-solid fa-database text-indigo-400"></i>
+                <span>Retenção: <strong class="text-slate-200">{{ retention_days }} dias</strong></span>
+            </div>
+
+            {% if request.user.profile.is_admin %}
+            <a href="{% url 'logs_cleanup' %}" onclick="return confirm('Deseja executar a limpeza de logs com mais de {{ retention_days }} dias agora?')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700" title="Limpar logs antigos">
+                <i class="fa-solid fa-broom text-[11px] text-amber-400"></i>
+                <span>Limpar Antigos</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Navegação por Abas: Histórico vs Live Stream -->
+    <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+        <button onclick="switchTab('tab-history')" id="btn-tab-history" class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+            <i class="fa-solid fa-list-check"></i>
+            <span>Histórico & Pesquisa</span>
+        </button>
+
+        <button onclick="switchTab('tab-live')" id="btn-tab-live" class="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Monitor ao Vivo (Live Stream)</span>
+        </button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ABA 1: HISTÓRICO & PESQUISA DE LOGS -->
+    <!-- ========================================== -->
+    <div id="tab-history" class="space-y-6">
+
+        <!-- Barra de Cards de Resumo -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Encontrado</span>
+                    <span class="text-xl font-bold text-white font-mono">{{ total_filtered_count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300">
+                    <i class="fa-solid fa-list"></i>
+                </div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold text-emerald-500/90 uppercase tracking-wider block mb-1">Requisições Liberadas</span>
+                    <span class="text-xl font-bold text-emerald-400 font-mono">{{ allowed_count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold text-rose-500/90 uppercase tracking-wider block mb-1">Requisições Bloqueadas</span>
+                    <span class="text-xl font-bold text-rose-400 font-mono">{{ blocked_count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                    <i class="fa-solid fa-ban"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Filtros Avançados -->
+        <div class="glass-panel p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+            
+            <!-- Linha 1: Atalhos Rápidos de Tempo -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                <div class="flex items-center gap-2">
+                    <i class="fa-regular fa-clock text-indigo-400 text-xs"></i>
+                    <span class="text-xs font-semibold text-slate-300">Filtro de Período Rápido:</span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 text-xs">
+                    <a href="?quick_time=&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if not quick_time and not date_from %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        Todos
+                    </a>
+                    <a href="?quick_time=15m&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if quick_time == '15m' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        15 min
+                    </a>
+                    <a href="?quick_time=30m&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if quick_time == '30m' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        30 min
+                    </a>
+                    <a href="?quick_time=1h&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if quick_time == '1h' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        1 hora
+                    </a>
+                    <a href="?quick_time=4h&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if quick_time == '4h' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        4 horas
+                    </a>
+                    <a href="?quick_time=today&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if quick_time == 'today' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        Hoje
+                    </a>
+                    <a href="?quick_time=yesterday&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if quick_time == 'yesterday' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        Ontem
+                    </a>
+                    <a href="?quick_time=7d&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}" class="px-2.5 py-1 rounded-lg font-semibold transition-all {% if quick_time == '7d' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+                        Últimos 7 dias
+                    </a>
+                </div>
+            </div>
+
+            <!-- Linha 2: Formulário de Filtro Detalhado -->
+            <form method="GET" action="{% url 'logs' %}" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end text-xs">
+                
+                <!-- Busca Textual -->
+                <div class="lg:col-span-2">
+                    <label class="block font-semibold text-slate-300 mb-1">
+                        <i class="fa-solid fa-magnifying-glass text-indigo-400 mr-1"></i> Domínio / URL ou IP:
+                    </label>
+                    <input type="text" name="q" value="{{ query_term }}" placeholder="ex: youtube.com, 10.40.90.101..." class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                </div>
+
+                <!-- Grupo -->
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">
+                        <i class="fa-solid fa-folder text-indigo-400 mr-1"></i> Grupo:
+                    </label>
+                    <select name="group" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                        <option value="">Todos os Grupos</option>
+                        {% for g in all_groups %}
+                        <option value="{{ g.id }}" {% if selected_group == g.id|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Sala / Porta -->
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">
+                        <i class="fa-solid fa-network-wired text-indigo-400 mr-1"></i> Sala / Porta:
+                    </label>
+                    <select name="port" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                        <option value="">Todas as Portas</option>
+                        {% for p in all_ports %}
+                        <option value="{{ p.id }}" {% if selected_port == p.id|stringformat:"s" %}selected{% endif %}>{{ p.port_number }} - {{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Ação / Status -->
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">
+                        <i class="fa-solid fa-filter text-indigo-400 mr-1"></i> Status / Ação:
+                    </label>
+                    <select name="action" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                        <option value="ALL" {% if action_filter == 'ALL' %}selected{% endif %}>Todos os Status</option>
+                        <option value="ALLOWED" {% if action_filter == 'ALLOWED' %}selected{% endif %}>Liberados (200 OK)</option>
+                        <option value="BLOCKED" {% if action_filter == 'BLOCKED' %}selected{% endif %}>Bloqueados (403 Denied)</option>
+                    </select>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-filter"></i>
+                        <span>Filtrar</span>
+                    </button>
+                    <a href="{% url 'logs' %}" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition-all border border-slate-700 flex items-center justify-center" title="Limpar Filtros">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </a>
+                </div>
+
+                <!-- Linha de Horários Personalizados (Expansível ou Direta) -->
+                <div class="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800/60">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Data Inicial:</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2 focus:border-indigo-500 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Hora Inicial:</label>
+                        <input type="time" name="time_from" value="{{ time_from }}" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2 focus:border-indigo-500 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Data Final:</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2 focus:border-indigo-500 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Hora Final:</label>
+                        <input type="time" name="time_to" value="{{ time_to }}" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2 focus:border-indigo-500 outline-none font-mono">
+                    </div>
+                </div>
+
+            </form>
+
+        </div>
+
+        <!-- Tabela de Logs Históricos -->
+        <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-[#111422] text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800">
+                            <th class="p-3.5 pl-6">Data / Horário</th>
+                            <th class="p-3.5">Sala / Porta</th>
+                            <th class="p-3.5">IP Cliente</th>
+                            <th class="p-3.5">Domínio / Destino</th>
+                            <th class="p-3.5 text-center">Status Squid</th>
+                            <th class="p-3.5 text-center">Tráfego</th>
+                            <th class="p-3.5 text-right pr-6">Ações Rápidas</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 text-xs">
+                        {% for log in logs %}
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            
+                            <!-- Data / Hora -->
+                            <td class="p-3.5 pl-6 font-mono text-slate-300 text-[11px] whitespace-nowrap">
+                                <span class="text-white font-semibold">{{ log.timestamp|date:"d/m/Y" }}</span>
+                                <span class="text-slate-400 ml-1">{{ log.timestamp|date:"H:i:s" }}</span>
+                            </td>
+
+                            <!-- Sala / Porta -->
+                            <td class="p-3.5 whitespace-nowrap">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                        {{ log.port_number }}
+                                    </span>
+                                    <span class="text-white font-medium">
+                                        {{ log.port.name|default:log.group.name|default:"-" }}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- IP Cliente -->
+                            <td class="p-3.5 font-mono text-slate-400 text-[11px]">
+                                {{ log.client_ip }}
+                            </td>
+
+                            <!-- Domínio -->
+                            <td class="p-3.5">
+                                <div class="flex items-center gap-2 max-w-md">
+                                    <span class="font-bold text-white tracking-wide font-mono text-[12px] truncate" title="{{ log.full_url }}">
+                                        {{ log.domain }}
+                                    </span>
+                                    {% if log.method != 'CONNECT' %}
+                                    <span class="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-400 font-mono uppercase">
+                                        {{ log.method }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                            <!-- Status / Ação -->
+                            <td class="p-3.5 text-center whitespace-nowrap">
+                                {% if log.is_blocked %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Bloqueado (403)
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberado (200)
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Tráfego -->
+                            <td class="p-3.5 text-center font-mono text-slate-400 text-[11px] whitespace-nowrap">
+                                {{ log.formatted_bytes }}
+                            </td>
+
+                            <!-- Ações Rápidas: Adicionar à Whitelist / Blacklist -->
+                            <td class="p-3.5 text-right pr-6 whitespace-nowrap">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button onclick="openAddToListModal('{{ log.domain|escapejs }}', 'WHITELIST')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all flex items-center gap-1" title="Adicionar este domínio a uma Whitelist">
+                                        <i class="fa-solid fa-plus"></i> Whitelist
+                                    </button>
+
+                                    <button onclick="openAddToListModal('{{ log.domain|escapejs }}', 'BLACKLIST')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all flex items-center gap-1" title="Adicionar este domínio a uma Blacklist">
+                                        <i class="fa-solid fa-ban"></i> Blacklist
+                                    </button>
+                                </div>
+                            </td>
+
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="p-8 text-center text-slate-500">
+                                <i class="fa-solid fa-magnifying-glass text-2xl mb-2 block opacity-40"></i>
+                                Nenhum registro de log encontrado para os filtros selecionados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginação -->
+            {% if logs.has_other_pages %}
+            <div class="p-4 bg-[#111422] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <span>Página <strong>{{ logs.number }}</strong> de <strong>{{ logs.paginator.num_pages }}</strong> (Total: {{ total_filtered_count }} logs)</span>
+                
+                <div class="flex items-center gap-1.5">
+                    {% if logs.has_previous %}
+                    <a href="?page={{ logs.previous_page_number }}&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}&quick_time={{ quick_time }}&date_from={{ date_from }}&time_from={{ time_from }}&date_to={{ date_to }}&time_to={{ time_to }}" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-all">
+                        Anterior
+                    </a>
+                    {% endif %}
+
+                    {% if logs.has_next %}
+                    <a href="?page={{ logs.next_page_number }}&q={{ query_term }}&group={{ selected_group }}&port={{ selected_port }}&action={{ action_filter }}&quick_time={{ quick_time }}&date_from={{ date_from }}&time_from={{ time_from }}&date_to={{ date_to }}&time_to={{ time_to }}" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-all">
+                        Próxima
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ABA 2: MONITOR AO VIVO (LIVE STREAM) -->
+    <!-- ========================================== -->
+    <div id="tab-live" class="space-y-4 hidden">
+        
+        <!-- Barra de Controles do Live Stream -->
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" id="live-indicator"></span>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">Monitoramento ao Vivo</span>
+                </div>
+
+                <!-- Seletor de Sala / Porta para Live -->
+                <div class="flex items-center gap-2">
+                    <label class="text-xs text-slate-400 font-semibold">Sala / Porta:</label>
+                    <select id="live-port-select" onchange="resetLiveStream()" class="bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-2 focus:border-indigo-500 outline-none">
+                        <option value="">Todas as Portas</option>
+                        {% for p in all_ports %}
+                        <option value="{{ p.id }}">{{ p.port_number }} - {{ p.name }} ({{ p.group.name }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Botões de Controle do Live -->
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="toggleLivePause()" id="btn-pause-live" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700">
+                    <i class="fa-solid fa-pause text-[10px] text-amber-400"></i>
+                    <span id="label-pause-live">Pausar Live</span>
+                </button>
+
+                <button type="button" onclick="clearLiveConsole()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700">
+                    <i class="fa-solid fa-trash-can text-[10px] text-slate-400"></i>
+                    <span>Limpar Console</span>
+                </button>
+
+                <label class="flex items-center gap-2 text-xs text-slate-400 select-none cursor-pointer ml-2">
+                    <input type="checkbox" id="live-autoscroll" checked class="w-3.5 h-3.5 rounded bg-slate-800 border-slate-700 text-indigo-600">
+                    <span>Auto-scroll</span>
+                </label>
+            </div>
+
+        </div>
+
+        <!-- Console / Terminal Live Stream -->
+        <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl bg-[#090b13]">
+            <div class="p-3 bg-[#0d101c] border-b border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                <div class="flex items-center gap-2 font-mono">
+                    <i class="fa-solid fa-terminal text-cyan-400"></i>
+                    <span>squid_access_stream ~ tail -f /var/log/squid/access.log</span>
+                </div>
+                <span class="text-[10px] text-slate-500 font-mono" id="live-status-text">Conectado (polling 2s)</span>
+            </div>
+
+            <!-- Área de Logs do Live -->
+            <div id="live-logs-container" class="p-4 space-y-2 max-h-[600px] min-h-[400px] overflow-y-auto font-mono text-xs">
+                <!-- Inserido dinamicamente via JS -->
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL RÁPIDO: ADICIONAR DOMÍNIO À LISTA -->
+<!-- ========================================== -->
+<div id="modal-add-domain-to-list" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2" id="modal-domain-title">
+                <i class="fa-solid fa-shield-plus text-emerald-400"></i>
+                <span>Adicionar Domínio à Lista</span>
+            </h3>
+            <button onclick="closeAddToListModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-add-domain-to-list" onsubmit="submitAddDomainToList(event)" class="p-6 space-y-4 text-xs">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Domínio Selecionado:</label>
+                <input type="text" id="target-domain-input" name="domain" readonly class="w-full bg-[#0d101a] border border-slate-700/80 text-cyan-300 font-mono text-xs rounded-xl p-3 outline-none font-bold">
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Selecione a Lista de Destino <span class="text-red-400">*</span></label>
+                <select id="target-list-select" name="list_id" required class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none font-medium">
+                    <!-- Preenchido via JS conforme Whitelist ou Blacklist -->
+                </select>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Observação (Opcional):</label>
+                <input type="text" id="target-desc-input" name="description" placeholder="ex: Adicionado via auditoria de logs" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <div id="modal-domain-feedback" class="text-xs min-h-[16px]"></div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="closeAddToListModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-submit-add-domain" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20">
+                    Confirmar e Adicionar
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- SCRIPTS DE INTERATIVIDADE & LIVE STREAM -->
+<!-- ========================================== -->
+<script>
+const whitelistsData = [
+    {% for wl in whitelists %}
+    { id: {{ wl.id }}, name: "{{ wl.name|escapejs }}", is_mandatory: {{ wl.is_mandatory|lower }} },
+    {% endfor %}
+];
+
+const blacklistsData = [
+    {% for bl in blacklists %}
+    { id: {{ bl.id }}, name: "{{ bl.name|escapejs }}" },
+    {% endfor %}
+];
+
+// Alternar Abas (Histórico vs Live)
+function switchTab(tabId) {
+    const tabHistory = document.getElementById('tab-history');
+    const tabLive = document.getElementById('tab-live');
+    const btnHistory = document.getElementById('btn-tab-history');
+    const btnLive = document.getElementById('btn-tab-live');
+
+    if (tabId === 'tab-history') {
+        tabHistory.classList.remove('hidden');
+        tabLive.classList.add('hidden');
+        btnHistory.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/20';
+        btnLive.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800';
+        stopLivePolling();
+    } else {
+        tabHistory.classList.add('hidden');
+        tabLive.classList.remove('hidden');
+        btnLive.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-600/20';
+        btnHistory.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800';
+        startLivePolling();
+    }
+}
+
+// Modal Adicionar Domínio à Lista
+function openAddToListModal(domain, listType) {
+    document.getElementById('target-domain-input').value = domain;
+    document.getElementById('target-desc-input').value = `Auditoria de Logs (${new Date().toLocaleDateString('pt-BR')})`;
+    document.getElementById('modal-domain-feedback').innerHTML = '';
+
+    const select = document.getElementById('target-list-select');
+    select.innerHTML = '';
+
+    const titleEl = document.getElementById('modal-domain-title');
+
+    if (listType === 'WHITELIST') {
+        titleEl.innerHTML = '<i class="fa-solid fa-shield-check text-emerald-400"></i><span>Adicionar à Whitelist (Permitir)</span>';
+        whitelistsData.forEach(wl => {
+            const opt = document.createElement('option');
+            opt.value = wl.id;
+            opt.textContent = `🛡️ ${wl.name}${wl.is_mandatory ? ' (Obrigatória)' : ''}`;
+            select.appendChild(opt);
+        });
+    } else {
+        titleEl.innerHTML = '<i class="fa-solid fa-ban text-rose-400"></i><span>Adicionar à Blacklist (Bloquear)</span>';
+        blacklistsData.forEach(bl => {
+            const opt = document.createElement('option');
+            opt.value = bl.id;
+            opt.textContent = `🚫 ${bl.name}`;
+            select.appendChild(opt);
+        });
+    }
+
+    document.getElementById('modal-add-domain-to-list').classList.remove('hidden');
+}
+
+function closeAddToListModal() {
+    document.getElementById('modal-add-domain-to-list').classList.add('hidden');
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function submitAddDomainToList(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-add-domain');
+    const feedback = document.getElementById('modal-domain-feedback');
+    const domain = document.getElementById('target-domain-input').value;
+    const listId = document.getElementById('target-list-select').value;
+    const desc = document.getElementById('target-desc-input').value;
+
+    btn.disabled = true;
+    feedback.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Salvando...</span>';
+
+    const formData = new URLSearchParams();
+    formData.append('domain', domain);
+    formData.append('list_id', listId);
+    formData.append('description', desc);
+
+    try {
+        const res = await fetch('/proxy/logs/add-to-list/', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            feedback.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check"></i> ${data.message}</span>`;
+            setTimeout(() => {
+                closeAddToListModal();
+                btn.disabled = false;
+            }, 1200);
+        } else {
+            feedback.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-circle-xmark"></i> ${data.error}</span>`;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        feedback.innerHTML = `<span class="text-rose-400">Erro na requisição.</span>`;
+        btn.disabled = false;
+    }
+}
+
+// ==========================================
+// MONITOR AO VIVO (LIVE STREAM POLLING)
+// ==========================================
+let liveTimer = null;
+let lastLogId = 0;
+let isPaused = false;
+
+function startLivePolling() {
+    if (liveTimer) clearInterval(liveTimer);
+    fetchLiveLogs();
+    liveTimer = setInterval(fetchLiveLogs, 2000);
+}
+
+function stopLivePolling() {
+    if (liveTimer) clearInterval(liveTimer);
+}
+
+function resetLiveStream() {
+    lastLogId = 0;
+    document.getElementById('live-logs-container').innerHTML = '';
+    fetchLiveLogs();
+}
+
+function toggleLivePause() {
+    isPaused = !isPaused;
+    const btn = document.getElementById('btn-pause-live');
+    const label = document.getElementById('label-pause-live');
+    const indicator = document.getElementById('live-indicator');
+    const statusText = document.getElementById('live-status-text');
+
+    if (isPaused) {
+        label.textContent = 'Retomar Live';
+        btn.classList.add('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
+        indicator.classList.remove('bg-emerald-400', 'animate-pulse');
+        indicator.classList.add('bg-amber-400');
+        statusText.textContent = 'Pausado';
+    } else {
+        label.textContent = 'Pausar Live';
+        btn.classList.remove('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
+        indicator.classList.add('bg-emerald-400', 'animate-pulse');
+        indicator.classList.remove('bg-amber-400');
+        statusText.textContent = 'Conectado (polling 2s)';
+    }
+}
+
+function clearLiveConsole() {
+    document.getElementById('live-logs-container').innerHTML = '<div class="text-slate-600 italic text-center py-4">Console limpo. Aguardando novas requisições...</div>';
+}
+
+async function fetchLiveLogs() {
+    if (isPaused) return;
+
+    const portId = document.getElementById('live-port-select').value;
+    const url = `/proxy/logs/live-stream/?port_id=${portId}&last_id=${lastLogId}`;
+
+    try {
+        const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const data = await res.json();
+
+        if (data.success && data.logs.length > 0) {
+            const container = document.getElementById('live-logs-container');
+            
+            data.logs.forEach(l => {
+                if (l.id > lastLogId) {
+                    lastLogId = l.id;
+                }
+
+                const isBlocked = l.action === 'BLOCKED' || l.http_status.includes('DENIED') || l.http_status.includes('403');
+                const row = document.createElement('div');
+                row.className = `p-2.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 transition-all animate-fade-in ${
+                    isBlocked 
+                    ? 'bg-rose-950/20 border-rose-500/25 hover:border-rose-500/40' 
+                    : 'bg-slate-900/60 border-slate-800/80 hover:border-emerald-500/30'
+                }`;
+
+                row.innerHTML = `
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <span class="text-slate-500 font-mono text-[11px]">${l.timestamp}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${isBlocked ? 'bg-rose-500/15 text-rose-300' : 'bg-indigo-500/15 text-indigo-300'}">
+                            ${l.port_number} • ${l.port_name}
+                        </span>
+                        <span class="text-slate-400 font-mono text-[11px]">${l.client_ip}</span>
+                        <span class="text-white font-bold font-mono tracking-wide text-xs">${l.domain}</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 self-end sm:self-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isBlocked ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+                            ${isBlocked ? '403 BLOQUEADO' : '200 OK'}
+                        </span>
+                        <span class="text-[10px] text-slate-500 font-mono">${l.bytes}</span>
+                        
+                        <div class="flex items-center gap-1 ml-1">
+                            <button onclick="openAddToListModal('${l.domain}', 'WHITELIST')" class="w-6 h-6 rounded bg-slate-800 hover:bg-emerald-600 text-emerald-400 hover:text-white flex items-center justify-center transition-all" title="Adicionar à Whitelist">
+                                <i class="fa-solid fa-plus text-[10px]"></i>
+                            </button>
+                            <button onclick="openAddToListModal('${l.domain}', 'BLACKLIST')" class="w-6 h-6 rounded bg-slate-800 hover:bg-rose-600 text-rose-400 hover:text-white flex items-center justify-center transition-all" title="Adicionar à Blacklist">
+                                <i class="fa-solid fa-ban text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(row);
+            });
+
+            // Auto-scroll para o final
+            if (document.getElementById('live-autoscroll').checked) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+    } catch (err) {
+        console.error('Erro no Live Stream:', err);
+    }
+}
+</script>
+{% endblock %}
