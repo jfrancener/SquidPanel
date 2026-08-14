@@ -10,7 +10,6 @@
 .bootstrapcdn.com
 .brainly.com.br
 .bvirtual.com.br
-.c.msn.com
 .cdnfonts.com
 .censupeg.com.br
 .censupegead.com.br
