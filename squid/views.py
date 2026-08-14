@@ -248,18 +248,32 @@ def port_delete_view(request, port_id):
 def port_toggle_status_view(request, port_id):
     """
     Altera o modo de liberação de uma porta específica (Liberada Total, Whitelist ou Bloqueada).
+    Suporta atualização instantânea via AJAX sem recarregar a página.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     port = get_object_or_404(ProxyPort, id=port_id)
 
     # Verifica permissão do usuário para esta porta
     if not profile.is_admin and port not in profile.allowed_ports.all() and port.group not in profile.allowed_groups.all():
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Acesso negado'}, status=403)
         return HttpResponseForbidden("Você não tem permissão para controlar esta porta.")
 
     new_status = request.POST.get('status') or request.GET.get('status')
     if new_status in ['ALLOWED', 'WHITELIST', 'BLOCKED']:
         port.current_status = new_status
         port.save()
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'port_id': port.id,
+                'port_number': port.port_number,
+                'port_name': port.name,
+                'new_status': port.current_status,
+                'status_display': port.get_current_status_display()
+            })
+
         messages.success(request, f"Status da sala '{port.name}' (Porta {port.port_number}) alterado para {port.get_current_status_display()}.")
 
     return redirect(request.META.get('HTTP_REFERER', 'groups'))
