@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - SquidPanel{% endblock %}
+{% block page_title %}Dashboard Geral{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto">
+    
+    <!-- Boas-vindas e Banner de Status -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                <span>Olá, {{ request.user.first_name|default:request.user.username }}!</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
+                    {{ profile.get_role_display }}
+                </span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Monitore o tráfego do proxy e gerencie as portas e salas autorizadas para o seu perfil.
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-400 bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-clock text-indigo-400"></i>
+                <span class="font-mono">Fuso: Brasília (UTC-3)</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Cards Estatísticos de Alto Nível -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Total de Portas -->
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-l-indigo-500 shadow-xl">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Portas / Salas</span>
+                    <span class="text-2xl font-bold text-white font-mono">{{ total_ports }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/15 flex items-center justify-center text-indigo-400">
+                    <i class="fa-solid fa-network-wired text-lg"></i>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2">Mapeadas no Squid</p>
+        </div>
+
+        <!-- Salas Liberadas (Acesso Completo) -->
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-l-emerald-500 shadow-xl">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-[11px] font-bold text-emerald-400/90 uppercase tracking-wider block mb-1">Acesso Total</span>
+                    <span class="text-2xl font-bold text-emerald-400 font-mono">{{ allowed_ports_count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400">
+                    <i class="fa-solid fa-lock-open text-lg"></i>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2">Salas 100% liberadas</p>
+        </div>
+
+        <!-- Salas em Whitelist -->
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-l-cyan-500 shadow-xl">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-[11px] font-bold text-cyan-400/90 uppercase tracking-wider block mb-1">Whitelist Didática</span>
+                    <span class="text-2xl font-bold text-cyan-400 font-mono">{{ whitelist_ports_count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/15 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-shield-check text-lg"></i>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2">Apenas sites permitidos</p>
+        </div>
+
+        <!-- Salas Bloqueadas -->
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-l-red-500 shadow-xl">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-[11px] font-bold text-red-400/90 uppercase tracking-wider block mb-1">Sem Acesso</span>
+                    <span class="text-2xl font-bold text-red-400 font-mono">{{ blocked_ports_count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center text-red-400">
+                    <i class="fa-solid fa-ban text-lg"></i>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2">Portas sem conexão</p>
+        </div>
+
+    </div>
+
+    <!-- Grid de Portas e Salas de Aula -->
+    <div class="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl">
+        <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-[#131627]/60">
+            <div>
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-door-open text-indigo-400"></i>
+                    <span>Status das Salas & Portas de Proxy</span>
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">Visão em tempo real das portas ativas e políticas de navegação</p>
+            </div>
+        </div>
+
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {% for port in ports %}
+                <div class="glass-card p-5 rounded-2xl border border-slate-800/90 hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
+                    
+                    <div>
+                        <!-- Header do Card da Sala -->
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-slate-800/80 group-hover:bg-indigo-600/20 text-slate-300 group-hover:text-indigo-400 flex items-center justify-center font-mono font-bold text-sm transition-all border border-slate-700/60">
+                                    {{ port.port_number }}
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-white">{{ port.name }}</h3>
+                                    <span class="text-[11px] text-slate-500">{{ port.group.name }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Badge de Status -->
+                            {% if port.current_status == 'ALLOWED' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Liberada
+                            </span>
+                            {% elif port.current_status == 'WHITELIST' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                                <i class="fa-solid fa-shield-check text-[9px]"></i> Whitelist
+                            </span>
+                            {% elif port.current_status == 'BLOCKED' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+                                <i class="fa-solid fa-ban text-[9px]"></i> Bloqueada
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                <i class="fa-solid fa-clock text-[9px]"></i> Agendada
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Detalhes e IP de Conexão -->
+                        <div class="bg-[#101321] p-3 rounded-xl border border-slate-800/80 mb-4 text-[11px] space-y-1.5">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Endereço Proxy:</span>
+                                <span class="text-slate-300 font-mono font-semibold">10.40.90.99:{{ port.port_number }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Política Ativa:</span>
+                                <span class="text-slate-300 font-semibold">{{ port.get_current_status_display }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rodapé com Info -->
+                    <div class="pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Status: <strong class="text-emerald-400 font-normal">Escutando</strong></span>
+                        <span class="text-slate-400"><i class="fa-solid fa-signal text-[10px] text-indigo-400"></i> Porta Ativa</span>
+                    </div>
+
+                </div>
+                {% empty %}
+                <div class="col-span-full py-12 text-center text-slate-500">
+                    <i class="fa-solid fa-network-wired text-4xl mb-3 opacity-40"></i>
+                    <p class="text-sm">Nenhuma porta atribuída ao seu usuário.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

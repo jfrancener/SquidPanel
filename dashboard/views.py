@@ -1,435 +1,426 @@
 import os
-import re
+import time
 import datetime
-import paramiko
-import subprocess
-from collections import defaultdict
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from .models import DomainRule
-from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.http import JsonResponse, HttpResponseForbidden
+from django.utils.text import slugify
 
-import tldextract
+from .models import (
+    SystemSetting,
+    ProxyGroup,
+    ProxyPort,
+    RoomSchedule,
+    DomainRule,
+    UserProfile
+)
 
-def get_available_logs():
-    hostname = "10.40.88.3"
-    username = "root"
-    password = "@info win 123"
-    try:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname, username=username, password=password, timeout=5)
-        stdin, stdout, stderr = client.exec_command('ls -1 /var/squid/logs/access.log*')
-        files = [f.split('/')[-1] for f in stdout.read().decode().splitlines()]
-        client.close()
-        return sorted(files)
-    except:
-        return ["access.log"]
+# ==========================================
+# 1. AUTENTICAÇÃO E SESSÃO
+# ==========================================
 
-def get_squid_logs(filename=None):
-    hostname = "10.40.88.3"
-    username = "root"
-    password = "@info win 123"
-    
-    try:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname, username=username, password=password, timeout=5)
-        
-        if filename == 'all':
-            cmd = 'cat /var/squid/logs/access.log /var/squid/logs/access.log.[0-6] 2>/dev/null'
-        elif filename:
-            cmd = f'cat /var/squid/logs/{filename}'
+def login_view(request):
+    """
+    Tela de login personalizada com controle de sessão persistente ('remember_me')
+    e detecção de encerramento por inatividade.
+    """
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    timeout_alert = request.GET.get('timeout') == '1'
+    next_url = request.GET.get('next', 'dashboard')
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        remember_me = request.POST.get('remember_me') == 'on'
+
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            if not user.is_active:
+                messages.error(request, 'Esta conta está desativada. Contate o Administrador de TI.')
+                return render(request, 'auth/login.html', {'next': next_url, 'timeout_alert': False})
+
+            login(request, user)
+
+            # Garante que o usuário possua UserProfile
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+
+            # Configura a expiração da sessão com base na preferência do usuário e nas configurações do sistema
+            if remember_me:
+                request.session['remember_me'] = True
+                try:
+                    remember_days = int(SystemSetting.get_value('session_remember_days', 7))
+                except (ValueError, TypeError):
+                    remember_days = 7
+                # Define expiração em segundos (ex: 7 dias)
+                request.session.set_expiry(remember_days * 86400)
+            else:
+                request.session['remember_me'] = False
+                # 0 = Expira quando o navegador é fechado
+                request.session.set_expiry(0)
+                request.session['last_activity'] = time.time()
+
+            return redirect(next_url if next_url and next_url != '/' else 'dashboard')
         else:
-            cmd = 'cat /var/squid/logs/access.log'
-            
-        stdin, stdout, stderr = client.exec_command(cmd)
-        logs = stdout.read().decode('utf-8', errors='ignore').splitlines()
-        client.close()
-        return logs
-    except Exception as e:
-        print(f"Erro ao conectar no pfSense: {e}")
-        return []
+            messages.error(request, 'Usuário ou senha incorretos. Verifique suas credenciais.')
 
-def extract_domain(url_or_domain):
-    clean = url_or_domain.split(':')[0]
-    match = re.search(r'[a-z0-9\-\.]+\.[a-z]{2,}', clean.lower())
-    if match:
-        return match.group(0)
-    return None
-
-def dashboard(request):
-    selected_log = request.GET.get('log_file', 'access.log')
-    start_time_str = request.GET.get('start_time', '').strip()
-    end_time_str = request.GET.get('end_time', '').strip()
-    quick_time = request.GET.get('quick_time', '').strip()
-
-    now = datetime.datetime.now()
-    start_dt = None
-    end_dt = None
-
-    if quick_time == '15m':
-        start_dt = now - datetime.timedelta(minutes=15)
-    elif quick_time == '30m':
-        start_dt = now - datetime.timedelta(minutes=30)
-    elif quick_time == '1h':
-        start_dt = now - datetime.timedelta(hours=1)
-    elif quick_time == '4h':
-        start_dt = now - datetime.timedelta(hours=4)
-    elif quick_time == 'today':
-        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif quick_time == 'yesterday':
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        start_dt = today_start - datetime.timedelta(days=1)
-        end_dt = today_start
-    elif start_time_str:
-        try:
-            clean_start = start_time_str.replace(' ', 'T')
-            start_dt = datetime.datetime.fromisoformat(clean_start)
-        except Exception:
-            pass
-
-    if not end_dt and end_time_str:
-        try:
-            clean_end = end_time_str.replace(' ', 'T')
-            end_dt = datetime.datetime.fromisoformat(clean_end)
-        except Exception:
-            pass
-
-    logs = get_squid_logs(selected_log)
-    available_logs = get_available_logs()
-    
-    # Busca todas as regras salvas no banco
-    rules = DomainRule.objects.all()
-    blacklist = {r.domain for r in rules if r.rule_type == 'block'}
-    whitelist = {r.domain for r in rules if r.rule_type == 'allow'}
-    hidden_domains = {r.domain for r in rules if r.rule_type == 'hide'}
-    verified_domains = {r.domain for r in rules if r.is_verified}
-    
-    groups = defaultdict(lambda: {
-        'count': 0, 
-        'subdomains': defaultdict(lambda: {'count': 0, 'status': 'Desconhecido'}),
-        'is_hidden': False,
-        'in_blacklist': False,
-        'in_whitelist': False,
-        'is_verified': False
+    remember_days = SystemSetting.get_value('session_remember_days', 7)
+    return render(request, 'auth/login.html', {
+        'next': next_url,
+        'timeout_alert': timeout_alert,
+        'remember_days': remember_days
     })
-    
-    filtered_logs_count = 0
-    earliest_dt = None
-    latest_dt = None
 
-    for line in logs:
-        parts = line.split()
-        if len(parts) >= 7:
-            try:
-                log_epoch = float(parts[0])
-                log_dt = datetime.datetime.fromtimestamp(log_epoch)
 
-                if earliest_dt is None or log_dt < earliest_dt:
-                    earliest_dt = log_dt
-                if latest_dt is None or log_dt > latest_dt:
-                    latest_dt = log_dt
+def logout_view(request):
+    """
+    Encerra a sessão do usuário de forma segura.
+    """
+    logout(request)
+    messages.success(request, 'Você saiu do sistema com segurança.')
+    return redirect('login')
 
-                if start_dt and log_dt < start_dt:
-                    continue
-                if end_dt and log_dt > end_dt:
-                    continue
-            except (ValueError, OSError):
-                pass
 
-            filtered_logs_count += 1
-            status = parts[3]
-            url = parts[6]
-            domain = extract_domain(url)
-            
-            if domain:
-                ext = tldextract.extract(domain)
-                root_domain = ext.registered_domain if ext.registered_domain else domain
-                
-                # Check root level rules
-                root_hidden = root_domain in hidden_domains
-                groups[root_domain]['is_hidden'] = root_hidden
-                groups[root_domain]['in_blacklist'] = root_domain in blacklist
-                groups[root_domain]['in_whitelist'] = root_domain in whitelist
-                groups[root_domain]['is_verified'] = root_domain in verified_domains
-                
-                # Add to total hits of the group
-                groups[root_domain]['count'] += 1
-                
-                # Register the specific subdomain
-                groups[root_domain]['subdomains'][domain]['count'] += 1
-                groups[root_domain]['subdomains'][domain]['is_verified'] = domain in verified_domains
-                
-                if 'DENIED' in status:
-                    groups[root_domain]['subdomains'][domain]['status'] = 'Bloqueado'
-                elif groups[root_domain]['subdomains'][domain]['status'] != 'Bloqueado':
-                    groups[root_domain]['subdomains'][domain]['status'] = 'Liberado'
-    
-    context_domains = []
-    for root_dom, data in groups.items():
-        subs = []
-        # Calculate group aggregated status
-        all_blocked = True
-        all_allowed = True
+# ==========================================
+# 2. DASHBOARD PRINCIPAL
+# ==========================================
+
+@login_required
+def dashboard_view(request):
+    """
+    Painel de controle principal exibindo métricas, status das portas e resumo de grupos autorizados.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    # Filtra grupos e portas conforme o perfil do usuário (RBAC)
+    if profile.is_admin:
+        groups = ProxyGroup.objects.prefetch_related('ports').filter(is_active=True)
+        ports = ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number')
+    else:
+        # Usuário comum (Professor / Coordenador) visualiza apenas os grupos/portas atribuídos
+        user_groups = profile.allowed_groups.filter(is_active=True)
+        user_ports = profile.allowed_ports.filter(is_active=True)
         
-        for sub_dom, sub_data in data['subdomains'].items():
-            sub_is_hidden = data['is_hidden'] or (sub_dom in hidden_domains)
-            sub_is_verified = data['is_verified'] or sub_data.get('is_verified', False)
-            
-            if sub_data['status'] == 'Liberado':
-                all_blocked = False
-            if sub_data['status'] == 'Bloqueado':
-                all_allowed = False
-                
-            subs.append({
-                'domain': sub_dom,
-                'count': sub_data['count'],
-                'last_status': sub_data['status'],
-                'in_blacklist': sub_dom in blacklist,
-                'in_whitelist': sub_dom in whitelist,
-                'is_hidden': sub_is_hidden,
-                'is_verified': sub_is_verified,
-                'is_root': sub_dom == root_dom
-            })
-            
-        subs.sort(key=lambda x: x['count'], reverse=True)
+        # Portas permitidas diretamente ou pertencentes aos grupos autorizados
+        ports = ProxyPort.objects.filter(
+            models.Q(id__in=user_ports.values_list('id', flat=True)) |
+            models.Q(group__in=user_groups)
+        ).distinct().select_related('group').order_by('port_number')
         
-        group_status = 'Misto'
-        if all_blocked and not all_allowed: group_status = 'Bloqueado'
-        elif all_allowed and not all_blocked: group_status = 'Liberado'
-        
-        # Se houver apenas 1 subdomínio E for exatamente o root, simplificamos no template
-        is_single_root = len(subs) == 1 and subs[0]['domain'] == root_dom
-        
-        # Filtra para não mostrar lixo (menos de 10 requisições no total da família), 
-        # a menos que a família ou algum subdomínio tenha uma regra aplicada.
-        has_root_rule = data['in_blacklist'] or data['in_whitelist'] or data['is_hidden']
-        has_sub_rule = any(sub['in_blacklist'] or sub['in_whitelist'] or sub['is_hidden'] for sub in subs)
-        
-        if data['count'] >= 10 or has_root_rule or has_sub_rule:
-            context_domains.append({
-                'domain': root_dom,
-                'count': data['count'],
-                'last_status': group_status,
-                'in_blacklist': data['in_blacklist'],
-                'in_whitelist': data['in_whitelist'],
-                'is_hidden': data['is_hidden'],
-                'is_verified': data['is_verified'],
-                'subdomains': subs,
-                'is_single': len(subs) == 1
-            })
-        
-    context_domains.sort(key=lambda x: x['count'], reverse=True)
-    
+        groups = ProxyGroup.objects.filter(
+            models.Q(id__in=user_groups.values_list('id', flat=True)) |
+            models.Q(ports__in=ports)
+        ).distinct().prefetch_related('ports')
+
+    # Métricas para os cards estatísticos
+    total_ports = ports.count()
+    allowed_ports_count = ports.filter(current_status='ALLOWED').count()
+    whitelist_ports_count = ports.filter(current_status='WHITELIST').count()
+    blocked_ports_count = ports.filter(current_status='BLOCKED').count()
+    total_rules = DomainRule.objects.count()
+
     return render(request, 'dashboard/index.html', {
-        'domains': context_domains, 
-        'total_logs': len(logs),
-        'filtered_logs_count': filtered_logs_count,
-        'start_time': start_dt.strftime('%Y-%m-%dT%H:%M') if start_dt else '',
-        'end_time': end_dt.strftime('%Y-%m-%dT%H:%M') if end_dt else '',
-        'formatted_start': start_dt.strftime('%d/%m/%Y %H:%M') if start_dt else None,
-        'formatted_end': end_dt.strftime('%d/%m/%Y %H:%M') if end_dt else None,
-        'quick_time': quick_time,
-        'earliest_dt': earliest_dt.strftime('%d/%m/%Y %H:%M:%S') if earliest_dt else None,
-        'latest_dt': latest_dt.strftime('%d/%m/%Y %H:%M:%S') if latest_dt else None,
-        'full_blacklist': sorted(list(blacklist)),
-        'full_whitelist': sorted(list(whitelist)),
-        'available_logs': available_logs,
-        'selected_log': selected_log
+        'profile': profile,
+        'groups': groups,
+        'ports': ports,
+        'total_ports': total_ports,
+        'allowed_ports_count': allowed_ports_count,
+        'whitelist_ports_count': whitelist_ports_count,
+        'blocked_ports_count': blocked_ports_count,
+        'total_rules': total_rules,
+        'active_menu': 'dashboard'
     })
 
-@csrf_exempt
-def domain_action(request):
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        domain = request.POST.get('domain')
-        
-        if not domain or not action:
-            return JsonResponse({'success': False, 'error': 'Dados invalidos'})
-        
-        clean_domain = domain.lstrip('.')
-        
-        if action == 'unhide':
-            DomainRule.objects.filter(domain=clean_domain, rule_type='hide').delete()
-            return JsonResponse({'success': True})
-            
-        if action == 'remove_rule':
-            rule = DomainRule.objects.filter(domain=clean_domain).first()
-            if rule:
-                if rule.is_verified:
-                    rule.rule_type = 'none'
-                    rule.save()
-                else:
-                    rule.delete()
-            return JsonResponse({'success': True})
-            
-        if action == 'edit_rule':
-            old_domain = request.POST.get('old_domain')
-            if old_domain:
-                old_domain = old_domain.lstrip('.')
-                rule = DomainRule.objects.filter(domain=old_domain).first()
-                if rule:
-                    rule.domain = clean_domain
-                    rule.save()
-            return JsonResponse({'success': True})
-            
-        if action in ['block', 'allow', 'hide', 'verify', 'unverify']:
-            if action == 'verify':
-                rule, created = DomainRule.objects.get_or_create(domain=clean_domain)
-                rule.is_verified = True
-                rule.save()
-                return JsonResponse({'success': True})
-            elif action == 'unverify':
-                rule, created = DomainRule.objects.get_or_create(domain=clean_domain)
-                rule.is_verified = False
-                rule.save()
-                return JsonResponse({'success': True})
-            
-            # Para as outras ações (block, allow, hide)
-            rule, created = DomainRule.objects.get_or_create(domain=clean_domain)
-            rule.rule_type = action
-            rule.save()
-            return JsonResponse({'success': True})
-        
-    return JsonResponse({'success': False})
 
-@csrf_exempt
-def mass_domain_action(request):
-    if request.method == 'POST':
-        import json
-        try:
-            data = json.loads(request.body)
-            action = data.get('action')
-            domains = data.get('domains', [])
-            
-            if not domains or not action:
-                return JsonResponse({'success': False, 'error': 'Dados invalidos'})
-                
-            for domain in domains:
-                clean_domain = domain.lstrip('.')
-                
-                if action == 'verify':
-                    rule, _ = DomainRule.objects.get_or_create(domain=clean_domain)
-                    rule.is_verified = True
-                    rule.save()
-                elif action == 'allow':
-                    rule, _ = DomainRule.objects.get_or_create(domain=clean_domain)
-                    rule.rule_type = 'allow'
-                    rule.save()
-                elif action == 'block':
-                    rule, _ = DomainRule.objects.get_or_create(domain=clean_domain)
-                    rule.rule_type = 'block'
-                    rule.save()
-                    
-            return JsonResponse({'success': True})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-            
-    return JsonResponse({'success': False})
+# ==========================================
+# 3. MÓDULO DE CONFIGURAÇÕES (GERAL & SESSÃO)
+# ==========================================
 
-@csrf_exempt
-def save_and_sync(request):
+@login_required
+def settings_general_view(request):
     """
-    Gera blacklist e whitelist baseado no DB, commita e faz push.
-    Depois, aciona o update via SSH.
+    Sublink: Parâmetros Gerais do Servidor (Apenas Admin).
     """
-    if request.method == 'POST':
-        from django.conf import settings
-        base_dir = str(settings.BASE_DIR)
-        black_path = os.path.join(base_dir, 'blacklist.txt')
-        white_path = os.path.join(base_dir, 'whitelist.txt')
-        
-        rules = DomainRule.objects.all()
-        
-        try:
-            # Sincroniza arquivos de texto
-            def filter_redundant(domain_list):
-                # Sort by length so parents come first
-                sorted_domains = sorted(domain_list, key=len)
-                filtered = []
-                for d in sorted_domains:
-                    is_redundant = False
-                    for parent in filtered:
-                        if d == parent or d.endswith('.' + parent):
-                            is_redundant = True
-                            break
-                    if not is_redundant:
-                        filtered.append(d)
-                return sorted(filtered)
-            
-            blocks = [r.domain for r in rules.filter(rule_type='block')]
-            allows = [r.domain for r in rules.filter(rule_type='allow')]
-            
-            with open(black_path, 'w', encoding='utf-8') as f:
-                for d in filter_redundant(blocks):
-                    f.write(f".{d}\n")
-                    
-            with open(white_path, 'w', encoding='utf-8') as f:
-                for d in filter_redundant(allows):
-                    f.write(f".{d}\n")
-                    
-            # Sincroniza com GitHub
-            subprocess.run(["git", "add", "blacklist.txt", "whitelist.txt"], cwd=base_dir, check=True)
-            subprocess.run(["git", "commit", "-m", "Sync DB via Dashboard"], cwd=base_dir) 
-            subprocess.run(["git", "push", "origin", "main"], cwd=base_dir, check=True)
-            
-            # Executa no firewall
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect("10.40.88.3", username="root", password="@info win 123", timeout=10)
-            stdin, stdout, stderr = client.exec_command("/root/update_lists.sh")
-            out = stdout.read().decode('utf-8', errors='ignore')
-            err = stderr.read().decode('utf-8', errors='ignore')
-            client.close()
-            
-            return JsonResponse({'success': True, 'message': 'Listas salvas, enviadas ao GitHub e atualizadas no Firewall!'})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-            
-    return JsonResponse({'success': False})
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Acesso negado: apenas Administradores de TI podem alterar as configurações.")
 
-@csrf_exempt
-def sync_from_github(request):
-    """
-    Puxa a versão mais recente do GitHub e atualiza o banco de dados (whitelist e blacklist).
-    Isso garante que edições feitas direto no site do GitHub entrem no sistema.
-    """
     if request.method == 'POST':
-        from django.conf import settings
-        base_dir = str(settings.BASE_DIR)
-        black_path = os.path.join(base_dir, 'blacklist.txt')
-        white_path = os.path.join(base_dir, 'whitelist.txt')
-        
+        server_name = request.POST.get('server_name', 'SquidPanel').strip()
+        server_dns = request.POST.get('server_dns', '1.1.1.1, 8.8.8.8').strip()
+        admin_email = request.POST.get('admin_email', '').strip()
+
+        SystemSetting.set_value('server_name', server_name, 'Nome de exibição do servidor')
+        SystemSetting.set_value('server_dns', server_dns, 'Servidores DNS de consulta')
+        SystemSetting.set_value('admin_email', admin_email, 'E-mail do Administrador de TI')
+
+        messages.success(request, 'Parâmetros gerais do servidor atualizados com sucesso!')
+        return redirect('settings_general')
+
+    server_name = SystemSetting.get_value('server_name', 'SquidPanel - Proxy Server')
+    server_dns = SystemSetting.get_value('server_dns', '1.1.1.1, 8.8.8.8')
+    admin_email = SystemSetting.get_value('admin_email', 'admin@local')
+
+    return render(request, 'settings/general.html', {
+        'profile': profile,
+        'server_name': server_name,
+        'server_dns': server_dns,
+        'admin_email': admin_email,
+        'active_menu': 'settings_general'
+    })
+
+
+@login_required
+def settings_session_view(request):
+    """
+    Sublink: Configuração de Sessão & Segurança (Apenas Admin).
+    Permite parametrizar dinamicamente os tempos de inatividade e validade de sessão.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Acesso negado: apenas Administradores de TI podem alterar as configurações.")
+
+    if request.method == 'POST':
         try:
-            # Puxa a força o que está no GitHub
-            subprocess.run(["git", "fetch", "origin", "main"], cwd=base_dir, check=True)
-            subprocess.run(["git", "reset", "--hard", "origin/main"], cwd=base_dir, check=True)
-            
-            # Lê os arquivos e atualiza o banco
-            if os.path.exists(black_path):
-                with open(black_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        domain = line.strip().lstrip('.')
-                        if domain:
-                            # Se não existir regra, ou se existir e não for 'hide', atualiza para 'block'
-                            rule, created = DomainRule.objects.get_or_create(domain=domain, defaults={'rule_type': 'block'})
-                            if not created and rule.rule_type != 'hide':
-                                rule.rule_type = 'block'
-                                rule.save()
-                                
-            if os.path.exists(white_path):
-                with open(white_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        domain = line.strip().lstrip('.')
-                        if domain:
-                            rule, created = DomainRule.objects.get_or_create(domain=domain, defaults={'rule_type': 'allow'})
-                            if not created and rule.rule_type != 'hide':
-                                rule.rule_type = 'allow'
-                                rule.save()
-                                
-            return JsonResponse({'success': True, 'message': 'Banco de dados atualizado com a versão do GitHub.'})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-            
-    return JsonResponse({'success': False})
+            timeout_minutes = int(request.POST.get('session_timeout_minutes', 10))
+            remember_days = int(request.POST.get('session_remember_days', 7))
+            max_login_attempts = int(request.POST.get('max_login_attempts', 5))
+            expire_browser_close = request.POST.get('expire_browser_close') == 'on'
+
+            # Validações básicas de limites razoáveis
+            timeout_minutes = max(1, min(240, timeout_minutes)) # 1 min a 4 horas
+            remember_days = max(1, min(30, remember_days))       # 1 a 30 dias
+
+            SystemSetting.set_value('session_timeout_minutes', timeout_minutes, 'Tempo de inatividade padrão (minutos)')
+            SystemSetting.set_value('session_remember_days', remember_days, 'Validade da sessão Lembrar-me (dias)')
+            SystemSetting.set_value('max_login_attempts', max_login_attempts, 'Máximo de tentativas de login')
+            SystemSetting.set_value('expire_browser_close', 'true' if expire_browser_close else 'false', 'Encerrar sessão ao fechar navegador')
+
+            messages.success(request, 'Configurações de Sessão e Segurança atualizadas com sucesso!')
+            return redirect('settings_session')
+        except ValueError:
+            messages.error(request, 'Valores numéricos inválidos fornecidos.')
+
+    timeout_minutes = SystemSetting.get_value('session_timeout_minutes', 10)
+    remember_days = SystemSetting.get_value('session_remember_days', 7)
+    max_login_attempts = SystemSetting.get_value('max_login_attempts', 5)
+    expire_browser_close = SystemSetting.get_value('expire_browser_close', 'true') == 'true'
+
+    return render(request, 'settings/session.html', {
+        'profile': profile,
+        'timeout_minutes': timeout_minutes,
+        'remember_days': remember_days,
+        'max_login_attempts': max_login_attempts,
+        'expire_browser_close': expire_browser_close,
+        'active_menu': 'settings_session'
+    })
+
+
+# ==========================================
+# 4. GESTÃO DE USUÁRIOS E PERMISSÕES (RBAC)
+# ==========================================
+
+@login_required
+def user_list_view(request):
+    """
+    Listagem de todos os usuários do sistema com seus respectivos perfis e salas autorizadas.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado: você não tem permissão para gerenciar usuários.")
+
+    query = request.GET.get('q', '').strip()
+    role_filter = request.GET.get('role', '').strip()
+
+    users = User.objects.select_related('profile').prefetch_related('profile__allowed_groups', 'profile__allowed_ports').all().order_by('-date_joined')
+
+    if query:
+        users = users.filter(
+            models.Q(username__icontains=query) |
+            models.Q(first_name__icontains=query) |
+            models.Q(last_name__icontains=query) |
+            models.Q(email__icontains=query)
+        )
+
+    if role_filter:
+        users = users.filter(profile__role=role_filter)
+
+    return render(request, 'users/index.html', {
+        'profile': profile,
+        'users_list': users,
+        'query': query,
+        'role_filter': role_filter,
+        'active_menu': 'users'
+    })
+
+
+@login_required
+def user_create_view(request):
+    """
+    Criação de um novo usuário com perfil, cargo e atribuição de grupos/salas.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado: você não tem permissão para criar usuários.")
+
+    groups = ProxyGroup.objects.filter(is_active=True).prefetch_related('ports')
+    ports = ProxyPort.objects.filter(is_active=True).select_related('group').order_by('port_number')
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '').strip()
+        role = request.POST.get('role', 'OPERATOR')
+        selected_groups = request.POST.getlist('allowed_groups')
+        selected_ports = request.POST.getlist('allowed_ports')
+
+        if not username or not password:
+            messages.error(request, 'Usuário e senha são obrigatórios.')
+            return render(request, 'users/form.html', {'groups': groups, 'ports': ports, 'profile': profile, 'is_edit': False})
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, f"O nome de usuário '{username}' já está em uso.")
+            return render(request, 'users/form.html', {'groups': groups, 'ports': ports, 'profile': profile, 'is_edit': False})
+
+        # Não permite que um Manager crie um ADMIN a menos que seja ele próprio um ADMIN
+        if role == 'ADMIN' and not profile.is_admin:
+            messages.error(request, 'Apenas Administradores Gerais podem conceder o perfil de Administrador.')
+            role = 'MANAGER'
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        user_profile, _ = UserProfile.objects.get_or_create(user=user)
+        user_profile.role = role
+        user_profile.save()
+
+        user_profile.allowed_groups.set(selected_groups)
+        user_profile.allowed_ports.set(selected_ports)
+
+        messages.success(request, f"Usuário '{username}' criado com sucesso!")
+        return redirect('user_list')
+
+    return render(request, 'users/form.html', {
+        'profile': profile,
+        'groups': groups,
+        'ports': ports,
+        'is_edit': False,
+        'active_menu': 'users'
+    })
+
+
+@login_required
+def user_edit_view(request, user_id):
+    """
+    Edição de dados, permissões, cargo e redefinição opcional de senha de um usuário.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado: você não tem permissão para editar usuários.")
+
+    target_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
+    target_profile, _ = UserProfile.objects.get_or_create(user=target_user)
+
+    # Proteção: Manager não pode editar Admin
+    if target_profile.is_admin and not profile.is_admin:
+        messages.error(request, 'Você não tem permissão para alterar contas de Administrador Geral.')
+        return redirect('user_list')
+
+    groups = ProxyGroup.objects.filter(is_active=True).prefetch_related('ports')
+    ports = ProxyPort.objects.filter(is_active=True).select_related('group').order_by('port_number')
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '').strip()
+        role = request.POST.get('role', target_profile.role)
+        selected_groups = request.POST.getlist('allowed_groups')
+        selected_ports = request.POST.getlist('allowed_ports')
+
+        target_user.first_name = first_name
+        target_user.last_name = last_name
+        target_user.email = email
+
+        if password:
+            target_user.set_password(password)
+
+        target_user.save()
+
+        if profile.is_admin:
+            target_profile.role = role
+
+        target_profile.save()
+        target_profile.allowed_groups.set(selected_groups)
+        target_profile.allowed_ports.set(selected_ports)
+
+        messages.success(request, f"Usuário '{target_user.username}' atualizado com sucesso!")
+        return redirect('user_list')
+
+    selected_group_ids = list(target_profile.allowed_groups.values_list('id', flat=True))
+    selected_port_ids = list(target_profile.allowed_ports.values_list('id', flat=True))
+
+    return render(request, 'users/form.html', {
+        'profile': profile,
+        'target_user': target_user,
+        'target_profile': target_profile,
+        'groups': groups,
+        'ports': ports,
+        'selected_group_ids': selected_group_ids,
+        'selected_port_ids': selected_port_ids,
+        'is_edit': True,
+        'active_menu': 'users'
+    })
+
+
+@login_required
+def user_toggle_status_view(request, user_id):
+    """
+    Ativa ou desativa a conta de um usuário.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    target_user = get_object_or_404(User, id=user_id)
+    if target_user == request.user:
+        messages.error(request, 'Você não pode desativar sua própria conta.')
+        return redirect('user_list')
+
+    target_user.is_active = not target_user.is_active
+    target_user.save()
+
+    status_str = "ativado" if target_user.is_active else "desativado"
+    messages.success(request, f"Usuário '{target_user.username}' foi {status_str} com sucesso.")
+    return redirect('user_list')
+
+
+@login_required
+def user_delete_view(request, user_id):
+    """
+    Exclui um usuário do sistema.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Acesso negado: apenas Administradores Gerais podem excluir contas.")
+
+    target_user = get_object_or_404(User, id=user_id)
+    if target_user == request.user:
+        messages.error(request, 'Você não pode excluir sua própria conta.')
+        return redirect('user_list')
+
+    username = target_user.username
+    target_user.delete()
+    messages.success(request, f"Usuário '{username}' foi excluído permanentemente.")
+    return redirect('user_list')

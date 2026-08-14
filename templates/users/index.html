@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block title %}Usuários & Acessos - SquidPanel{% endblock %}
+{% block page_title %}Gestão de Acesso / Usuários{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header e Ações -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-users-gear text-indigo-400"></i>
+                <span>Usuários & Permissões (RBAC)</span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Cadastre professores, coordenadores e defina quais salas cada usuário pode visualizar ou liberar.
+            </p>
+        </div>
+
+        <a href="{% url 'user_create' %}" class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Novo Usuário</span>
+        </a>
+    </div>
+
+    <!-- Filtros e Busca -->
+    <div class="glass-panel p-4 rounded-2xl border border-slate-800/80 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <form method="GET" action="{% url 'user_list' %}" class="flex-1 flex gap-3 w-full">
+            <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+                <input type="text" name="q" value="{{ query }}" placeholder="Buscar por usuário, nome ou e-mail..." class="w-full bg-[#111422] border border-slate-700/80 text-white text-xs rounded-xl pl-9 pr-4 py-2.5 focus:border-indigo-500 outline-none">
+            </div>
+            
+            <select name="role" onchange="this.form.submit()" class="bg-[#111422] border border-slate-700/80 text-white text-xs rounded-xl px-3 py-2.5 focus:border-indigo-500 outline-none">
+                <option value="">Todos os Cargos</option>
+                <option value="ADMIN" {% if role_filter == 'ADMIN' %}selected{% endif %}>Administrador Geral</option>
+                <option value="MANAGER" {% if role_filter == 'MANAGER' %}selected{% endif %}>Coordenador / Gestor</option>
+                <option value="OPERATOR" {% if role_filter == 'OPERATOR' %}selected{% endif %}>Operador / Professor</option>
+            </select>
+        </form>
+    </div>
+
+    <!-- Tabela de Usuários -->
+    <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-[#131627] text-slate-400 text-[11px] font-bold uppercase tracking-wider border-b border-slate-800">
+                        <th class="p-4">Usuário / Nome</th>
+                        <th class="p-4">Cargo / Nível</th>
+                        <th class="p-4">Salas / Portas Autorizadas</th>
+                        <th class="p-4 text-center">Status</th>
+                        <th class="p-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 text-xs">
+                    {% for u in users_list %}
+                    <tr class="hover:bg-slate-800/30 transition-colors">
+                        
+                        <!-- Nome e Usuário -->
+                        <td class="p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600/30 to-purple-600/30 border border-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center text-xs">
+                                    {{ u.first_name|default:u.username|slice:":1"|upper }}
+                                </div>
+                                <div>
+                                    <p class="font-bold text-white">{{ u.get_full_name|default:u.username }}</p>
+                                    <p class="text-[11px] text-slate-500 font-mono">@{{ u.username }} {% if u.email %}• {{ u.email }}{% endif %}</p>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Cargo -->
+                        <td class="p-4">
+                            {% if u.profile.role == 'ADMIN' or u.is_superuser %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                                <i class="fa-solid fa-crown text-[9px]"></i> Admin Geral
+                            </span>
+                            {% elif u.profile.role == 'MANAGER' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                <i class="fa-solid fa-user-tie text-[9px]"></i> Coordenador
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                                <i class="fa-solid fa-chalkboard-user text-[9px]"></i> Professor / Operador
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Salas Autorizadas -->
+                        <td class="p-4">
+                            {% if u.profile.role == 'ADMIN' or u.is_superuser %}
+                                <span class="text-xs text-indigo-400 font-semibold flex items-center gap-1">
+                                    <i class="fa-solid fa-globe text-[11px]"></i> Todas as Salas e Grupos
+                                </span>
+                            {% else %}
+                                <div class="flex flex-wrap gap-1">
+                                    {% for port in u.profile.allowed_ports.all %}
+                                        <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] border border-slate-700 font-mono">
+                                            {{ port.name }} ({{ port.port_number }})
+                                        </span>
+                                    {% empty %}
+                                        <span class="text-slate-500 text-[11px]">Nenhuma sala vinculada</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status -->
+                        <td class="p-4 text-center">
+                            {% if u.is_active %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Ativo
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+                                Inativo
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Ações -->
+                        <td class="p-4 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="{% url 'user_edit' u.id %}" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white flex items-center justify-center transition-all border border-slate-700/60" title="Editar usuário">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </a>
+
+                                {% if u != request.user %}
+                                <a href="{% url 'user_toggle_status' u.id %}" class="w-8 h-8 rounded-lg {% if u.is_active %}bg-slate-800 hover:bg-amber-600 text-slate-400 hover:text-white{% else %}bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white{% endif %} flex items-center justify-center transition-all border border-slate-700/60" title="{% if u.is_active %}Desativar conta{% else %}Ativar conta{% endif %}">
+                                    <i class="fa-solid {% if u.is_active %}fa-user-slash{% else %}fa-user-check{% endif %} text-xs"></i>
+                                </a>
+
+                                {% if profile.is_admin %}
+                                <a href="{% url 'user_delete' u.id %}" onclick="return confirm('Tem certeza que deseja excluir o usuário {{ u.username }}?')" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white flex items-center justify-center transition-all border border-slate-700/60" title="Excluir usuário">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </a>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-slate-500">
+                            <i class="fa-solid fa-users text-3xl mb-2 opacity-40"></i>
+                            <p>Nenhum usuário encontrado.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
