@@ -1,0 +1,573 @@
+{% extends 'base.html' %}
+
+{% block title %}Grupos & Portas - SquidPanel{% endblock %}
+{% block page_title %}Proxy / Grupos & Portas de Escuta{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header Principal -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-layer-group text-indigo-400"></i>
+                <span>Gerenciador de Grupos & Portas de Proxy</span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Crie grupos (ex: Salas de Aula, EAD, Administrativo), defina a política padrão (Bloqueio Total ou Liberado Geral) e associe as Whitelists/Blacklists desejadas.
+            </p>
+        </div>
+
+        <button onclick="document.getElementById('modal-new-group').classList.remove('hidden')" class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all transform hover:-translate-y-0.5">
+            <i class="fa-solid fa-plus"></i>
+            <span>Novo Grupo</span>
+        </button>
+    </div>
+
+    <!-- Estatísticas Rápidas -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-l-indigo-500 shadow-lg">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total de Grupos</span>
+                    <span class="text-2xl font-bold text-white font-mono">{{ groups.count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-folder-tree"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-l-cyan-500 shadow-lg">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total de Salas / Portas</span>
+                    <span class="text-2xl font-bold text-cyan-400 font-mono">{{ total_ports_count }}</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-network-wired"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-l-emerald-500 shadow-lg">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Whitelists / Blacklists</span>
+                    <span class="text-2xl font-bold text-emerald-400 font-mono">{{ all_whitelists.count }} <span class="text-xs text-slate-500 font-normal">WL</span> / {{ all_blacklists.count }} <span class="text-xs text-slate-500 font-normal">BL</span></span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-sliders"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Busca -->
+    <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+        <form method="GET" action="{% url 'groups' %}" class="flex gap-3">
+            <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+                <input type="text" name="q" value="{{ query }}" placeholder="Buscar por grupo, sala ou número de porta..." class="w-full bg-[#111422] border border-slate-700/80 text-white text-xs rounded-xl pl-9 pr-4 py-2.5 focus:border-indigo-500 outline-none">
+            </div>
+            {% if query %}
+            <a href="{% url 'groups' %}" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Limpar</span>
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Lista de Grupos -->
+    <div class="space-y-6">
+        {% for g in groups %}
+        <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl transition-all">
+            
+            <!-- Topo do Grupo -->
+            <div class="p-6 bg-[#131627] border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="space-y-1.5">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-folder-open text-indigo-400"></i>
+                            <span>{{ g.name }}</span>
+                        </h2>
+
+                        <!-- Badge Política Padrão -->
+                        {% if g.default_policy == 'WHITELIST_STRICT' %}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            <i class="fa-solid fa-lock text-[9px]"></i> Bloqueio Total (Apenas Whitelists)
+                        </span>
+                        {% elif g.default_policy == 'BLACKLIST_ONLY' %}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            <i class="fa-solid fa-lock-open text-[9px]"></i> Liberado Geral (Aplica Blacklists)
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                            <i class="fa-solid fa-clock text-[9px]"></i> Horários Programados
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    <p class="text-xs text-slate-400">
+                        {{ g.description|default:"Grupo de controle de navegação e salas." }}
+                    </p>
+                </div>
+
+                <!-- Ações do Grupo -->
+                <div class="flex items-center gap-2">
+                    <button onclick="openAddPortModal({{ g.id }}, '{{ g.name|escapejs }}')" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-indigo-500/30">
+                        <i class="fa-solid fa-plus text-[10px]"></i>
+                        <span>Nova Sala / Porta</span>
+                    </button>
+
+                    <button onclick="openEditGroupModal({{ g.id }}, '{{ g.name|escapejs }}', '{{ g.description|escapejs }}', '{{ g.default_policy }}', [{% for wl in g.whitelists.all %}{{ wl.id }},{% endfor %}], [{% for bl in g.blacklists.all %}{{ bl.id }},{% endfor %}])" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700">
+                        <i class="fa-solid fa-gear text-[10px]"></i>
+                        <span>Configurar Grupo</span>
+                    </button>
+
+                    {% if request.user.profile.is_admin %}
+                    <a href="{% url 'group_delete' g.id %}" onclick="return confirm('Excluir o grupo {{ g.name }} e todas as suas portas?')" class="p-2 bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white rounded-xl text-xs transition-all border border-slate-700" title="Excluir Grupo">
+                        <i class="fa-solid fa-trash text-[11px]"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Listas Vinculadas a este Grupo -->
+            <div class="p-4 bg-[#0f121e] border-b border-slate-800/80 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                
+                <!-- Whitelists Aplicadas -->
+                <div>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-shield-halved text-emerald-400"></i> Whitelists Permitidas neste Grupo:
+                    </span>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for wl in g.whitelists.all %}
+                        <a href="{% url 'list_detail' wl.id %}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 transition-all">
+                            <span>{{ wl.name }}</span>
+                            <span class="text-[9px] font-mono text-emerald-400/80 bg-emerald-950 px-1 rounded">({{ wl.domain_count }})</span>
+                        </a>
+                        {% empty %}
+                        <span class="text-slate-600 italic text-[11px]">Nenhuma whitelist vinculada.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Blacklists Aplicadas -->
+                <div>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-ban text-rose-400"></i> Blacklists Bloqueadas neste Grupo:
+                    </span>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for bl in g.blacklists.all %}
+                        <a href="{% url 'list_detail' bl.id %}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 transition-all">
+                            <span>{{ bl.name }}</span>
+                            <span class="text-[9px] font-mono text-rose-400/80 bg-rose-950 px-1 rounded">({{ bl.domain_count }})</span>
+                        </a>
+                        {% empty %}
+                        <span class="text-slate-600 italic text-[11px]">Nenhuma blacklist vinculada.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Tabela de Portas / Salas do Grupo -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-[#111422] text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800/80">
+                            <th class="p-3.5 pl-6">Porta Squid</th>
+                            <th class="p-3.5">Nome da Sala / Setor</th>
+                            <th class="p-3.5 text-center">Status de Acesso Atual</th>
+                            <th class="p-3.5 text-right pr-6">Ações / Alternar Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 text-xs">
+                        {% for port in g.ports.all %}
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            
+                            <!-- Porta -->
+                            <td class="p-3.5 pl-6 font-mono font-bold text-indigo-400">
+                                <span class="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                                    {{ port.port_number }}
+                                </span>
+                            </td>
+
+                            <!-- Nome -->
+                            <td class="p-3.5 font-semibold text-white">
+                                {{ port.name }}
+                            </td>
+
+                            <!-- Status -->
+                            <td class="p-3.5 text-center">
+                                {% if port.current_status == 'ALLOWED' %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberada Total
+                                </span>
+                                {% elif port.current_status == 'WHITELIST' %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Apenas Whitelist
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Bloqueio Total
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Ações -->
+                            <td class="p-3.5 text-right pr-6">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    
+                                    <!-- Botão Alternar Status Rápido -->
+                                    <form method="POST" action="{% url 'port_toggle_status' port.id %}" class="inline-flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+                                        {% csrf_token %}
+                                        <button type="submit" name="status" value="WHITELIST" class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all {% if port.current_status == 'WHITELIST' %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}" title="Modo Whitelist">
+                                            WL
+                                        </button>
+                                        <button type="submit" name="status" value="ALLOWED" class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all {% if port.current_status == 'ALLOWED' %}bg-emerald-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}" title="Liberar Total">
+                                            Livre
+                                        </button>
+                                        <button type="submit" name="status" value="BLOCKED" class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all {% if port.current_status == 'BLOCKED' %}bg-rose-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}" title="Bloquear Total">
+                                            Bloquear
+                                        </button>
+                                    </form>
+
+                                    <!-- Excluir Porta -->
+                                    {% if request.user.profile.is_admin %}
+                                    <a href="{% url 'port_delete' port.id %}" onclick="return confirm('Excluir a porta {{ port.port_number }} ({{ port.name }})?')" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white transition-all border border-slate-700/60" title="Excluir porta">
+                                        <i class="fa-solid fa-trash text-[10px]"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="p-6 text-center text-slate-500">
+                                <i class="fa-solid fa-network-wired text-2xl mb-1.5 opacity-40"></i>
+                                <p class="text-xs">Nenhuma sala/porta cadastrada neste grupo.</p>
+                                <button onclick="openAddPortModal({{ g.id }}, '{{ g.name|escapejs }}')" class="mt-2 text-indigo-400 hover:text-indigo-300 text-xs font-semibold">
+                                    + Adicionar primeira porta
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+        {% empty %}
+        <div class="py-16 text-center text-slate-500 glass-panel rounded-2xl border border-slate-800">
+            <i class="fa-solid fa-layer-group text-4xl mb-3 opacity-40 text-indigo-500"></i>
+            <h3 class="text-sm font-bold text-white mb-1">Nenhum Grupo de Proxy Cadastrado</h3>
+            <p class="text-xs text-slate-400 max-w-md mx-auto mb-4">Crie grupos como Salas de Aula ou EAD para gerenciar as portas e políticas de acesso.</p>
+            <button onclick="document.getElementById('modal-new-group').classList.remove('hidden')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all">
+                Criar Primeiro Grupo
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL DE CRIAÇÃO DE NOVO GRUPO -->
+<!-- ========================================== -->
+<div id="modal-new-group" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-fade-in max-h-[90vh] flex flex-col">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-folder-plus text-indigo-400"></i>
+                <span>Novo Grupo de Navegação</span>
+            </h3>
+            <button onclick="document.getElementById('modal-new-group').classList.add('hidden')" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="{% url 'group_create' %}" class="p-6 space-y-5 overflow-y-auto flex-1">
+            {% csrf_token %}
+
+            <div>
+                <label for="group_name" class="block text-xs font-semibold text-white mb-1.5">
+                    Nome do Grupo <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="group_name" name="name" required placeholder="ex: Salas EAD / Laboratório de Robótica" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label for="group_description" class="block text-xs font-semibold text-white mb-1.5">
+                    Descrição do Grupo
+                </label>
+                <input type="text" id="group_description" name="description" placeholder="ex: Controle de acesso para computadores do bloco B" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <!-- Política Padrão -->
+            <div>
+                <label class="block text-xs font-semibold text-white mb-1.5">
+                    Política de Acesso Padrão:
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="bg-[#0f121e] p-3.5 rounded-xl border border-slate-800 hover:border-amber-500/50 cursor-pointer transition-all flex items-start gap-3">
+                        <input type="radio" name="default_policy" value="WHITELIST_STRICT" checked class="mt-1 text-amber-500 focus:ring-amber-500">
+                        <div>
+                            <span class="text-xs font-bold text-amber-300 block">Bloqueio Total (Whitelist)</span>
+                            <span class="text-[11px] text-slate-400 block mt-0.5">Tudo é bloqueado por padrão, permitindo apenas os sites das Whitelists vinculadas.</span>
+                        </div>
+                    </label>
+
+                    <label class="bg-[#0f121e] p-3.5 rounded-xl border border-slate-800 hover:border-emerald-500/50 cursor-pointer transition-all flex items-start gap-3">
+                        <input type="radio" name="default_policy" value="BLACKLIST_ONLY" class="mt-1 text-emerald-500 focus:ring-emerald-500">
+                        <div>
+                            <span class="text-xs font-bold text-emerald-300 block">Liberado Geral (Blacklist)</span>
+                            <span class="text-[11px] text-slate-400 block mt-0.5">Acesso livre à internet, bloqueando apenas os sites das Blacklists vinculadas.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Seleção de Whitelists -->
+            <div>
+                <label class="block text-xs font-semibold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved"></i> Vincular Whitelists (Sites Permitidos):
+                </label>
+                <div class="space-y-1.5 bg-[#0f121e] p-3 rounded-xl border border-slate-800 max-h-36 overflow-y-auto">
+                    {% for wl in all_whitelists %}
+                    <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                        <span class="text-xs text-slate-300">{{ wl.name }} <span class="text-[10px] text-slate-500">({{ wl.domain_count }} domínios)</span></span>
+                        <input type="checkbox" name="whitelists" value="{{ wl.id }}" class="w-4 h-4 rounded bg-[#181c30] border-slate-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Seleção de Blacklists -->
+            <div>
+                <label class="block text-xs font-semibold text-rose-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-ban"></i> Vincular Blacklists (Sites Bloqueados):
+                </label>
+                <div class="space-y-1.5 bg-[#0f121e] p-3 rounded-xl border border-slate-800 max-h-36 overflow-y-auto">
+                    {% for bl in all_blacklists %}
+                    <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                        <span class="text-xs text-slate-300">{{ bl.name }} <span class="text-[10px] text-slate-500">({{ bl.domain_count }} domínios)</span></span>
+                        <input type="checkbox" name="blacklists" value="{{ bl.id }}" class="w-4 h-4 rounded bg-[#181c30] border-slate-700 text-rose-600 focus:ring-rose-500 cursor-pointer">
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('modal-new-group').classList.add('hidden')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20">
+                    Criar Grupo
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL DE EDIÇÃO DE GRUPO -->
+<!-- ========================================== -->
+<div id="modal-edit-group" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-fade-in max-h-[90vh] flex flex-col">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-gear text-indigo-400"></i>
+                <span>Configurar Grupo & Políticas</span>
+            </h3>
+            <button onclick="document.getElementById('modal-edit-group').classList.add('hidden')" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-edit-group" method="POST" action="" class="p-6 space-y-5 overflow-y-auto flex-1">
+            {% csrf_token %}
+
+            <div>
+                <label for="edit_group_name" class="block text-xs font-semibold text-white mb-1.5">
+                    Nome do Grupo <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="edit_group_name" name="name" required class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label for="edit_group_description" class="block text-xs font-semibold text-white mb-1.5">
+                    Descrição do Grupo
+                </label>
+                <input type="text" id="edit_group_description" name="description" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <!-- Política Padrão -->
+            <div>
+                <label class="block text-xs font-semibold text-white mb-1.5">
+                    Política de Acesso Padrão:
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="bg-[#0f121e] p-3.5 rounded-xl border border-slate-800 hover:border-amber-500/50 cursor-pointer transition-all flex items-start gap-3">
+                        <input type="radio" id="policy_strict" name="default_policy" value="WHITELIST_STRICT" class="mt-1 text-amber-500 focus:ring-amber-500">
+                        <div>
+                            <span class="text-xs font-bold text-amber-300 block">Bloqueio Total (Whitelist)</span>
+                            <span class="text-[11px] text-slate-400 block mt-0.5">Tudo é bloqueado por padrão, permitindo apenas os sites das Whitelists vinculadas.</span>
+                        </div>
+                    </label>
+
+                    <label class="bg-[#0f121e] p-3.5 rounded-xl border border-slate-800 hover:border-emerald-500/50 cursor-pointer transition-all flex items-start gap-3">
+                        <input type="radio" id="policy_blacklist" name="default_policy" value="BLACKLIST_ONLY" class="mt-1 text-emerald-500 focus:ring-emerald-500">
+                        <div>
+                            <span class="text-xs font-bold text-emerald-300 block">Liberado Geral (Blacklist)</span>
+                            <span class="text-[11px] text-slate-400 block mt-0.5">Acesso livre à internet, bloqueando apenas os sites das Blacklists vinculadas.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Seleção de Whitelists -->
+            <div>
+                <label class="block text-xs font-semibold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved"></i> Vincular Whitelists (Sites Permitidos):
+                </label>
+                <div class="space-y-1.5 bg-[#0f121e] p-3 rounded-xl border border-slate-800 max-h-36 overflow-y-auto">
+                    {% for wl in all_whitelists %}
+                    <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                        <span class="text-xs text-slate-300">{{ wl.name }} <span class="text-[10px] text-slate-500">({{ wl.domain_count }} domínios)</span></span>
+                        <input type="checkbox" name="whitelists" value="{{ wl.id }}" class="checkbox-wl-edit w-4 h-4 rounded bg-[#181c30] border-slate-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Seleção de Blacklists -->
+            <div>
+                <label class="block text-xs font-semibold text-rose-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-ban"></i> Vincular Blacklists (Sites Bloqueados):
+                </label>
+                <div class="space-y-1.5 bg-[#0f121e] p-3 rounded-xl border border-slate-800 max-h-36 overflow-y-auto">
+                    {% for bl in all_blacklists %}
+                    <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                        <span class="text-xs text-slate-300">{{ bl.name }} <span class="text-[10px] text-slate-500">({{ bl.domain_count }} domínios)</span></span>
+                        <input type="checkbox" name="blacklists" value="{{ bl.id }}" class="checkbox-bl-edit w-4 h-4 rounded bg-[#181c30] border-slate-700 text-rose-600 focus:ring-rose-500 cursor-pointer">
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('modal-edit-group').classList.add('hidden')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20">
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL DE ADICIONAR SALA / PORTA -->
+<!-- ========================================== -->
+<div id="modal-add-port" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-network-wired text-indigo-400"></i>
+                    <span>Nova Sala / Porta de Escuta</span>
+                </h3>
+                <p id="port-modal-group-name" class="text-[11px] text-indigo-400/80 mt-0.5 font-medium"></p>
+            </div>
+            <button onclick="document.getElementById('modal-add-port').classList.add('hidden')" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-add-port" method="POST" action="" class="p-6 space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label for="port_name" class="block text-xs font-semibold text-white mb-1.5">
+                    Nome da Sala / Identificação <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="port_name" name="name" required placeholder="ex: Sala 1, Sala EAD 2, Lab Info" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label for="port_number" class="block text-xs font-semibold text-white mb-1.5">
+                    Número da Porta Proxy (Squid) <span class="text-red-400">*</span>
+                </label>
+                <input type="number" id="port_number" name="port_number" required min="1024" max="65535" placeholder="ex: 9020, 9021, 9030" class="w-full bg-[#0f121e] border border-slate-700 text-white font-mono text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+                <p class="text-[10px] text-slate-500 mt-1">Defina a porta TCP onde as máquinas desta sala serão apontadas.</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-white mb-1.5">
+                    Status Inicial da Porta:
+                </label>
+                <select name="current_status" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+                    <option value="WHITELIST" selected>Apenas Whitelist (Padrão Seguro)</option>
+                    <option value="ALLOWED">Liberada Total (Acesso Livre)</option>
+                    <option value="BLOCKED">Bloqueio Total (Sem Acesso)</option>
+                </select>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('modal-add-port').classList.add('hidden')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20">
+                    Cadastrar Sala/Porta
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- Scripts de Interatividade dos Modais -->
+<script>
+function openAddPortModal(groupId, groupName) {
+    document.getElementById('form-add-port').action = `/proxy/groups/${groupId}/ports/create/`;
+    document.getElementById('port-modal-group-name').textContent = `Grupo: ${groupName}`;
+    document.getElementById('port_name').value = '';
+    document.getElementById('port_number').value = '';
+    document.getElementById('modal-add-port').classList.remove('hidden');
+}
+
+function openEditGroupModal(groupId, name, description, defaultPolicy, whitelistIds, blacklistIds) {
+    document.getElementById('form-edit-group').action = `/proxy/groups/${groupId}/edit/`;
+    document.getElementById('edit_group_name').value = name;
+    document.getElementById('edit_group_description').value = description;
+    
+    if (defaultPolicy === 'WHITELIST_STRICT') {
+        document.getElementById('policy_strict').checked = true;
+    } else {
+        document.getElementById('policy_blacklist').checked = true;
+    }
+
+    // Marca as checkboxes de whitelists
+    document.querySelectorAll('.checkbox-wl-edit').forEach(cb => {
+        cb.checked = whitelistIds.includes(parseInt(cb.value));
+    });
+
+    // Marca as checkboxes de blacklists
+    document.querySelectorAll('.checkbox-bl-edit').forEach(cb => {
+        cb.checked = blacklistIds.includes(parseInt(cb.value));
+    });
+
+    document.getElementById('modal-edit-group').classList.remove('hidden');
+}
+</script>
+{% endblock %}

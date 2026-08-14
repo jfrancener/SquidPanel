@@ -79,6 +79,12 @@ class ProxyPort(models.Model):
     def __str__(self):
         return f"{self.name} (Porta {self.port_number})"
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(f"{self.name}-{self.port_number}")
+        super().save(*args, **kwargs)
+
 
 class RoomSchedule(models.Model):
     """
