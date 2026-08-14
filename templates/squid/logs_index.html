@@ -20,7 +20,7 @@
                         </span>
                     </h1>
                     <p class="text-xs text-slate-400 mt-0.5">
-                        Histórico completo de navegação, auditoria e monitoramento em tempo real das salas e portas.
+                        Histórico de navegação, auditoria de IPs/Hostnames e monitoramento em tempo real das salas.
                     </p>
                 </div>
             </div>
@@ -137,9 +137,9 @@
                 <!-- Busca Textual -->
                 <div class="lg:col-span-2">
                     <label class="block font-semibold text-slate-300 mb-1">
-                        <i class="fa-solid fa-magnifying-glass text-indigo-400 mr-1"></i> Domínio / URL ou IP:
+                        <i class="fa-solid fa-magnifying-glass text-indigo-400 mr-1"></i> Domínio, Hostname ou IP:
                     </label>
-                    <input type="text" name="q" value="{{ query_term }}" placeholder="ex: youtube.com, 10.40.90.101..." class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                    <input type="text" name="q" value="{{ query_term }}" placeholder="ex: youtube.com, PC-ALUNO, 10.40.90.101..." class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
                 </div>
 
                 <!-- Grupo -->
@@ -147,7 +147,7 @@
                     <label class="block font-semibold text-slate-300 mb-1">
                         <i class="fa-solid fa-folder text-indigo-400 mr-1"></i> Grupo:
                     </label>
-                    <select name="group" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                    <select id="filter-group" name="group" onchange="filterPortsByGroup()" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
                         <option value="">Todos os Grupos</option>
                         {% for g in all_groups %}
                         <option value="{{ g.id }}" {% if selected_group == g.id|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
@@ -155,15 +155,15 @@
                     </select>
                 </div>
 
-                <!-- Sala / Porta -->
+                <!-- Sala / Porta (Filtrado pelo Grupo) -->
                 <div>
                     <label class="block font-semibold text-slate-300 mb-1">
                         <i class="fa-solid fa-network-wired text-indigo-400 mr-1"></i> Sala / Porta:
                     </label>
-                    <select name="port" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                    <select id="filter-port" name="port" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
                         <option value="">Todas as Portas</option>
                         {% for p in all_ports %}
-                        <option value="{{ p.id }}" {% if selected_port == p.id|stringformat:"s" %}selected{% endif %}>{{ p.port_number }} - {{ p.name }}</option>
+                        <option value="{{ p.id }}" data-group-id="{{ p.group.id }}" {% if selected_port == p.id|stringformat:"s" %}selected{% endif %}>{{ p.port_number }} - {{ p.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -191,7 +191,7 @@
                     </a>
                 </div>
 
-                <!-- Linha de Horários Personalizados (Expansível ou Direta) -->
+                <!-- Linha de Horários Personalizados -->
                 <div class="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800/60">
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-400 mb-1">Data Inicial:</label>
@@ -223,7 +223,7 @@
                         <tr class="bg-[#111422] text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800">
                             <th class="p-3.5 pl-6">Data / Horário</th>
                             <th class="p-3.5">Sala / Porta</th>
-                            <th class="p-3.5">IP Cliente</th>
+                            <th class="p-3.5">Equipamento / IP</th>
                             <th class="p-3.5">Domínio / Destino</th>
                             <th class="p-3.5 text-center">Status Squid</th>
                             <th class="p-3.5 text-center">Tráfego</th>
@@ -252,9 +252,29 @@
                                 </div>
                             </td>
 
-                            <!-- IP Cliente -->
-                            <td class="p-3.5 font-mono text-slate-400 text-[11px]">
-                                {{ log.client_ip }}
+                            <!-- Equipamento / Hostname & IP -->
+                            <td class="p-3.5 whitespace-nowrap">
+                                <div class="flex items-center gap-2">
+                                    {% if log.device %}
+                                    <div>
+                                        <div class="flex items-center gap-1.5 font-bold text-cyan-300 text-xs">
+                                            <i class="fa-solid fa-desktop text-indigo-400 text-[10px]"></i>
+                                            <span>{{ log.device.hostname }}</span>
+                                            <button type="button" onclick="openDeviceModal('{{ log.client_ip|escapejs }}', '{{ log.device.hostname|escapejs }}', '{{ log.device.description|escapejs }}')" class="text-slate-500 hover:text-indigo-300 text-[10px]" title="Editar Hostname">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                        </div>
+                                        <span class="text-slate-500 font-mono text-[10px]">{{ log.client_ip }}</span>
+                                    </div>
+                                    {% else %}
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-mono text-slate-300 text-[11px]">{{ log.client_ip }}</span>
+                                        <button type="button" onclick="openDeviceModal('{{ log.client_ip|escapejs }}', '', '')" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white text-[9px] font-semibold transition-all border border-slate-700" title="Atribuir Hostname a este IP">
+                                            <i class="fa-solid fa-tag"></i> Nomear
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                </div>
                             </td>
 
                             <!-- Domínio -->
@@ -458,6 +478,56 @@
 </div>
 
 <!-- ========================================== -->
+<!-- MODAL: IDENTIFICAR EQUIPAMENTO / HOSTNAME -->
+<!-- ========================================== -->
+<div id="modal-device-host" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-desktop text-indigo-400"></i>
+                <span>Identificação de Equipamento / Hostname</span>
+            </h3>
+            <button onclick="closeDeviceModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-device-host" onsubmit="submitSaveDevice(event)" class="p-6 space-y-4 text-xs">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Endereço IP do Equipamento:</label>
+                <input type="text" id="device-ip-input" name="ip_address" readonly class="w-full bg-[#0d101a] border border-slate-700/80 text-cyan-300 font-mono text-xs rounded-xl p-3 outline-none font-bold">
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Nome / Hostname do Equipamento <span class="text-red-400">*</span></label>
+                <input type="text" id="device-hostname-input" name="hostname" required placeholder="ex: PC-ALUNO-01, LAB-05, NOTEBOOK-PROF" class="w-full bg-[#0f121e] border border-slate-700 text-white font-mono text-xs rounded-xl p-3 focus:border-indigo-500 outline-none font-bold">
+                <p class="text-[10px] text-slate-500 mt-1">Este nome será exibido nos logs e no monitor ao vivo para identificar este computador.</p>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Descrição / Localização (Opcional):</label>
+                <input type="text" id="device-desc-input" name="description" placeholder="ex: Bancada 1 - Sala de Estudos EAD" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <div id="modal-device-feedback" class="text-xs min-h-[16px]"></div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="closeDeviceModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-submit-device" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20">
+                    Salvar Identificação
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
 <!-- SCRIPTS DE INTERATIVIDADE & LIVE STREAM -->
 <!-- ========================================== -->
 <script>
@@ -473,7 +543,42 @@ const blacklistsData = [
     {% endfor %}
 ];
 
-// Alternar Abas (Histórico vs Live)
+// 1. Filtro dinâmico de portas por Grupo Selecionado
+function filterPortsByGroup() {
+    const groupSelect = document.getElementById('filter-group');
+    const portSelect = document.getElementById('filter-port');
+    const selectedGroupId = groupSelect.value;
+
+    const options = portSelect.querySelectorAll('option');
+    let hasSelectedValid = false;
+
+    options.forEach(opt => {
+        if (!opt.value) {
+            opt.style.display = 'block';
+            return;
+        }
+
+        const optGroupId = opt.getAttribute('data-group-id');
+        if (!selectedGroupId || optGroupId === selectedGroupId) {
+            opt.style.display = 'block';
+            if (opt.selected) hasSelectedValid = true;
+        } else {
+            opt.style.display = 'none';
+            if (opt.selected) opt.selected = false;
+        }
+    });
+
+    if (!hasSelectedValid && selectedGroupId) {
+        portSelect.value = '';
+    }
+}
+
+// Inicializa o filtro de portas na carga da página
+document.addEventListener('DOMContentLoaded', () => {
+    filterPortsByGroup();
+});
+
+// 2. Alternar Abas (Histórico vs Live)
 function switchTab(tabId) {
     const tabHistory = document.getElementById('tab-history');
     const tabLive = document.getElementById('tab-live');
@@ -495,7 +600,7 @@ function switchTab(tabId) {
     }
 }
 
-// Modal Adicionar Domínio à Lista
+// 3. Modal Adicionar Domínio à Lista
 function openAddToListModal(domain, listType) {
     document.getElementById('target-domain-input').value = domain;
     document.getElementById('target-desc-input').value = `Auditoria de Logs (${new Date().toLocaleDateString('pt-BR')})`;
@@ -531,6 +636,20 @@ function closeAddToListModal() {
     document.getElementById('modal-add-domain-to-list').classList.add('hidden');
 }
 
+// 4. Modal Identificar Equipamento / Hostname
+function openDeviceModal(ipAddress, hostname = '', description = '') {
+    document.getElementById('device-ip-input').value = ipAddress;
+    document.getElementById('device-hostname-input').value = hostname;
+    document.getElementById('device-desc-input').value = description;
+    document.getElementById('modal-device-feedback').innerHTML = '';
+    document.getElementById('modal-device-host').classList.remove('hidden');
+    document.getElementById('device-hostname-input').focus();
+}
+
+function closeDeviceModal() {
+    document.getElementById('modal-device-host').classList.add('hidden');
+}
+
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -546,6 +665,53 @@ function getCookie(name) {
     return cookieValue;
 }
 
+// Submissão do Modal de Equipamento
+async function submitSaveDevice(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-device');
+    const feedback = document.getElementById('modal-device-feedback');
+    const ipAddress = document.getElementById('device-ip-input').value;
+    const hostname = document.getElementById('device-hostname-input').value;
+    const description = document.getElementById('device-desc-input').value;
+
+    btn.disabled = true;
+    feedback.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Salvando...</span>';
+
+    const formData = new URLSearchParams();
+    formData.append('ip_address', ipAddress);
+    formData.append('hostname', hostname);
+    formData.append('description', description);
+
+    try {
+        const res = await fetch('/proxy/devices/save/', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            feedback.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check"></i> ${data.message}</span>`;
+            setTimeout(() => {
+                closeDeviceModal();
+                btn.disabled = false;
+                window.location.reload();
+            }, 1000);
+        } else {
+            feedback.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-circle-xmark"></i> ${data.error}</span>`;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        feedback.innerHTML = `<span class="text-rose-400">Erro na requisição.</span>`;
+        btn.disabled = false;
+    }
+}
+
+// Submissão do Modal de Adicionar Domínio
 async function submitAddDomainToList(e) {
     e.preventDefault();
     const btn = document.getElementById('btn-submit-add-domain');
@@ -665,13 +831,17 @@ async function fetchLiveLogs() {
                     : 'bg-slate-900/60 border-slate-800/80 hover:border-emerald-500/30'
                 }`;
 
+                const deviceDisplay = l.hostname 
+                    ? `<span class="font-bold text-cyan-300"><i class="fa-solid fa-desktop text-[9px] text-indigo-400 mr-1"></i>${l.hostname}</span> <span class="text-slate-500 font-mono text-[10px]">(${l.client_ip})</span>`
+                    : `<span class="text-slate-400 font-mono text-[11px]">${l.client_ip}</span>`;
+
                 row.innerHTML = `
                     <div class="flex flex-wrap items-center gap-2.5">
                         <span class="text-slate-500 font-mono text-[11px]">${l.timestamp}</span>
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${isBlocked ? 'bg-rose-500/15 text-rose-300' : 'bg-indigo-500/15 text-indigo-300'}">
                             ${l.port_number} • ${l.port_name}
                         </span>
-                        <span class="text-slate-400 font-mono text-[11px]">${l.client_ip}</span>
+                        ${deviceDisplay}
                         <span class="text-white font-bold font-mono tracking-wide text-xs">${l.domain}</span>
                     </div>
 

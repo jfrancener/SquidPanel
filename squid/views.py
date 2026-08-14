@@ -664,7 +664,7 @@ def domain_bulk_add_view(request, list_id):
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.core.paginator import Paginator
-from .models import AccessLog
+from .models import AccessLog, DeviceHost
 from .log_service import cleanup_old_logs, generate_mock_initial_logs_if_empty
 from dashboard.models import SystemSetting
 
@@ -672,7 +672,7 @@ from dashboard.models import SystemSetting
 @login_required
 def logs_view(request):
     """
-    Tela completa de Logs de Acesso com filtros por Data, Hora, Grupo, Porta, Status, Domínio e IP.
+    Tela completa de Logs de Acesso com filtros por Data, Hora, Grupo, Porta, Status, Domínio, IP e Hostname.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     generate_mock_initial_logs_if_empty()
@@ -699,11 +699,17 @@ def logs_view(request):
             models.Q(group__in=allowed_groups)
         )
 
-    # Filtro por Termo (Domínio ou IP)
+    # Filtro por Termo (Domínio, IP ou Hostname)
     if query_term:
+        matching_ips = list(DeviceHost.objects.filter(
+            models.Q(hostname__icontains=query_term) |
+            models.Q(description__icontains=query_term)
+        ).values_list('ip_address', flat=True))
+
         logs_qs = logs_qs.filter(
             models.Q(domain__icontains=query_term) |
             models.Q(client_ip__icontains=query_term) |
+            models.Q(client_ip__in=matching_ips) |
             models.Q(full_url__icontains=query_term)
         )
 
@@ -770,6 +776,11 @@ def logs_view(request):
     page_number = request.GET.get('page', 1)
     logs_page = paginator.get_page(page_number)
 
+    # Anexa DeviceHost aos logs da página atual
+    device_map = {d.ip_address: d for d in DeviceHost.objects.all()}
+    for log in logs_page:
+        log.device = device_map.get(log.client_ip)
+
     # Dados para os dropdowns de filtro
     all_groups = ProxyGroup.objects.filter(is_active=True).order_by('name')
     all_ports = ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number')
@@ -826,13 +837,18 @@ def logs_live_stream_view(request):
     else:
         new_logs = list(logs_qs[:20])
 
+    device_map = {d.ip_address: d for d in DeviceHost.objects.all()}
+
     data = []
     for l in reversed(new_logs):
+        dev = device_map.get(l.client_ip)
         data.append({
             'id': l.id,
             'timestamp': l.timestamp.strftime('%H:%M:%S'),
             'date': l.timestamp.strftime('%d/%m/%Y'),
             'client_ip': l.client_ip,
+            'hostname': dev.hostname if dev else None,
+            'device_desc': dev.description if dev else None,
             'port_number': l.port_number,
             'port_name': l.port.name if l.port else f"Porta {l.port_number}",
             'group_name': l.group.name if l.group else '-',
@@ -846,6 +862,42 @@ def logs_live_stream_view(request):
         })
 
     return JsonResponse({'success': True, 'logs': data})
+
+
+@login_required
+def device_save_view(request):
+    """
+    Endpoint AJAX para cadastrar ou editar o Hostname/Identificação de um IP de equipamento.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado'}, status=403)
+
+    if request.method == 'POST':
+        ip_address = request.POST.get('ip_address', '').strip()
+        hostname = request.POST.get('hostname', '').strip()
+        description = request.POST.get('description', '').strip()
+
+        if not ip_address or not hostname:
+            return JsonResponse({'success': False, 'error': 'IP e Nome do Equipamento são obrigatórios.'})
+
+        device, created = DeviceHost.objects.update_or_create(
+            ip_address=ip_address,
+            defaults={
+                'hostname': hostname,
+                'description': description
+            }
+        )
+
+        return JsonResponse({
+            'success': True,
+            'ip_address': device.ip_address,
+            'hostname': device.hostname,
+            'description': device.description,
+            'message': f"Equipamento '{device.hostname}' ({device.ip_address}) salvo com sucesso!"
+        })
+
+    return JsonResponse({'success': False, 'error': 'Método inválido.'}, status=405)
 
 
 @login_required
@@ -898,4 +950,5 @@ def logs_cleanup_view(request):
     deleted_count, retention_days = cleanup_old_logs()
     messages.success(request, f"Limpeza concluída com sucesso: {deleted_count} registros de logs com mais de {retention_days} dias foram removidos.")
     return redirect(request.META.get('HTTP_REFERER', 'logs'))
+
 

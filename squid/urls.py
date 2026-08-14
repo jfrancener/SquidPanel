@@ -20,6 +20,7 @@ urlpatterns = [
     path('logs/live-stream/', views.logs_live_stream_view, name='logs_live_stream'),
     path('logs/add-to-list/', views.log_add_to_list_view, name='log_add_to_list'),
     path('logs/cleanup/', views.logs_cleanup_view, name='logs_cleanup'),
+    path('devices/save/', views.device_save_view, name='device_save'),
 
     # Listagens White e Black
     path('whitelists/', views.whitelists_view, name='whitelists'),

@@ -138,3 +138,24 @@ class AccessLog(models.Model):
             return f"{self.bytes_sent / 1024:.1f} KB"
         return f"{self.bytes_sent / (1024 * 1024):.1f} MB"
 
+
+class DeviceHost(models.Model):
+    """
+    Mapeamento de endereço IP para Hostname / Nome amigável do Equipamento.
+    Permite identificar exatamente qual computador/terminal da sala fez a requisição.
+    """
+    ip_address = models.GenericIPAddressField(unique=True, db_index=True, verbose_name="Endereço IP")
+    hostname = models.CharField(max_length=100, verbose_name="Nome / Hostname do Equipamento")
+    description = models.CharField(max_length=255, blank=True, verbose_name="Descrição / Localização")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Equipamento / Hostname"
+        verbose_name_plural = "Equipamentos / Hostnames"
+        ordering = ['hostname', 'ip_address']
+
+    def __str__(self):
+        return f"{self.hostname} ({self.ip_address})"
+
+
