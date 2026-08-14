@@ -116,6 +116,12 @@
 
                 <!-- Ações do Grupo -->
                 <div class="flex items-center gap-2">
+                    <button onclick="toggleGroupLists({{ g.id }})" id="btn-toggle-lists-{{ g.id }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700" title="Expandir/Recolher Whitelists e Blacklists vinculadas">
+                        <i class="fa-solid fa-shield-halved text-[11px] text-emerald-400"></i>
+                        <span>Listas ({{ g.whitelists.count }} WL / {{ g.blacklists.count }} BL)</span>
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200" id="chevron-lists-{{ g.id }}"></i>
+                    </button>
+
                     <button onclick="openAddPortModal({{ g.id }}, '{{ g.name|escapejs }}')" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-indigo-500/30">
                         <i class="fa-solid fa-plus text-[10px]"></i>
                         <span>Nova Sala / Porta</span>
@@ -134,12 +140,12 @@
                 </div>
             </div>
 
-            <!-- Listas Vinculadas a este Grupo -->
-            <div class="p-4 bg-[#0f121e] border-b border-slate-800/80 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <!-- Listas Vinculadas a este Grupo (Recolhido por Padrão) -->
+            <div id="group-lists-panel-{{ g.id }}" class="hidden p-5 bg-[#0e111c] border-b border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs transition-all duration-300">
                 
                 <!-- Whitelists Aplicadas -->
-                <div>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                <div class="bg-[#121524] p-4 rounded-xl border border-slate-800/80">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
                         <i class="fa-solid fa-shield-halved text-emerald-400"></i> Whitelists Permitidas neste Grupo:
                     </span>
                     <div class="flex flex-wrap gap-1.5">
@@ -155,8 +161,8 @@
                 </div>
 
                 <!-- Blacklists Aplicadas -->
-                <div>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                <div class="bg-[#121524] p-4 rounded-xl border border-slate-800/80">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
                         <i class="fa-solid fa-ban text-rose-400"></i> Blacklists Bloqueadas neste Grupo:
                     </span>
                     <div class="flex flex-wrap gap-1.5">
@@ -537,6 +543,17 @@
 
 <!-- Scripts de Interatividade dos Modais -->
 <script>
+function toggleGroupLists(groupId) {
+    const panel = document.getElementById(`group-lists-panel-${groupId}`);
+    const chevron = document.getElementById(`chevron-lists-${groupId}`);
+    if (panel) {
+        panel.classList.toggle('hidden');
+        if (chevron) {
+            chevron.classList.toggle('rotate-180');
+        }
+    }
+}
+
 function openAddPortModal(groupId, groupName) {
     document.getElementById('form-add-port').action = `/proxy/groups/${groupId}/ports/create/`;
     document.getElementById('port-modal-group-name').textContent = `Grupo: ${groupName}`;
