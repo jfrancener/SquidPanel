@@ -105,7 +105,14 @@
                             {% endif %}
                         </div>
                         <div>
-                            <h3 class="text-sm font-bold text-white {% if list_type == 'WHITELIST' %}group-hover:text-emerald-300{% else %}group-hover:text-rose-300{% endif %} transition-colors">{{ item.name }}</h3>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm font-bold text-white {% if list_type == 'WHITELIST' %}group-hover:text-emerald-300{% else %}group-hover:text-rose-300{% endif %} transition-colors">{{ item.name }}</h3>
+                                {% if item.is_mandatory %}
+                                <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 font-sans flex items-center gap-1">
+                                    <i class="fa-solid fa-lock text-[8px]"></i> Obrigatória
+                                </span>
+                                {% endif %}
+                            </div>
                             <span class="text-[10px] font-mono text-slate-500">{{ item.slug }}</span>
                         </div>
                     </div>
@@ -155,9 +162,15 @@
                 </a>
 
                 {% if request.user.profile.is_admin %}
-                <a href="{% url 'list_delete' item.id %}" onclick="return confirm('Deseja realmente excluir a lista {{ item.name }} e todos os seus domínios?')" class="text-slate-500 hover:text-red-400 text-xs transition-colors p-1" title="Excluir Lista">
-                    <i class="fa-solid fa-trash"></i>
-                </a>
+                    {% if item.is_mandatory %}
+                    <span class="text-slate-600 text-xs flex items-center gap-1 cursor-not-allowed" title="Lista protegida do sistema">
+                        <i class="fa-solid fa-lock text-[10px]"></i>
+                    </span>
+                    {% else %}
+                    <a href="{% url 'list_delete' item.id %}" onclick="return confirm('Deseja realmente excluir a lista {{ item.name }} e todos os seus domínios?')" class="text-slate-500 hover:text-red-400 text-xs transition-colors p-1" title="Excluir Lista">
+                        <i class="fa-solid fa-trash"></i>
+                    </a>
+                    {% endif %}
                 {% endif %}
             </div>
 
@@ -209,6 +222,19 @@
                 </label>
                 <input type="text" id="description" name="description" placeholder="ex: Portais de pesquisa, enciclopédias e AVA" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
             </div>
+
+            {% if list_type == 'WHITELIST' %}
+            <!-- Opção de Whitelist Obrigatória do Sistema -->
+            <div class="p-3.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                <label class="flex items-start gap-3 cursor-pointer select-none">
+                    <input type="checkbox" name="is_mandatory" class="mt-0.5 w-4 h-4 rounded bg-[#181c30] border-slate-700 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                    <div>
+                        <span class="text-xs font-bold text-amber-300 block">Marcar como Whitelist Obrigatória do Sistema</span>
+                        <span class="text-[10px] text-slate-400 block mt-0.5">Listas obrigatórias são aplicadas automaticamente em todos os grupos e salas com proteção contra remoção acidental.</span>
+                    </div>
+                </label>
+            </div>
+            {% endif %}
 
             <!-- Seleção dos Grupos para Aplicação -->
             <div>

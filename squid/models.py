@@ -27,6 +27,7 @@ class ProxyList(models.Model):
     list_type = models.CharField(max_length=20, choices=LIST_TYPE_CHOICES, default='WHITELIST')
     color = models.CharField(max_length=20, choices=COLOR_CHOICES, default='emerald')
     description = models.CharField(max_length=255, blank=True, verbose_name="Descrição")
+    is_mandatory = models.BooleanField(default=False, verbose_name="Obrigatória do Sistema")
     is_active = models.BooleanField(default=True, verbose_name="Ativa")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

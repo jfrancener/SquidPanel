@@ -31,7 +31,7 @@ def groups_view(request):
             models.Q(ports__name__icontains=query)
         ).distinct()
 
-    all_whitelists = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).order_by('name')
+    all_whitelists = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).order_by('-is_mandatory', 'name')
     all_blacklists = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).order_by('name')
     total_ports_count = ProxyPort.objects.filter(is_active=True).count()
 
@@ -50,6 +50,7 @@ def groups_view(request):
 def group_create_view(request):
     """
     Criação de um novo Grupo de Proxy com política e listas associadas.
+    Garante que Whitelists obrigatórias sejam sempre incluídas.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_manager:
@@ -82,6 +83,10 @@ def group_create_view(request):
         if selected_blacklists:
             group.blacklists.set(selected_blacklists)
 
+        # Garante que Whitelists obrigatórias estejam sempre presentes
+        mandatory_wls = ProxyList.objects.filter(list_type='WHITELIST', is_mandatory=True)
+        group.whitelists.add(*mandatory_wls)
+
         messages.success(request, f"Grupo '{name}' criado com sucesso! Agora você pode adicionar portas/salas a ele.")
         return redirect('groups')
 
@@ -92,6 +97,7 @@ def group_create_view(request):
 def group_edit_view(request, group_id):
     """
     Edição de um Grupo existente, suas políticas de acesso e listas vinculadas.
+    Garante que Whitelists obrigatórias permaneçam sempre ativas.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_manager:
@@ -117,6 +123,10 @@ def group_edit_view(request, group_id):
 
         group.whitelists.set(selected_whitelists)
         group.blacklists.set(selected_blacklists)
+
+        # Garante que Whitelists obrigatórias continuem sempre vinculadas
+        mandatory_wls = ProxyList.objects.filter(list_type='WHITELIST', is_mandatory=True)
+        group.whitelists.add(*mandatory_wls)
 
         messages.success(request, f"Grupo '{group.name}' atualizado com sucesso!")
         return redirect('groups')
@@ -288,8 +298,10 @@ def check_port_availability_view(request):
 @login_required
 def port_toggle_status_view(request, port_id):
     """
-    Altera o modo de liberação de uma porta específica (Liberada Total, Whitelist ou Bloqueada).
-    Suporta atualização instantânea via AJAX sem recarregar a página.
+    Altera o modo de liberação de uma porta específica:
+    - ALLOWED: Liberado Total (100% Livre, sem Blacklist)
+    - BLACKLIST: Liberado com Blacklist
+    - WHITELIST: Apenas Whitelist (Modo Seguro)
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     port = get_object_or_404(ProxyPort, id=port_id)
@@ -301,7 +313,7 @@ def port_toggle_status_view(request, port_id):
         return HttpResponseForbidden("Você não tem permissão para controlar esta porta.")
 
     new_status = request.POST.get('status') or request.GET.get('status')
-    if new_status in ['ALLOWED', 'WHITELIST', 'BLOCKED']:
+    if new_status in ['ALLOWED', 'BLACKLIST', 'WHITELIST']:
         port.current_status = new_status
         port.save()
 
@@ -334,7 +346,7 @@ def whitelists_view(request):
         return HttpResponseForbidden("Acesso negado.")
 
     query = request.GET.get('q', '').strip()
-    lists = ProxyList.objects.filter(list_type='WHITELIST').prefetch_related('domains', 'applied_groups_whitelist').order_by('name')
+    lists = ProxyList.objects.filter(list_type='WHITELIST').prefetch_related('domains', 'applied_groups_whitelist').order_by('-is_mandatory', 'name')
 
     if query:
         lists = lists.filter(
@@ -415,6 +427,7 @@ def list_create_view(request):
         name = request.POST.get('name', '').strip()
         list_type = request.POST.get('list_type', 'WHITELIST').strip()
         description = request.POST.get('description', '').strip()
+        is_mandatory = request.POST.get('is_mandatory') == 'on' and list_type == 'WHITELIST'
         selected_groups = request.POST.getlist('groups')
 
         if not name:
@@ -432,10 +445,15 @@ def list_create_view(request):
             list_type=list_type,
             color='emerald' if list_type == 'WHITELIST' else 'rose',
             description=description,
+            is_mandatory=is_mandatory,
             is_active=True
         )
 
-        if selected_groups:
+        # Se for obrigatória, aplica em todos os grupos
+        if is_mandatory:
+            for g in ProxyGroup.objects.all():
+                g.whitelists.add(proxy_list)
+        elif selected_groups:
             groups = ProxyGroup.objects.filter(id__in=selected_groups)
             for g in groups:
                 if list_type == 'WHITELIST':
@@ -506,7 +524,7 @@ def list_detail_view(request, list_id):
 @login_required
 def list_edit_view(request, list_id):
     """
-    Edição de metadados da Lista (Nome, Descrição, Grupos associados).
+    Edição de metadados da Lista (Nome, Descrição, Obrigatoriedade, Grupos associados).
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_manager:
@@ -518,6 +536,7 @@ def list_edit_view(request, list_id):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         description = request.POST.get('description', '').strip()
+        is_mandatory = request.POST.get('is_mandatory') == 'on' and proxy_list.list_type == 'WHITELIST'
         selected_groups = request.POST.getlist('groups')
 
         if not name:
@@ -526,19 +545,25 @@ def list_edit_view(request, list_id):
 
         proxy_list.name = name
         proxy_list.description = description
+        proxy_list.is_mandatory = is_mandatory
         proxy_list.save()
 
-        for g in all_groups:
-            if proxy_list.list_type == 'WHITELIST':
-                if str(g.id) in selected_groups:
-                    g.whitelists.add(proxy_list)
+        # Atualiza a associação dos grupos
+        if is_mandatory:
+            for g in all_groups:
+                g.whitelists.add(proxy_list)
+        else:
+            for g in all_groups:
+                if proxy_list.list_type == 'WHITELIST':
+                    if str(g.id) in selected_groups:
+                        g.whitelists.add(proxy_list)
+                    else:
+                        g.whitelists.remove(proxy_list)
                 else:
-                    g.whitelists.remove(proxy_list)
-            else:
-                if str(g.id) in selected_groups:
-                    g.blacklists.add(proxy_list)
-                else:
-                    g.blacklists.remove(proxy_list)
+                    if str(g.id) in selected_groups:
+                        g.blacklists.add(proxy_list)
+                    else:
+                        g.blacklists.remove(proxy_list)
 
         messages.success(request, f"Lista '{proxy_list.name}' atualizada com sucesso!")
         return redirect('list_detail', list_id=proxy_list.id)
@@ -549,13 +574,18 @@ def list_edit_view(request, list_id):
 @login_required
 def list_delete_view(request, list_id):
     """
-    Exclusão de uma Lista inteira.
+    Exclusão de uma Lista inteira (protegendo listas obrigatórias).
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_admin:
         return HttpResponseForbidden("Acesso negado: apenas Administradores de TI podem excluir listas.")
 
     proxy_list = get_object_or_404(ProxyList, id=list_id)
+
+    if proxy_list.is_mandatory:
+        messages.error(request, f"A lista '{proxy_list.name}' é uma Whitelist Obrigatória do Sistema e não pode ser excluída.")
+        return redirect('whitelists')
+
     list_type = proxy_list.list_type
     name = proxy_list.name
     proxy_list.delete()

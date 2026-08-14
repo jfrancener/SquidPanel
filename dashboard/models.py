@@ -61,9 +61,9 @@ class ProxyPort(models.Model):
     Porta de escuta do Squid mapeada para uma sala ou setor.
     """
     STATUS_CHOICES = [
-        ('BLOCKED', 'Bloqueada (Sem Acesso)'),
-        ('WHITELIST', 'Whitelist Básica'),
-        ('ALLOWED', 'Liberada Total (Acesso Completo)'),
+        ('ALLOWED', 'Liberado Total (100% Livre)'),
+        ('BLACKLIST', 'Liberado com Blacklist'),
+        ('WHITELIST', 'Apenas Whitelist (Padrão Seguro)'),
         ('SCHEDULED', 'Agendamento / Horário Automático'),
     ]
     group = models.ForeignKey(ProxyGroup, on_delete=models.CASCADE, related_name='ports')
