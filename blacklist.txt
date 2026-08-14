@@ -51,6 +51,7 @@
 .ajleiloes.com.br
 .akamaihd.net
 .akamaized.net
+.alchat.com
 .alibaba.com
 .alpixtrack.com
 .altmetric.com
@@ -624,6 +625,7 @@
 .servenobid.com
 .servicesadmedia.com
 .seznam.cz
+.sharepoint.com
 .sharethrough.com
 .shb-sync.com
 .shein.com
