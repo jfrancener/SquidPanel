@@ -6,6 +6,7 @@ from django.db import models
 from django.utils.text import slugify
 
 from .models import ProxyList, DomainItem
+from .squid_sync import apply_squid_changes, restart_squid_service, mark_squid_sync_needed, is_squid_sync_needed
 from dashboard.models import ProxyGroup, ProxyPort, UserProfile
 
 # ==========================================
@@ -950,5 +951,54 @@ def logs_cleanup_view(request):
     deleted_count, retention_days = cleanup_old_logs()
     messages.success(request, f"Limpeza concluída com sucesso: {deleted_count} registros de logs com mais de {retention_days} dias foram removidos.")
     return redirect(request.META.get('HTTP_REFERER', 'logs'))
+
+
+# ==========================================
+# 7. CONTROLE & SINCRONIZAÇÃO DO SERVIÇO SQUID
+# ==========================================
+
+@login_required
+def squid_apply_view(request):
+    """
+    Gera a configuração atualizada e aplica imediatamente no Squid (squid -k reconfigure).
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Apenas Administradores podem aplicar alterações no Squid.")
+
+    success, msg = apply_squid_changes()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': success, 'message': msg})
+
+    if success:
+        messages.success(request, f"⚡ {msg}")
+    else:
+        messages.error(request, f"Erro ao aplicar no Squid: {msg}")
+
+    return redirect(request.META.get('HTTP_REFERER', 'groups'))
+
+
+@login_required
+def squid_restart_view(request):
+    """
+    Reinicia completamente o serviço do Squid no sistema operacional.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Apenas Administradores podem reiniciar o serviço Squid.")
+
+    success, msg = restart_squid_service()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': success, 'message': msg})
+
+    if success:
+        messages.success(request, f"🔄 {msg}")
+    else:
+        messages.error(request, f"Erro ao reiniciar o Squid: {msg}")
+
+    return redirect(request.META.get('HTTP_REFERER', 'groups'))
+
 
 

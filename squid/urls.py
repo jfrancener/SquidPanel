@@ -22,6 +22,10 @@ urlpatterns = [
     path('logs/cleanup/', views.logs_cleanup_view, name='logs_cleanup'),
     path('devices/save/', views.device_save_view, name='device_save'),
 
+    # Controle & Sincronização do Serviço Squid
+    path('service/apply/', views.squid_apply_view, name='squid_apply'),
+    path('service/restart/', views.squid_restart_view, name='squid_restart'),
+
     # Listagens White e Black
     path('whitelists/', views.whitelists_view, name='whitelists'),
     path('blacklists/', views.blacklists_view, name='blacklists'),

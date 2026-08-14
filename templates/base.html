@@ -193,13 +193,22 @@
             </div>
 
             <!-- Card de Usuário e Ações -->
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
                 
-                <!-- Notificações -->
-                <button class="relative w-8 h-8 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-all">
-                    <i class="fa-regular fa-bell text-xs"></i>
-                    <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-500"></span>
-                </button>
+                {% if request.user.profile.is_admin %}
+                <!-- Botões de Controle do Squid -->
+                <div class="flex items-center gap-2">
+                    <button onclick="executeSquidAction('apply')" id="btn-squid-apply" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition-all" title="Aplica as configurações e recarrega as ACLs no Squid imediatamente">
+                        <i class="fa-solid fa-bolt text-yellow-300 text-[11px]"></i>
+                        <span>Aplicar no Squid</span>
+                    </button>
+
+                    <button onclick="executeSquidAction('restart')" id="btn-squid-restart" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all" title="Reinicia o serviço do Squid no Linux">
+                        <i class="fa-solid fa-rotate text-cyan-400 text-[11px]"></i>
+                        <span class="hidden md:inline">Reiniciar</span>
+                    </button>
+                </div>
+                {% endif %}
 
                 <!-- Divisor -->
                 <div class="h-6 w-px bg-slate-800"></div>
@@ -250,6 +259,47 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+
+    <script>
+    async function executeSquidAction(action) {
+        const isApply = action === 'apply';
+        const btn = document.getElementById(isApply ? 'btn-squid-apply' : 'btn-squid-restart');
+        if (!btn) return;
+
+        const url = isApply ? "{% url 'squid_apply' %}" : "{% url 'squid_restart' %}";
+        const originalHtml = btn.innerHTML;
+
+        if (!isApply && !confirm('Deseja realmente reiniciar todo o serviço do Squid no servidor?')) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>${isApply ? 'Aplicando...' : 'Reiniciando...'}</span>`;
+
+        try {
+            const res = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const data = await res.json();
+            if (data.success) {
+                btn.innerHTML = `<i class="fa-solid fa-check text-white text-xs"></i> <span>${isApply ? 'Aplicado!' : 'Reiniciado!'}</span>`;
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }, 2500);
+            } else {
+                alert('Erro: ' + (data.message || data.error));
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        } catch (err) {
+            window.location.href = url;
+        }
+    }
+    </script>
 
     {% block extra_scripts %}{% endblock %}
 </body>
