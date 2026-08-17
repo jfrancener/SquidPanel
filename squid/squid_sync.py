@@ -51,6 +51,32 @@ def is_squid_sync_needed():
     return SystemSetting.get_value('squid_pending_sync', 'false') == 'true'
 
 
+def _write_file_safely(filepath, content):
+    """
+    Escreve o conteúdo no arquivo de forma segura. Se ocorrer PermissionError
+    por causa do usuário www-data não ser dono direto de /etc/squid, usa sudo tee.
+    """
+    try:
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+    except (PermissionError, OSError):
+        # Tenta escrever via sudo tee se não for Windows
+        if sys.platform != 'win32':
+            process = subprocess.Popen(
+                ['sudo', 'tee', filepath],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            _, err = process.communicate(input=content)
+            if process.returncode != 0:
+                raise PermissionError(f"Falha ao gravar {filepath} via sudo: {err}")
+        else:
+            raise
+
+
 def generate_squid_config_and_lists():
     """
     Gera dinamicamente todos os arquivos de Whitelist/Blacklist e o /etc/squid/squid.conf
@@ -68,10 +94,10 @@ def generate_squid_config_and_lists():
         mandatory_domains.update(domains)
 
     mandatory_file_path = os.path.join(lists_dir, 'mandatory_whitelist.txt')
-    with open(mandatory_file_path, 'w', encoding='utf-8') as f:
-        f.write("# Whitelists Obrigatorias do Sistema (SquidPanel)\n")
-        for d in sorted(mandatory_domains):
-            f.write(f"{d}\n")
+    mandatory_content = ["# Whitelists Obrigatorias do Sistema (SquidPanel)"]
+    for d in sorted(mandatory_domains):
+        mandatory_content.append(f"{d}")
+    _write_file_safely(mandatory_file_path, "\n".join(mandatory_content) + "\n")
 
     # 2. Gera arquivos de listas por Grupo
     groups = ProxyGroup.objects.prefetch_related('whitelists', 'blacklists', 'ports').filter(is_active=True)
@@ -85,10 +111,10 @@ def generate_squid_config_and_lists():
             g_wl_domains.update(wl.domains.filter(is_active=True).values_list('domain', flat=True))
 
         wl_file_path = os.path.join(lists_dir, f"group_{g.id}_whitelist.txt")
-        with open(wl_file_path, 'w', encoding='utf-8') as f:
-            f.write(f"# Whitelist do Grupo: {g.name}\n")
-            for d in sorted(g_wl_domains):
-                f.write(f"{d}\n")
+        wl_content = [f"# Whitelist do Grupo: {g.name}"]
+        for d in sorted(g_wl_domains):
+            wl_content.append(f"{d}")
+        _write_file_safely(wl_file_path, "\n".join(wl_content) + "\n")
 
         # Blacklists do grupo
         g_bl_domains = set()
@@ -96,10 +122,10 @@ def generate_squid_config_and_lists():
             g_bl_domains.update(bl.domains.filter(is_active=True).values_list('domain', flat=True))
 
         bl_file_path = os.path.join(lists_dir, f"group_{g.id}_blacklist.txt")
-        with open(bl_file_path, 'w', encoding='utf-8') as f:
-            f.write(f"# Blacklist do Grupo: {g.name}\n")
-            for d in sorted(g_bl_domains):
-                f.write(f"{d}\n")
+        bl_content = [f"# Blacklist do Grupo: {g.name}"]
+        for d in sorted(g_bl_domains):
+            bl_content.append(f"{d}")
+        _write_file_safely(bl_file_path, "\n".join(bl_content) + "\n")
 
         group_list_files[g.id] = {
             'wl_path': wl_file_path,
@@ -203,14 +229,15 @@ def generate_squid_config_and_lists():
     conf_lines.append("via on\n")
 
     # Escreve o squid.conf
-    with open(conf_file, 'w', encoding='utf-8') as f:
-        f.write("\n".join(conf_lines))
+    _write_file_safely(conf_file, "\n".join(conf_lines) + "\n")
 
     # Ajusta permissões no Linux se necessário
     if paths['is_linux']:
         try:
-            os.system(f"chown -R proxy:proxy {lists_dir} {conf_file} 2>/dev/null || true")
-            os.system(f"chmod -R 755 {lists_dir} 2>/dev/null || true")
+            prefix = "sudo " if hasattr(os, 'geteuid') and os.geteuid() != 0 else ""
+            os.system(f"{prefix}chown -R proxy:www-data {lists_dir} {conf_file} 2>/dev/null || true")
+            os.system(f"{prefix}chmod -R 775 {lists_dir} 2>/dev/null || true")
+            os.system(f"{prefix}chmod 664 {conf_file} 2>/dev/null || true")
         except Exception:
             pass
 
