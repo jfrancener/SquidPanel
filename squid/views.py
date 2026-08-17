@@ -848,10 +848,11 @@ def logs_live_stream_view(request):
     data = []
     for l in new_logs:
         dev = device_map.get(l.client_ip)
+        local_ts = timezone.localtime(l.timestamp)
         data.append({
             'id': l.id,
-            'timestamp': l.timestamp.strftime('%H:%M:%S'),
-            'date': l.timestamp.strftime('%d/%m/%Y'),
+            'timestamp': local_ts.strftime('%H:%M:%S'),
+            'date': local_ts.strftime('%d/%m/%Y'),
             'client_ip': l.client_ip,
             'hostname': dev.hostname if dev else None,
             'device_desc': dev.description if dev else None,

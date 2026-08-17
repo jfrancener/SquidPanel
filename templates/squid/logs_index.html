@@ -818,6 +818,7 @@ async function fetchLiveLogs() {
         if (data.success && data.logs.length > 0) {
             const container = document.getElementById('live-logs-container');
             
+            // Se for carga inicial ou novas linhas, insere no topo (mais recentes primeiro)
             data.logs.forEach(l => {
                 if (l.id > lastLogId) {
                     lastLogId = l.id;
@@ -862,12 +863,18 @@ async function fetchLiveLogs() {
                     </div>
                 `;
 
-                container.appendChild(row);
+                // Inserir no início para que as mais recentes apareçam no topo
+                container.prepend(row);
             });
 
-            // Auto-scroll para o final
+            // Limita o número de linhas no console para 100
+            while (container.children.length > 100) {
+                container.lastElementChild.remove();
+            }
+
+            // Manter visualização no topo quando auto-scroll ativo
             if (document.getElementById('live-autoscroll').checked) {
-                container.scrollTop = container.scrollHeight;
+                container.scrollTop = 0;
             }
         }
     } catch (err) {
