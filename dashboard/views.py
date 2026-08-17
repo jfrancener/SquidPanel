@@ -70,7 +70,6 @@ def dashboard_view(request):
     })
 
 
-@login_required
 def system_metrics_api_view(request):
     """
     Endpoint AJAX para atualização contínua em tempo real da telemetria de hardware no Dashboard.
