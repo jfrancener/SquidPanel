@@ -1010,6 +1010,27 @@ function debounceLiveReset() {
     }, 350);
 }
 
+function setLiveHostnameFilter(term) {
+    const input = document.getElementById('live-hostname-input');
+    if (!input) return;
+    input.value = term;
+    const clearBtn = document.getElementById('btn-clear-live-host');
+    if (clearBtn) clearBtn.classList.remove('hidden');
+    resetLiveStream();
+}
+
+function setLivePortFilter(portNumber) {
+    const select = document.getElementById('live-port-select');
+    if (!select) return;
+    for (let opt of select.options) {
+        if (opt.text.startsWith(portNumber + ' ') || opt.text.startsWith(portNumber + ' -') || opt.value === String(portNumber)) {
+            select.value = opt.value;
+            resetLiveStream();
+            break;
+        }
+    }
+}
+
 function clearLiveHostnameFilter() {
     const input = document.getElementById('live-hostname-input');
     if (input) input.value = '';
@@ -1077,13 +1098,13 @@ async function fetchLiveLogs() {
                 }`;
 
                 const deviceDisplay = l.hostname 
-                    ? `<span class="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 font-bold border border-cyan-500/25 text-[11px] inline-flex items-center gap-1.5"><i class="fa-solid fa-desktop text-[10px] text-cyan-400"></i>${l.hostname}</span> <span class="text-slate-500 font-mono text-[10px]">${l.client_ip}</span>`
-                    : `<span class="text-slate-400 font-mono text-[11px]">${l.client_ip}</span>`;
+                    ? `<span onclick="setLiveHostnameFilter('${l.hostname.replace(/'/g, "\\'")}')" class="px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 hover:text-white font-bold border border-cyan-500/25 hover:border-cyan-400 text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-all shadow-sm group" title="Filtrar Live Stream por ${l.hostname}"><i class="fa-solid fa-desktop text-[10px] text-cyan-400 group-hover:scale-110 transition-transform"></i>${l.hostname}</span> <span onclick="setLiveHostnameFilter('${l.client_ip}')" class="text-slate-500 hover:text-cyan-300 font-mono text-[10px] cursor-pointer hover:underline transition-colors" title="Filtrar Live Stream por IP ${l.client_ip}">(${l.client_ip})</span>`
+                    : `<span onclick="setLiveHostnameFilter('${l.client_ip}')" class="text-slate-400 hover:text-cyan-300 font-mono text-[11px] cursor-pointer hover:underline px-1 py-0.5 rounded hover:bg-slate-800 transition-all" title="Filtrar Live Stream por IP ${l.client_ip}">${l.client_ip}</span>`;
 
                 row.innerHTML = `
                     <div class="flex flex-wrap items-center gap-2.5">
                         <span class="text-slate-500 font-mono text-[11px]">${l.timestamp}</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${isBlocked ? 'bg-rose-500/15 text-rose-300' : 'bg-indigo-500/15 text-indigo-300'}">
+                        <span onclick="setLivePortFilter('${l.port_number}')" class="px-2 py-0.5 rounded text-[10px] font-bold font-mono cursor-pointer hover:brightness-125 transition-all ${isBlocked ? 'bg-rose-500/15 text-rose-300' : 'bg-indigo-500/15 text-indigo-300'}" title="Filtrar por Porta ${l.port_number}">
                             ${l.port_number} • ${l.port_name}
                         </span>
                         ${deviceDisplay}
