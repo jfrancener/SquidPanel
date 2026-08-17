@@ -85,30 +85,46 @@ def system_metrics_api_view(request):
 def settings_general_view(request):
     """
     Sublink: Parâmetros Gerais do Servidor (Apenas Admin).
+    Permite configurar Nome, DNS, Gateway, IP de Escuta e E-mail do Administrador.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_admin:
         return HttpResponseForbidden("Acesso negado: apenas Administradores de TI podem alterar as configurações.")
 
+    from .system_metrics import get_network_info
+    net_info = get_network_info()
+
     if request.method == 'POST':
-        server_name = request.POST.get('server_name', 'SquidPanel').strip()
+        server_name = request.POST.get('server_name', 'SquidPanel - Proxy Server').strip()
+        server_ip = request.POST.get('server_ip', '10.40.88.5').strip()
+        server_gateway = request.POST.get('server_gateway', '').strip()
         server_dns = request.POST.get('server_dns', '1.1.1.1, 8.8.8.8').strip()
         admin_email = request.POST.get('admin_email', '').strip()
 
         SystemSetting.set_value('server_name', server_name, 'Nome de exibição do servidor')
+        SystemSetting.set_value('server_ip', server_ip, 'Endereço IP de escuta do servidor')
+        SystemSetting.set_value('server_gateway', server_gateway, 'Gateway padrão da rede')
         SystemSetting.set_value('server_dns', server_dns, 'Servidores DNS de consulta')
         SystemSetting.set_value('admin_email', admin_email, 'E-mail do Administrador de TI')
 
-        messages.success(request, 'Parâmetros gerais do servidor atualizados com sucesso!')
+        # Sincroniza regras do Squid caso necessário
+        from squid.squid_sync import sync_squid_rules
+        sync_squid_rules()
+
+        messages.success(request, 'Parâmetros gerais de rede e servidor atualizados com sucesso!')
         return redirect('settings_general')
 
     server_name = SystemSetting.get_value('server_name', 'SquidPanel - Proxy Server')
-    server_dns = SystemSetting.get_value('server_dns', '1.1.1.1, 8.8.8.8')
-    admin_email = SystemSetting.get_value('admin_email', 'admin@local')
+    server_ip = SystemSetting.get_value('server_ip', net_info['server_ip'])
+    server_gateway = SystemSetting.get_value('server_gateway', net_info['gateway'])
+    server_dns = SystemSetting.get_value('server_dns', '10.40.88.1, 10.40.88.2, 1.1.1.1')
+    admin_email = SystemSetting.get_value('admin_email', 'informatica@pij.local')
 
     return render(request, 'settings/general.html', {
         'profile': profile,
         'server_name': server_name,
+        'server_ip': server_ip,
+        'server_gateway': server_gateway,
         'server_dns': server_dns,
         'admin_email': admin_email,
         'active_menu': 'settings_general'

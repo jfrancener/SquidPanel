@@ -111,16 +111,18 @@
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-network-wired text-amber-400"></i> Conectividade de Rede
                     </span>
-                    <span class="text-xs font-bold font-mono text-emerald-400">ATIVO</span>
+                    <a href="{% url 'settings_general' %}" class="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1" title="Configurar Gateway e DNS">
+                        <i class="fa-solid fa-gear"></i> Ajustar
+                    </a>
                 </div>
                 <div class="space-y-1 text-[11px] text-slate-300 font-mono">
                     <div class="flex justify-between">
                         <span class="text-slate-500">Gateway:</span>
-                        <span>10.40.88.1</span>
+                        <span class="text-amber-300 font-bold" id="telemetry-gateway">{{ system_metrics.gateway|default:"10.40.91.254" }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-500">DNS Primário:</span>
-                        <span>10.40.88.1</span>
+                        <span class="text-slate-300" id="telemetry-dns">{{ system_metrics.primary_dns|default:"10.40.88.1" }}</span>
                     </div>
                 </div>
             </div>
@@ -323,6 +325,12 @@ async function refreshTelemetry() {
         // Uptime
         const uptime = document.getElementById('telemetry-uptime');
         if (uptime) uptime.textContent = data.uptime;
+
+        // Gateway & DNS
+        const gw = document.getElementById('telemetry-gateway');
+        const dns = document.getElementById('telemetry-dns');
+        if (gw && data.gateway) gw.textContent = data.gateway;
+        if (dns && data.primary_dns) dns.textContent = data.primary_dns;
     } catch(err) {
         console.error('Erro ao atualizar telemetria:', err);
     }

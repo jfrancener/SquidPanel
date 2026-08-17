@@ -174,15 +174,70 @@ def get_server_uptime():
     return "Ativo"
 
 
+def get_network_info():
+    """
+    Retorna o Gateway, DNS Primário e IP de Escuta do servidor (com suporte a configuração manual no painel e detecção no SO).
+    """
+    from dashboard.models import SystemSetting
+
+    # 1. IP de Escuta
+    server_ip = SystemSetting.get_value('server_ip', '10.40.88.5')
+
+    # 2. Gateway
+    server_gateway = SystemSetting.get_value('server_gateway', '').strip()
+    if not server_gateway:
+        # Detecta a rota padrão real no Linux
+        if os.path.exists('/proc/net/route'):
+            try:
+                with open('/proc/net/route', 'r') as f:
+                    for line in f:
+                        fields = line.strip().split()
+                        if len(fields) >= 3 and fields[1] == '00000000':
+                            gw_hex = fields[2]
+                            server_gateway = socket.inet_ntoa(bytes.fromhex(gw_hex)[::-1])
+                            break
+            except Exception:
+                pass
+        if not server_gateway:
+            server_gateway = '10.40.91.254'
+
+    # 3. DNS Primário
+    server_dns = SystemSetting.get_value('server_dns', '').strip()
+    primary_dns = ''
+    if server_dns:
+        primary_dns = server_dns.split(',')[0].strip()
+    elif os.path.exists('/etc/resolv.conf'):
+        try:
+            with open('/etc/resolv.conf', 'r') as f:
+                for line in f:
+                    if line.startswith('nameserver'):
+                        primary_dns = line.split()[1].strip()
+                        break
+        except Exception:
+            pass
+    if not primary_dns:
+        primary_dns = '10.40.88.1'
+
+    return {
+        'server_ip': server_ip,
+        'gateway': server_gateway,
+        'primary_dns': primary_dns
+    }
+
+
 def get_full_system_telemetry():
     """
     Consolida todas as métricas do servidor em um único dicionário para o Dashboard.
     """
+    net_info = get_network_info()
     return {
         'cpu': get_cpu_metrics(),
         'memory': get_memory_metrics(),
         'disk': get_disk_metrics(),
         'internet': get_internet_status(),
         'uptime': get_server_uptime(),
-        'server_ip': '10.40.88.5'
+        'server_ip': net_info['server_ip'],
+        'gateway': net_info['gateway'],
+        'primary_dns': net_info['primary_dns']
     }
+
