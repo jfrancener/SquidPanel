@@ -161,7 +161,7 @@ def group_delete_view(request, group_id):
 @login_required
 def port_create_view(request, group_id):
     """
-    Criação de uma nova porta de escuta / sala associada a um grupo.
+    Criação de uma nova porta de escuta / sala associada a um grupo e sincronização com o Squid.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_manager:
@@ -191,7 +191,7 @@ def port_create_view(request, group_id):
             messages.error(request, f"A porta de proxy {port_number} já está em uso por outra sala.")
             return redirect('groups')
 
-        ProxyPort.objects.create(
+        port = ProxyPort.objects.create(
             group=group,
             name=name,
             port_number=port_number,
@@ -199,7 +199,15 @@ def port_create_view(request, group_id):
             is_active=True
         )
 
-        messages.success(request, f"Sala '{name}' (Porta {port_number}) criada com sucesso no grupo '{group.name}'!")
+        # Sincroniza imediatamente o squid.conf
+        from .squid_sync import sync_squid_rules
+        sync_ok, sync_msg = sync_squid_rules()
+
+        if sync_ok:
+            messages.success(request, f"Sala '{name}' (Porta {port_number}) criada e aplicada no Squid com sucesso!")
+        else:
+            messages.warning(request, f"Sala '{name}' (Porta {port_number}) criada, mas houve um aviso no Squid: {sync_msg}")
+
         return redirect('groups')
 
     return redirect('groups')
@@ -208,16 +216,18 @@ def port_create_view(request, group_id):
 @login_required
 def port_edit_view(request, port_id):
     """
-    Edição de dados de uma porta/sala (Nome, Grupo ou Status).
+    Edição de dados de uma porta/sala (Nome, Número da Porta, Grupo e Status) com sincronização imediata no Squid.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_manager:
         return HttpResponseForbidden("Acesso negado.")
 
     port = get_object_or_404(ProxyPort, id=port_id)
+    old_port_number = port.port_number
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
+        port_str = request.POST.get('port_number', '').strip()
         group_id = request.POST.get('group_id')
         current_status = request.POST.get('current_status', port.current_status)
 
@@ -225,15 +235,40 @@ def port_edit_view(request, port_id):
             messages.error(request, 'O nome da sala é obrigatório.')
             return redirect('groups')
 
-        if group_id:
-            new_group = get_object_or_404(ProxyGroup, id=group_id)
+        if port_str:
+            try:
+                new_port_number = int(port_str)
+                if new_port_number < 1024 or new_port_number > 65535:
+                    messages.error(request, 'O número da porta deve estar entre 1024 e 65535.')
+                    return redirect('groups')
+                if ProxyPort.objects.filter(port_number=new_port_number).exclude(id=port.id).exists():
+                    messages.error(request, f"A porta {new_port_number} já está em uso por outra sala.")
+                    return redirect('groups')
+                port.port_number = new_port_number
+            except ValueError:
+                messages.error(request, 'Número de porta inválido.')
+                return redirect('groups')
+
+        if group_id and group_id.isdigit():
+            new_group = get_object_or_404(ProxyGroup, id=int(group_id))
             port.group = new_group
 
         port.name = name
         port.current_status = current_status
         port.save()
 
-        messages.success(request, f"Porta '{port.name}' ({port.port_number}) atualizada com sucesso!")
+        # Sincroniza imediatamente o arquivo de configuração do Squid (/etc/squid/squid.conf)
+        from .squid_sync import sync_squid_rules
+        sync_ok, sync_msg = sync_squid_rules()
+
+        if sync_ok:
+            if old_port_number != port.port_number:
+                messages.success(request, f"Porta alterada de {old_port_number} para {port.port_number} e sincronizada no Squid com sucesso!")
+            else:
+                messages.success(request, f"Sala '{port.name}' (Porta {port.port_number}) atualizada com sucesso!")
+        else:
+            messages.warning(request, f"Porta atualizada no banco, mas houve aviso no Squid: {sync_msg}")
+
         return redirect('groups')
 
     return redirect('groups')
@@ -242,7 +277,7 @@ def port_edit_view(request, port_id):
 @login_required
 def port_delete_view(request, port_id):
     """
-    Exclusão de uma porta/sala do sistema.
+    Exclusão de uma porta/sala do sistema com reconfiguração do Squid.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     if not profile.is_admin:
@@ -253,7 +288,11 @@ def port_delete_view(request, port_id):
     port_num = port.port_number
     port.delete()
 
-    messages.success(request, f"Sala '{name}' (Porta {port_num}) excluída com sucesso.")
+    # Sincroniza imediatamente o squid.conf removendo a porta
+    from .squid_sync import sync_squid_rules
+    sync_ok, sync_msg = sync_squid_rules()
+
+    messages.success(request, f"Sala '{name}' (Porta {port_num}) excluída e removida do Squid com sucesso.")
     return redirect('groups')
 
 

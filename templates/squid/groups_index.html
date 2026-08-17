@@ -246,6 +246,11 @@
                                         <span>PAC</span>
                                     </button>
 
+                                    <!-- Editar Porta -->
+                                    <button type="button" onclick="openEditPortModal({{ port.id }}, '{{ port.port_number }}', '{{ port.name|escapejs }}', {{ g.id }}, '{{ port.current_status }}')" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white transition-all border border-slate-700/60" title="Editar Sala / Porta (Trocar número da porta ou nome)">
+                                        <i class="fa-solid fa-pencil text-[10px]"></i>
+                                    </button>
+
                                     <!-- Excluir Porta -->
                                     {% if request.user.profile.is_admin %}
                                     <a href="{% url 'port_delete' port.id %}" onclick="return confirm('Excluir a porta {{ port.port_number }} ({{ port.name }})?')" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white transition-all border border-slate-700/60" title="Excluir porta">
@@ -779,6 +784,20 @@ function closePacModal() {
     document.getElementById('modal-pac').classList.add('hidden');
 }
 
+function openEditPortModal(portId, portNumber, portName, groupId, currentStatus) {
+    document.getElementById('edit-port-subtitle').textContent = `Porta atual: ${portNumber}`;
+    document.getElementById('edit_port_name').value = portName;
+    document.getElementById('edit_port_number').value = portNumber;
+    document.getElementById('edit_port_group').value = groupId;
+    document.getElementById('edit_port_status').value = currentStatus;
+    document.getElementById('form-edit-port').action = `/proxy/ports/${portId}/edit/`;
+    document.getElementById('modal-edit-port').classList.remove('hidden');
+}
+
+function closeEditPortModal() {
+    document.getElementById('modal-edit-port').classList.add('hidden');
+}
+
 function copyToClipboard(text, btn) {
     navigator.clipboard.writeText(text).then(() => {
         const originalHtml = btn.innerHTML;
@@ -791,6 +810,78 @@ function copyToClipboard(text, btn) {
     });
 }
 </script>
+
+<!-- ========================================== -->
+<!-- MODAL: EDITAR SALA / PORTA SQUID -->
+<!-- ========================================== -->
+<div id="modal-edit-port" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-pencil text-indigo-400"></i>
+                    <span>Editar Sala / Porta de Escuta</span>
+                </h3>
+                <p id="edit-port-subtitle" class="text-[11px] text-cyan-400 mt-0.5 font-medium"></p>
+            </div>
+            <button onclick="closeEditPortModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-edit-port" method="POST" action="" class="p-6 space-y-4 text-xs">
+            {% csrf_token %}
+
+            <div>
+                <label for="edit_port_name" class="block font-semibold text-white mb-1.5">
+                    Nome da Sala / Identificação <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="edit_port_name" name="name" required placeholder="ex: Sala 1, Galeria, Lab Info" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label for="edit_port_number" class="block font-semibold text-white mb-1.5">
+                    Número da Porta Proxy (Squid) <span class="text-red-400">*</span>
+                </label>
+                <input type="number" id="edit_port_number" name="port_number" required min="1024" max="65535" placeholder="ex: 9010, 9020" class="w-full bg-[#0f121e] border border-slate-700 text-white font-mono text-xs rounded-xl p-3 focus:border-indigo-500 outline-none transition-all font-bold">
+                <p class="text-[10px] text-slate-500 mt-1">Ao alterar a porta, o arquivo <code class="text-cyan-400">/etc/squid/squid.conf</code> será atualizado e o Squid reconfigurado automaticamente.</p>
+            </div>
+
+            <div>
+                <label for="edit_port_group" class="block font-semibold text-white mb-1.5">
+                    Grupo de Proxy Associado <span class="text-red-400">*</span>
+                </label>
+                <select id="edit_port_group" name="group_id" required class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+                    {% for grp in groups %}
+                    <option value="{{ grp.id }}">{{ grp.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="edit_port_status" class="block font-semibold text-white mb-1.5">
+                    Status de Acesso da Porta:
+                </label>
+                <select id="edit_port_status" name="current_status" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+                    <option value="WHITELIST">Apenas Whitelist (Padrão Seguro)</option>
+                    <option value="BLACKLIST">Liberada com Blacklist</option>
+                    <option value="ALLOWED">Liberada Total (100% Livre)</option>
+                </select>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="closeEditPortModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20">
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
 
 <!-- ========================================== -->
 <!-- MODAL: SCRIPT PAC / WPAD DA PORTA -->
