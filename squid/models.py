@@ -99,6 +99,7 @@ class AccessLog(models.Model):
 
     timestamp = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Data / Hora")
     client_ip = models.CharField(max_length=45, verbose_name="IP do Cliente")
+    hostname = models.CharField(max_length=100, blank=True, db_index=True, verbose_name="Hostname do Equipamento")
     port_number = models.PositiveIntegerField(db_index=True, verbose_name="Porta Proxy")
     port = models.ForeignKey('dashboard.ProxyPort', on_delete=models.SET_NULL, null=True, blank=True, related_name='access_logs')
     group = models.ForeignKey('dashboard.ProxyGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='access_logs')
@@ -121,6 +122,7 @@ class AccessLog(models.Model):
             models.Index(fields=['-timestamp', 'port_number']),
             models.Index(fields=['domain']),
             models.Index(fields=['action']),
+            models.Index(fields=['hostname']),
         ]
 
     def __str__(self):

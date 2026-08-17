@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from django.utils import timezone
 from django.conf import settings
 
-from .models import AccessLog, ProxyList, DomainItem
+from .models import AccessLog, ProxyList, DomainItem, DeviceHost
 from dashboard.models import ProxyGroup, ProxyPort, SystemSetting
 
 
@@ -34,9 +34,10 @@ def cleanup_old_logs():
     return deleted_count, retention_days
 
 
-def parse_squid_log_line(line, port_map):
+def parse_squid_log_line(line, port_map, device_map=None):
     """
     Faz o parsing de uma linha do /var/log/squid/access.log no formato nativo do Squid / SquidPanel.
+    Grava o Hostname correspondente ao IP naquele exato momento.
     """
     parts = line.strip().split()
     if len(parts) < 7:
@@ -53,16 +54,21 @@ def parse_squid_log_line(line, port_map):
         # 3. IP do Cliente
         client_ip = parts[2]
 
-        # 4. Status HTTP / Squid
+        # 4. Hostname do Equipamento no momento da requisição
+        hostname = ''
+        if device_map and client_ip in device_map:
+            hostname = device_map[client_ip]
+
+        # 5. Status HTTP / Squid
         http_status = parts[3]
 
-        # 5. Bytes Trafegados
+        # 6. Bytes Trafegados
         bytes_sent = int(parts[4]) if parts[4].isdigit() else 0
 
-        # 6. Método HTTP
+        # 7. Método HTTP
         method = parts[5].upper()
 
-        # 7. URL ou Host requisitado
+        # 8. URL ou Host requisitado
         raw_url = parts[6]
         full_url = raw_url
 
@@ -75,10 +81,10 @@ def parse_squid_log_line(line, port_map):
 
         domain = domain.lstrip('.').lower()
 
-        # 8. Mime Type
+        # 9. Mime Type
         mime_type = parts[9] if len(parts) > 9 else '-'
 
-        # 9. Porta local de escuta (se presente na última posição)
+        # 10. Porta local de escuta (se presente na última posição)
         port_number = None
         if len(parts) >= 11 and parts[-1].isdigit():
             port_number = int(parts[-1])
@@ -100,6 +106,7 @@ def parse_squid_log_line(line, port_map):
         return AccessLog(
             timestamp=log_time,
             client_ip=client_ip,
+            hostname=hostname,
             port_number=port_number,
             port=proxy_port,
             group=proxy_group,
@@ -119,14 +126,15 @@ def parse_squid_log_line(line, port_map):
 def sync_logs_from_squid_file():
     """
     Lê incrementalmente as novas linhas completas do arquivo /var/log/squid/access.log
-    e insere os registros reais no banco de dados.
+    e insere os registros reais no banco de dados com seus respectivos hostnames.
     """
     log_file_path = get_squid_log_path()
     if not os.path.exists(log_file_path):
         return 0
 
-    # Carrega mapa de portas em memória
+    # Carrega mapa de portas e mapa de dispositivos (IP -> Hostname) em memória
     port_map = {p.port_number: p for p in ProxyPort.objects.select_related('group').filter(is_active=True)}
+    device_map = dict(DeviceHost.objects.values_list('ip_address', 'hostname'))
 
     # Pega offset anterior
     offset_str = SystemSetting.get_value('squid_log_file_offset', '0')
@@ -162,7 +170,7 @@ def sync_logs_from_squid_file():
                     break
                 
                 valid_offset = f.tell()
-                parsed_log = parse_squid_log_line(line, port_map)
+                parsed_log = parse_squid_log_line(line, port_map, device_map)
                 if parsed_log:
                     new_logs.append(parsed_log)
 
@@ -174,4 +182,5 @@ def sync_logs_from_squid_file():
     except Exception as e:
         print(f"Erro ao ler access.log do Squid: {e}")
         return 0
+
 

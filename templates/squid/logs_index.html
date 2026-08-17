@@ -277,12 +277,12 @@
                             <!-- Equipamento / Hostname & IP -->
                             <td class="p-3.5 whitespace-nowrap">
                                 <div class="flex items-center gap-2">
-                                    {% if log.device %}
+                                    {% if log.hostname or log.device %}
                                     <div>
                                         <div class="flex items-center gap-1.5 font-bold text-cyan-300 text-xs">
                                             <i class="fa-solid fa-desktop text-indigo-400 text-[10px]"></i>
-                                            <span>{{ log.device.hostname }}</span>
-                                            <button type="button" onclick="openDeviceModal('{{ log.client_ip|escapejs }}', '{{ log.device.hostname|escapejs }}', '{{ log.device.description|escapejs }}')" class="text-slate-500 hover:text-indigo-300 text-[10px]" title="Editar Hostname">
+                                            <span>{{ log.hostname|default:log.device.hostname }}</span>
+                                            <button type="button" onclick="openDeviceModal('{{ log.client_ip|escapejs }}', '{{ log.hostname|default:log.device.hostname|escapejs }}', '{{ log.device.description|default:""|escapejs }}')" class="text-slate-500 hover:text-indigo-300 text-[10px]" title="Editar Hostname">
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </button>
                                         </div>
