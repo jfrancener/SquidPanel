@@ -105,7 +105,7 @@
                 </div>
             </div>
 
-            <!-- 4. Gateway & DNS -->
+            <!-- 4. Gateway & DNS com PING (Verde OK / Vermelho OFF / Amarelo ?) -->
             <div class="p-4 rounded-xl bg-[#0e111f] border border-slate-800/80 flex flex-col justify-between space-y-2 hover:border-slate-700 transition-all">
                 <div class="flex justify-between items-start">
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -115,14 +115,29 @@
                         <i class="fa-solid fa-gear"></i> Ajustar
                     </a>
                 </div>
-                <div class="space-y-1 text-[11px] text-slate-300 font-mono">
-                    <div class="flex justify-between">
+                <div class="space-y-1.5 text-[11px] font-mono">
+                    <!-- Gateway -->
+                    <div class="flex justify-between items-center">
                         <span class="text-slate-500">Gateway:</span>
-                        <span class="text-amber-300 font-bold" id="telemetry-gateway">{{ system_metrics.gateway|default:"10.40.91.254" }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-slate-200 font-bold" id="telemetry-gateway">{{ system_metrics.gateway|default:"10.40.91.254" }}</span>
+                            <span id="telemetry-gw-badge" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold {% if system_metrics.gateway_ping.status == 'ok' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% elif system_metrics.gateway_ping.status == 'off' %}bg-rose-500/20 text-rose-400 border border-rose-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+                                <span class="w-1.5 h-1.5 rounded-full {% if system_metrics.gateway_ping.status == 'ok' %}bg-emerald-400 animate-pulse{% elif system_metrics.gateway_ping.status == 'off' %}bg-rose-400{% else %}bg-amber-400{% endif %}"></span>
+                                <span id="telemetry-gw-ping">{{ system_metrics.gateway_ping.label|default:"OK" }}</span>
+                            </span>
+                        </div>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">DNS Primário:</span>
-                        <span class="text-slate-300" id="telemetry-dns">{{ system_metrics.primary_dns|default:"10.40.88.1" }}</span>
+
+                    <!-- DNS Primário -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-500">DNS Prim.:</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-slate-200" id="telemetry-dns">{{ system_metrics.primary_dns|default:"10.40.88.1" }}</span>
+                            <span id="telemetry-dns-badge" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold {% if system_metrics.dns_ping.status == 'ok' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% elif system_metrics.dns_ping.status == 'off' %}bg-rose-500/20 text-rose-400 border border-rose-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+                                <span class="w-1.5 h-1.5 rounded-full {% if system_metrics.dns_ping.status == 'ok' %}bg-emerald-400 animate-pulse{% elif system_metrics.dns_ping.status == 'off' %}bg-rose-400{% else %}bg-amber-400{% endif %}"></span>
+                                <span id="telemetry-dns-ping">{{ system_metrics.dns_ping.label|default:"OK" }}</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -326,11 +341,31 @@ async function refreshTelemetry() {
         const uptime = document.getElementById('telemetry-uptime');
         if (uptime) uptime.textContent = data.uptime;
 
+        // Atualizador de Badge de Ping (Verde: OK, Vermelho: OFF, Amarelo: ?)
+        const updatePingBadge = (badgeEl, pingData) => {
+            if (!badgeEl || !pingData) return;
+            if (pingData.status === 'ok') {
+                badgeEl.className = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                badgeEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>${pingData.label || 'OK'}</span>`;
+            } else if (pingData.status === 'off') {
+                badgeEl.className = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30';
+                badgeEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span><span>OFF</span>`;
+            } else {
+                badgeEl.className = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                badgeEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span><span>?</span>`;
+            }
+        };
+
         // Gateway & DNS
         const gw = document.getElementById('telemetry-gateway');
-        const dns = document.getElementById('telemetry-dns');
+        const gwBadge = document.getElementById('telemetry-gw-badge');
         if (gw && data.gateway) gw.textContent = data.gateway;
+        updatePingBadge(gwBadge, data.gateway_ping);
+
+        const dns = document.getElementById('telemetry-dns');
+        const dnsBadge = document.getElementById('telemetry-dns-badge');
         if (dns && data.primary_dns) dns.textContent = data.primary_dns;
+        updatePingBadge(dnsBadge, data.dns_ping);
     } catch(err) {
         console.error('Erro ao atualizar telemetria:', err);
     }

@@ -174,9 +174,60 @@ def get_server_uptime():
     return "Ativo"
 
 
+def ping_host(host, timeout_sec=1):
+    """
+    Executa teste de ping ICMP (ou fallback TCP) para o host.
+    Retorna dicionário com:
+      - status: 'ok' (verde), 'off' (vermelho), 'unknown' (amarelo)
+      - latency_ms: float em ms ou None
+      - label: 'OK (0.5ms)', 'OFF' ou 'Desconhecido'
+    """
+    import subprocess
+
+    if not host or str(host).strip() in ('', '-', 'None'):
+        return {'status': 'unknown', 'latency_ms': None, 'label': 'Desconhecido'}
+
+    host_clean = str(host).strip()
+
+    # 1. Ping ICMP via subprocess no Linux
+    try:
+        start = time.perf_counter()
+        res = subprocess.run(
+            ['ping', '-c', '1', '-W', str(timeout_sec), host_clean],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        elapsed = round((time.perf_counter() - start) * 1000, 1)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                if 'min/avg/max' in line or 'rtt' in line:
+                    parts = line.split('=')[1].strip().split('/')
+                    if len(parts) >= 2:
+                        elapsed = round(float(parts[1]), 1)
+            return {'status': 'ok', 'latency_ms': elapsed, 'label': f'{elapsed}ms'}
+    except Exception:
+        pass
+
+    # 2. Fallback TCP nas portas mais comuns (53 para DNS, 80/443 para Gateway)
+    for port in [53, 80, 443, 22]:
+        try:
+            start = time.perf_counter()
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout_sec)
+            sock.connect((host_clean, port))
+            sock.close()
+            elapsed = round((time.perf_counter() - start) * 1000, 1)
+            return {'status': 'ok', 'latency_ms': elapsed, 'label': f'{elapsed}ms'}
+        except Exception:
+            continue
+
+    return {'status': 'off', 'latency_ms': None, 'label': 'OFF'}
+
+
 def get_network_info():
     """
-    Retorna o Gateway, DNS Primário e IP de Escuta do servidor (com suporte a configuração manual no painel e detecção no SO).
+    Retorna o Gateway, DNS Primário, IP de Escuta do servidor e seus respectivos status de PING.
     """
     from dashboard.models import SystemSetting
 
@@ -186,7 +237,6 @@ def get_network_info():
     # 2. Gateway
     server_gateway = SystemSetting.get_value('server_gateway', '').strip()
     if not server_gateway:
-        # Detecta a rota padrão real no Linux
         if os.path.exists('/proc/net/route'):
             try:
                 with open('/proc/net/route', 'r') as f:
@@ -218,10 +268,16 @@ def get_network_info():
     if not primary_dns:
         primary_dns = '10.40.88.1'
 
+    # 4. Pings em Tempo Real
+    gateway_ping = ping_host(server_gateway, timeout_sec=1)
+    dns_ping = ping_host(primary_dns, timeout_sec=1)
+
     return {
         'server_ip': server_ip,
         'gateway': server_gateway,
-        'primary_dns': primary_dns
+        'gateway_ping': gateway_ping,
+        'primary_dns': primary_dns,
+        'dns_ping': dns_ping
     }
 
 
@@ -238,6 +294,9 @@ def get_full_system_telemetry():
         'uptime': get_server_uptime(),
         'server_ip': net_info['server_ip'],
         'gateway': net_info['gateway'],
-        'primary_dns': net_info['primary_dns']
+        'gateway_ping': net_info['gateway_ping'],
+        'primary_dns': net_info['primary_dns'],
+        'dns_ping': net_info['dns_ping']
     }
+
 
