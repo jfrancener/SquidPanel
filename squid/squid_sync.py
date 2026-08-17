@@ -233,16 +233,18 @@ def generate_squid_config_and_lists():
         conf_lines.append(f"\n# Porta {p.port_number}: {p.name} (Grupo: {g.name}) - Modo: {p.current_status}")
 
         if p.current_status == 'ALLOWED':
-            # Modo Liberado Total (100% Livre, sem Blacklist)
+            # Modo Liberado Total (100% Livre)
             conf_lines.append(f"http_access allow myport_{p.port_number}")
 
         elif p.current_status == 'BLACKLIST':
-            # Modo Liberado com Blacklist
+            # Modo Liberado com Blacklist (Whitelists Obrigatória e do Grupo têm precedência sobre a Blacklist)
+            conf_lines.append(f"http_access allow myport_{p.port_number} mandatory_whitelist")
+            conf_lines.append(f"http_access allow myport_{p.port_number} group_{g.id}_wl")
             conf_lines.append(f"http_access deny myport_{p.port_number} group_{g.id}_bl")
             conf_lines.append(f"http_access allow myport_{p.port_number}")
 
         else:
-            # Modo Whitelist (Padrão Seguro)
+            # Modo Whitelist (Padrão Seguro: apenas Whitelists permitidas)
             conf_lines.append(f"http_access allow myport_{p.port_number} mandatory_whitelist")
             conf_lines.append(f"http_access allow myport_{p.port_number} group_{g.id}_wl")
             conf_lines.append(f"http_access deny myport_{p.port_number}")
