@@ -1042,5 +1042,29 @@ def download_certificate_view(request):
         return response
 
 
+@login_required
+def sync_ad_devices_view(request):
+    """
+    Aciona a sincronização automática de Hostnames e IPs a partir do Active Directory e DNS.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Apenas Administradores podem sincronizar o Active Directory.")
+
+    from .ad_sync import sync_devices_from_ad
+    count, msg = sync_devices_from_ad()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': count > 0 or 'concluída' in msg.lower(), 'message': msg, 'count': count})
+
+    if count > 0 or 'concluída' in msg.lower():
+        messages.success(request, f"🖥️ {msg}")
+    else:
+        messages.error(request, f"Erro na sincronização AD: {msg}")
+
+    return redirect(request.META.get('HTTP_REFERER', 'logs'))
+
+
+
 
 

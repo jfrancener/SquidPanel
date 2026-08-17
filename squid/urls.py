@@ -21,6 +21,7 @@ urlpatterns = [
     path('logs/add-to-list/', views.log_add_to_list_view, name='log_add_to_list'),
     path('logs/cleanup/', views.logs_cleanup_view, name='logs_cleanup'),
     path('devices/save/', views.device_save_view, name='device_save'),
+    path('devices/sync-ad/', views.sync_ad_devices_view, name='sync_ad_devices'),
 
     # Controle & Sincronização do Serviço Squid
     path('service/apply/', views.squid_apply_view, name='squid_apply'),
