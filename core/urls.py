@@ -21,4 +21,7 @@ urlpatterns = [
     path('settings/general/', dashboard_views.settings_general_view, name='settings_general'),
     path('settings/session/', dashboard_views.settings_session_view, name='settings_session'),
     path('settings/logs/', dashboard_views.settings_logs_view, name='settings_logs'),
+    path('settings/export/', dashboard_views.settings_export_view, name='settings_export'),
+    path('settings/export/config/xml/', dashboard_views.export_config_xml_view, name='export_config_xml'),
+    path('settings/export/logs/txt/', dashboard_views.export_logs_txt_view, name='export_logs_txt'),
 ]

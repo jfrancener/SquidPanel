@@ -185,3 +185,99 @@ def settings_logs_view(request):
         'active_menu': 'settings_logs'
     })
 
+
+# ==========================================
+# 3. EXPORTAÇÃO & BACKUPS (XML & TXT)
+# ==========================================
+
+@login_required
+def settings_export_view(request):
+    """
+    Tela de Gestão de Exportações e Backups (XML de Configurações e TXT de Logs).
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Acesso negado: apenas Administradores de TI podem acessar a área de exportação.")
+
+    from squid.models import ProxyList, DomainItem, DeviceHost, AccessLog
+
+    total_groups = ProxyGroup.objects.filter(is_active=True).count()
+    total_ports = ProxyPort.objects.filter(is_active=True).count()
+    total_whitelists = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).count()
+    total_blacklists = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).count()
+    total_domains = DomainItem.objects.filter(is_active=True).count()
+    total_devices = DeviceHost.objects.count()
+    total_logs = AccessLog.objects.count()
+
+    all_ports = ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number')
+    all_groups = ProxyGroup.objects.filter(is_active=True).order_by('name')
+
+    return render(request, 'settings/export.html', {
+        'profile': profile,
+        'total_groups': total_groups,
+        'total_ports': total_ports,
+        'total_whitelists': total_whitelists,
+        'total_blacklists': total_blacklists,
+        'total_domains': total_domains,
+        'total_devices': total_devices,
+        'total_logs': total_logs,
+        'all_ports': all_ports,
+        'all_groups': all_groups,
+        'active_menu': 'settings_export'
+    })
+
+
+@login_required
+def export_config_xml_view(request):
+    """
+    Gera e entrega o arquivo XML com todas as configurações do servidor para download.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Acesso negado.")
+
+    from django.http import HttpResponse
+    from django.utils import timezone
+    from .export_service import generate_configuration_xml
+
+    xml_content = generate_configuration_xml()
+    filename = f"SquidPanel_Config_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xml"
+
+    response = HttpResponse(xml_content, content_type='application/xml; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+def export_logs_txt_view(request):
+    """
+    Gera e entrega o arquivo TXT com os logs de acesso filtrados para download.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden("Acesso negado.")
+
+    from django.http import HttpResponse
+    from django.utils import timezone
+    from .export_service import export_logs_to_txt
+
+    filters = {
+        'period': request.GET.get('period', 'today'),
+        'port_id': request.GET.get('port_id'),
+        'action': request.GET.get('action', 'ALL'),
+        'hostname_ip': request.GET.get('hostname_ip', '').strip(),
+        'format': request.GET.get('format', 'human'),
+        'date_from': request.GET.get('date_from'),
+        'date_to': request.GET.get('date_to'),
+        'time_from': request.GET.get('time_from', '00:00'),
+        'time_to': request.GET.get('time_to', '23:59'),
+    }
+
+    txt_content = export_logs_to_txt(filters)
+    filename = f"Squid_Logs_{filters['period']}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.txt"
+
+    response = HttpResponse(txt_content, content_type='text/plain; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+

@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+
+{% block title %}Exportação & Backups - SquidPanel{% endblock %}
+{% block page_title %}Configurações / Exportação & Backups{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    
+    <!-- Cabeçalho da Página -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center gap-2.5">
+                <i class="fa-solid fa-file-export text-indigo-400"></i>
+                <span>Exportação de Dados & Backups</span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Gere backups estruturados em XML de todas as regras do servidor ou exporte relatórios textuais (.txt) de logs de acesso.
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-mono font-semibold flex items-center gap-1.5">
+                <i class="fa-solid fa-shield-halved text-cyan-400"></i>
+                <span>SquidPanel v2.0</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Grid de Exportadores: XML de Configuração vs TXT de Logs -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- ============================================================ -->
+        <!-- CARD 1: EXPORTAÇÃO COMPLETA DE CONFIGURAÇÕES (XML) -->
+        <!-- ============================================================ -->
+        <div class="lg:col-span-5 glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col justify-between">
+            <div class="p-6 space-y-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <i class="fa-solid fa-file-code text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Backup de Configurações (XML)</h2>
+                        <p class="text-[11px] text-slate-400">Estrutura completa de regras e servidores</p>
+                    </div>
+                </div>
+
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    Exporta um arquivo <strong class="text-emerald-400 font-mono">.XML</strong> padronizado contendo todas as definições operacionais do sistema:
+                </p>
+
+                <!-- Resumo dos Itens Exportados -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="p-3 rounded-xl bg-[#111422] border border-slate-800/80">
+                        <span class="text-[10px] text-slate-400 block">Grupos de Proxy:</span>
+                        <span class="text-base font-bold text-white font-mono">{{ total_groups }}</span>
+                    </div>
+                    <div class="p-3 rounded-xl bg-[#111422] border border-slate-800/80">
+                        <span class="text-[10px] text-slate-400 block">Salas / Portas:</span>
+                        <span class="text-base font-bold text-cyan-400 font-mono">{{ total_ports }}</span>
+                    </div>
+                    <div class="p-3 rounded-xl bg-[#111422] border border-slate-800/80">
+                        <span class="text-[10px] text-slate-400 block">Whitelists Ativas:</span>
+                        <span class="text-base font-bold text-emerald-400 font-mono">{{ total_whitelists }}</span>
+                    </div>
+                    <div class="p-3 rounded-xl bg-[#111422] border border-slate-800/80">
+                        <span class="text-[10px] text-slate-400 block">Blacklists Ativas:</span>
+                        <span class="text-base font-bold text-rose-400 font-mono">{{ total_blacklists }}</span>
+                    </div>
+                    <div class="p-3 rounded-xl bg-[#111422] border border-slate-800/80 col-span-2">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="text-[10px] text-slate-400 block">Total de Domínios Cadastrados:</span>
+                                <span class="text-base font-bold text-indigo-400 font-mono">{{ total_domains }}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[10px] text-slate-400 block">Equipamentos Mapeados:</span>
+                                <span class="text-sm font-bold text-slate-300 font-mono">{{ total_devices }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2.5">
+                    <i class="fa-solid fa-circle-info text-cyan-400 text-xs mt-0.5"></i>
+                    <span>O arquivo gerado é compatível para auditoria, migrações de servidor e restaurações seguras.</span>
+                </div>
+            </div>
+
+            <!-- Botão de Ação XML -->
+            <div class="p-6 pt-0">
+                <a href="{% url 'export_config_xml' %}" class="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold tracking-wide shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 group">
+                    <i class="fa-solid fa-cloud-arrow-down text-sm group-hover:scale-110 transition-transform"></i>
+                    <span>Baixar Configurações em XML (.xml)</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- CARD 2: EXPORTADOR DE LOGS DE ACESSO (TXT) -->
+        <!-- ============================================================ -->
+        <div class="lg:col-span-7 glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+            <div class="p-6 border-b border-slate-800 bg-[#121422]">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <i class="fa-solid fa-file-lines text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Exportação Filtrada de Logs (TXT)</h2>
+                        <p class="text-[11px] text-slate-400">Gere relatórios de auditoria e históricos de navegação em texto puro</p>
+                    </div>
+                </div>
+            </div>
+
+            <form method="GET" action="{% url 'export_logs_txt' %}" class="p-6 space-y-4 text-xs">
+                
+                <!-- 1. Período -->
+                <div>
+                    <label class="block font-semibold text-white mb-1.5">
+                        <i class="fa-solid fa-calendar-days text-indigo-400 mr-1"></i> Período do Relatório:
+                    </label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-[#111422] border border-slate-700/70 hover:border-indigo-500 cursor-pointer transition-all">
+                            <input type="radio" name="period" value="today" checked onchange="toggleCustomDates(false)" class="text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-slate-300 font-medium">Hoje</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-[#111422] border border-slate-700/70 hover:border-indigo-500 cursor-pointer transition-all">
+                            <input type="radio" name="period" value="yesterday" onchange="toggleCustomDates(false)" class="text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-slate-300 font-medium">Ontem</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-[#111422] border border-slate-700/70 hover:border-indigo-500 cursor-pointer transition-all">
+                            <input type="radio" name="period" value="7d" onchange="toggleCustomDates(false)" class="text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-slate-300 font-medium">Últimos 7 dias</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-[#111422] border border-slate-700/70 hover:border-indigo-500 cursor-pointer transition-all">
+                            <input type="radio" name="period" value="custom" onchange="toggleCustomDates(true)" class="text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-slate-300 font-medium">Personalizado</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Datas Personalizadas (Oculto por padrão) -->
+                <div id="custom-date-container" class="hidden p-3.5 rounded-xl bg-[#111422] border border-slate-700/70 space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">De (Data Inicial):</label>
+                            <input type="date" name="date_from" class="w-full bg-[#0d101c] border border-slate-700 text-white rounded-lg p-2 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">Até (Data Final):</label>
+                            <input type="date" name="date_to" class="w-full bg-[#0d101c] border border-slate-700 text-white rounded-lg p-2 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Filtros de Porta e Status -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                        <label class="block font-semibold text-white mb-1.5">
+                            <i class="fa-solid fa-door-open text-cyan-400 mr-1"></i> Filtrar por Sala / Porta:
+                        </label>
+                        <select name="port_id" class="w-full bg-[#111422] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                            <option value="">Todas as Portas</option>
+                            {% for p in all_ports %}
+                            <option value="{{ p.id }}">{{ p.port_number }} - {{ p.name }} ({{ p.group.name }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-white mb-1.5">
+                            <i class="fa-solid fa-filter text-amber-400 mr-1"></i> Filtrar por Ação:
+                        </label>
+                        <select name="action" class="w-full bg-[#111422] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
+                            <option value="ALL">Todos os Registros (Liberados e Bloqueados)</option>
+                            <option value="BLOCKED">Apenas Bloqueados (403 Forbidden / Negados)</option>
+                            <option value="ALLOWED">Apenas Liberados (200 OK)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 3. Hostname / IP e Formato -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                        <label class="block font-semibold text-white mb-1.5">
+                            <i class="fa-solid fa-desktop text-indigo-400 mr-1"></i> Hostname ou IP (Opcional):
+                        </label>
+                        <input type="text" name="hostname_ip" placeholder="ex: PIJ-PEDAGOGIA, 10.40..." class="w-full bg-[#111422] border border-slate-700 text-white font-mono rounded-xl p-2.5 focus:border-indigo-500 outline-none placeholder-slate-500">
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-white mb-1.5">
+                            <i class="fa-solid fa-file-lines text-cyan-400 mr-1"></i> Layout do Arquivo TXT:
+                        </label>
+                        <select name="format" class="w-full bg-[#111422] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none font-medium">
+                            <option value="human" selected>Formato Legível de Auditoria (Colunado)</option>
+                            <option value="squid">Formato Nativo Squid (access.log unix format)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Total de Logs no Banco -->
+                <div class="pt-2 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Base total atual: <strong class="text-slate-200 font-mono">{{ total_logs }} registros</strong></span>
+                    <span class="text-indigo-400 font-mono"><i class="fa-solid fa-bolt mr-1"></i>Exportação em tempo real</span>
+                </div>
+
+                <!-- Botão de Ação TXT -->
+                <div class="pt-4 border-t border-slate-800 flex justify-end">
+                    <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all group">
+                        <i class="fa-solid fa-file-arrow-down text-sm group-hover:scale-110 transition-transform"></i>
+                        <span>Gerar e Baixar Logs (.txt)</span>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+function toggleCustomDates(show) {
+    const container = document.getElementById('custom-date-container');
+    if (show) {
+        container.classList.remove('hidden');
+    } else {
+        container.classList.add('hidden');
+    }
+}
+</script>
+{% endblock %}
