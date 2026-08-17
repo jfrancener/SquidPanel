@@ -27,6 +27,7 @@ urlpatterns = [
 
     # App Dashboard (Painel Principal e Configurações)
     path('', dashboard_views.dashboard_view, name='dashboard'),
+    path('api/system-metrics/', dashboard_views.system_metrics_api_view, name='api_system_metrics'),
     path('settings/general/', dashboard_views.settings_general_view, name='settings_general'),
     path('settings/session/', dashboard_views.settings_session_view, name='settings_session'),
     path('settings/logs/', dashboard_views.settings_logs_view, name='settings_logs'),

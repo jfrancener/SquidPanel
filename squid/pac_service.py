@@ -8,7 +8,7 @@ def generate_pac_content(port_number=None, fallback_direct=True):
     Gera o conteúdo JavaScript padronizado para Proxy Auto-Configuration (PAC / WPAD)
     com suporte nativo a bypass de rede local e failover transparente para DIRECT.
     """
-    server_ip = SystemSetting.get_value('server_ip', '10.40.90.99')
+    server_ip = SystemSetting.get_value('server_ip', '10.40.88.5')
     
     # Se nenhuma porta foi especificada, pega a primeira porta ativa ou 9010
     if not port_number:

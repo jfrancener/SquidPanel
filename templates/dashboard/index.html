@@ -6,26 +6,127 @@
 {% block content %}
 <div class="space-y-6 max-w-7xl mx-auto">
     
-    <!-- Boas-vindas e Banner de Status -->
-    <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-            <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                <span>Olá, {{ request.user.first_name|default:request.user.username }}!</span>
-                <span class="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
-                    {{ profile.get_role_display }}
-                </span>
-            </h1>
-            <p class="text-xs text-slate-400 mt-1">
-                Monitore o tráfego do proxy e gerencie as portas e salas autorizadas para o seu perfil.
-            </p>
+    <!-- Painel de Telemetria do Servidor de Produção (CPU, RAM, Disco, Internet) -->
+    <div class="glass-panel p-5 rounded-2xl border border-slate-800 shadow-2xl space-y-4 bg-gradient-to-b from-[#131629] to-[#0c0e1a]">
+        
+        <!-- Header da Telemetria -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800/80">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                    <i class="fa-solid fa-server text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span>Servidor SquidProxy</span>
+                            <span class="px-2 py-0.5 rounded-lg bg-cyan-500/15 border border-cyan-500/25 text-cyan-300 font-mono text-[11px] font-bold" id="telemetry-ip">
+                                {{ server_ip }}
+                            </span>
+                        </h2>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-0.5">
+                        Telemetria em tempo real de hardware, processamento e conectividade de rede
+                    </p>
+                </div>
+            </div>
+
+            <!-- Status de Internet & Uptime -->
+            <div class="flex items-center gap-2.5">
+                <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-2 text-xs" id="telemetry-net-badge">
+                    <span class="w-2.5 h-2.5 rounded-full {% if system_metrics.internet.online %}bg-emerald-400 animate-pulse{% else %}bg-rose-500{% endif %}" id="telemetry-net-dot"></span>
+                    <span class="font-bold text-white text-[11px]" id="telemetry-net-text">
+                        {% if system_metrics.internet.online %}Internet Online ({{ system_metrics.internet.latency_ms }}ms){% else %}Sem Internet{% endif %}
+                    </span>
+                </div>
+                <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-stopwatch text-indigo-400"></i>
+                    <span>Uptime: <strong class="text-slate-200" id="telemetry-uptime">{{ system_metrics.uptime }}</strong></span>
+                </div>
+            </div>
         </div>
 
-        <div class="flex items-center gap-3">
-            <span class="text-xs text-slate-400 bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-clock text-indigo-400"></i>
-                <span class="font-mono">Fuso: Brasília (UTC-3)</span>
-            </span>
+        <!-- 4 Cards de Métricas em Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
+            
+            <!-- 1. Processador (CPU) -->
+            <div class="p-4 rounded-xl bg-[#0e111f] border border-slate-800/80 flex flex-col justify-between space-y-2 hover:border-slate-700 transition-all">
+                <div class="flex justify-between items-start">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-microchip text-indigo-400"></i> Processamento (CPU)
+                    </span>
+                    <span class="text-xs font-bold font-mono text-indigo-400" id="telemetry-cpu-pct">{{ system_metrics.cpu.percent }}%</span>
+                </div>
+                <div class="space-y-1">
+                    <div class="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
+                        <div id="telemetry-cpu-bar" class="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500" style="width: {{ system_metrics.cpu.percent }}%;"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] text-slate-500 font-mono pt-1">
+                        <span>Cores: {{ system_metrics.cpu.cores }}</span>
+                        <span id="telemetry-cpu-load">Load: {{ system_metrics.cpu.load_1 }}, {{ system_metrics.cpu.load_5 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Memória RAM -->
+            <div class="p-4 rounded-xl bg-[#0e111f] border border-slate-800/80 flex flex-col justify-between space-y-2 hover:border-slate-700 transition-all">
+                <div class="flex justify-between items-start">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-memory text-cyan-400"></i> Memória RAM
+                    </span>
+                    <span class="text-xs font-bold font-mono text-cyan-300" id="telemetry-mem-pct">{{ system_metrics.memory.percent }}%</span>
+                </div>
+                <div class="space-y-1">
+                    <div class="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
+                        <div id="telemetry-mem-bar" class="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-500" style="width: {{ system_metrics.memory.percent }}%;"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1">
+                        <span id="telemetry-mem-used">{{ system_metrics.memory.used_gb }} GB Usados</span>
+                        <span class="text-slate-500" id="telemetry-mem-total">{{ system_metrics.memory.total_gb }} GB Total</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Espaço em Disco -->
+            <div class="p-4 rounded-xl bg-[#0e111f] border border-slate-800/80 flex flex-col justify-between space-y-2 hover:border-slate-700 transition-all">
+                <div class="flex justify-between items-start">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-hard-drive text-emerald-400"></i> Armazenamento (Disco)
+                    </span>
+                    <span class="text-xs font-bold font-mono text-emerald-300" id="telemetry-disk-pct">{{ system_metrics.disk.percent }}%</span>
+                </div>
+                <div class="space-y-1">
+                    <div class="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
+                        <div id="telemetry-disk-bar" class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" style="width: {{ system_metrics.disk.percent }}%;"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1">
+                        <span class="text-emerald-400 font-bold" id="telemetry-disk-free">{{ system_metrics.disk.free_gb }} GB Livres</span>
+                        <span class="text-slate-500" id="telemetry-disk-total">{{ system_metrics.disk.total_gb }} GB Total</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Gateway & DNS -->
+            <div class="p-4 rounded-xl bg-[#0e111f] border border-slate-800/80 flex flex-col justify-between space-y-2 hover:border-slate-700 transition-all">
+                <div class="flex justify-between items-start">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-network-wired text-amber-400"></i> Conectividade de Rede
+                    </span>
+                    <span class="text-xs font-bold font-mono text-emerald-400">ATIVO</span>
+                </div>
+                <div class="space-y-1 text-[11px] text-slate-300 font-mono">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Gateway:</span>
+                        <span>10.40.88.1</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">DNS Primário:</span>
+                        <span>10.40.88.1</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
+
     </div>
 
     <!-- Cards Estatísticos de Alto Nível -->
@@ -143,7 +244,7 @@
                         <div class="bg-[#101321] p-3 rounded-xl border border-slate-800/80 mb-4 text-[11px] space-y-1.5">
                             <div class="flex justify-between">
                                 <span class="text-slate-500">Endereço Proxy:</span>
-                                <span class="text-slate-300 font-mono font-semibold">10.40.90.99:{{ port.port_number }}</span>
+                                <span class="text-cyan-300 font-mono font-bold">{{ server_ip|default:"10.40.88.5" }}:{{ port.port_number }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-slate-500">Política Ativa:</span>
@@ -170,4 +271,64 @@
     </div>
 
 </div>
+
+<script>
+async function refreshTelemetry() {
+    try {
+        const res = await fetch('/api/system-metrics/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // CPU
+        const cpuPct = document.getElementById('telemetry-cpu-pct');
+        const cpuBar = document.getElementById('telemetry-cpu-bar');
+        const cpuLoad = document.getElementById('telemetry-cpu-load');
+        if (cpuPct) cpuPct.textContent = data.cpu.percent + '%';
+        if (cpuBar) cpuBar.style.width = data.cpu.percent + '%';
+        if (cpuLoad) cpuLoad.textContent = `Load: ${data.cpu.load_1}, ${data.cpu.load_5}`;
+        
+        // RAM
+        const memPct = document.getElementById('telemetry-mem-pct');
+        const memBar = document.getElementById('telemetry-mem-bar');
+        const memUsed = document.getElementById('telemetry-mem-used');
+        const memTotal = document.getElementById('telemetry-mem-total');
+        if (memPct) memPct.textContent = data.memory.percent + '%';
+        if (memBar) memBar.style.width = data.memory.percent + '%';
+        if (memUsed) memUsed.textContent = `${data.memory.used_gb} GB Usados`;
+        if (memTotal) memTotal.textContent = `${data.memory.total_gb} GB Total`;
+        
+        // Disco
+        const diskPct = document.getElementById('telemetry-disk-pct');
+        const diskBar = document.getElementById('telemetry-disk-bar');
+        const diskFree = document.getElementById('telemetry-disk-free');
+        const diskTotal = document.getElementById('telemetry-disk-total');
+        if (diskPct) diskPct.textContent = data.disk.percent + '%';
+        if (diskBar) diskBar.style.width = data.disk.percent + '%';
+        if (diskFree) diskFree.textContent = `${data.disk.free_gb} GB Livres`;
+        if (diskTotal) diskTotal.textContent = `${data.disk.total_gb} GB Total`;
+        
+        // Internet
+        const dot = document.getElementById('telemetry-net-dot');
+        const text = document.getElementById('telemetry-net-text');
+        if (dot && text) {
+            if (data.internet.online) {
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+                text.textContent = `Internet Online (${data.internet.latency_ms}ms)`;
+            } else {
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+                text.textContent = 'Sem Internet';
+            }
+        }
+        
+        // Uptime
+        const uptime = document.getElementById('telemetry-uptime');
+        if (uptime) uptime.textContent = data.uptime;
+    } catch(err) {
+        console.error('Erro ao atualizar telemetria:', err);
+    }
+}
+
+// Inicia polling de telemetria a cada 4 segundos
+setInterval(refreshTelemetry, 4000);
+</script>
 {% endblock %}

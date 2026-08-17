@@ -772,7 +772,7 @@ async function togglePortStatusAjax(event, portId, status) {
 // ==========================================
 function openPacModal(portNumber, portName) {
     document.getElementById('modal-pac-title').textContent = `Script PAC - Porta ${portNumber} (${portName})`;
-    const pacUrl = `http://10.40.90.99/${portNumber}.pac`;
+    const pacUrl = `http://10.40.88.5/${portNumber}.pac`;
     document.getElementById('modal-pac-url').value = pacUrl;
     document.getElementById('modal-pac-ps').value = `Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings' -Name AutoConfigURL -Value '${pacUrl}'`;
     document.getElementById('modal-pac-download').href = `/${portNumber}.pac`;

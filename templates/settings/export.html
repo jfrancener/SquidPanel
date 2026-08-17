@@ -271,13 +271,13 @@
                             <td class="p-3 text-slate-400 font-mono text-[11px]">Todas as Portas</td>
                             <td class="p-3 font-mono text-cyan-300 text-[11px]">
                                 <div class="flex items-center gap-2">
-                                    <span class="bg-[#090b13] px-2.5 py-1 rounded-lg border border-slate-800 select-all">http://10.40.90.99/proxy.pac</span>
+                                    <span class="bg-[#090b13] px-2.5 py-1 rounded-lg border border-slate-800 select-all">http://10.40.88.5/proxy.pac</span>
                                     <span class="text-slate-500 text-[10px]">ou /wpad.dat</span>
                                 </div>
                             </td>
                             <td class="p-3 text-right pr-4 whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-1.5">
-                                    <button onclick="copyToClipboard('http://10.40.90.99/proxy.pac', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white text-[11px] font-semibold transition-all border border-slate-700">
+                                    <button onclick="copyToClipboard('http://10.40.88.5/proxy.pac', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white text-[11px] font-semibold transition-all border border-slate-700">
                                         <i class="fa-solid fa-copy mr-1"></i> Copiar Link
                                     </button>
                                     <a href="/proxy.pac" download="proxy.pac" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition-all border border-slate-700" title="Baixar arquivo .pac">
@@ -299,13 +299,13 @@
                             <td class="p-3 text-slate-300 text-[11px]">{{ p.group.name }}</td>
                             <td class="p-3 font-mono text-cyan-300 text-[11px]">
                                 <div class="flex items-center gap-2">
-                                    <span class="bg-[#090b13] px-2.5 py-1 rounded-lg border border-slate-800 select-all">http://10.40.90.99/{{ p.port_number }}.pac</span>
+                                    <span class="bg-[#090b13] px-2.5 py-1 rounded-lg border border-slate-800 select-all">http://10.40.88.5/{{ p.port_number }}.pac</span>
                                     <span class="text-slate-500 text-[10px]">ou /{{ p.port_number }}.dat</span>
                                 </div>
                             </td>
                             <td class="p-3 text-right pr-4 whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-1.5">
-                                    <button onclick="copyToClipboard('http://10.40.90.99/{{ p.port_number }}.pac', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white text-[11px] font-semibold transition-all border border-slate-700">
+                                    <button onclick="copyToClipboard('http://10.40.88.5/{{ p.port_number }}.pac', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white text-[11px] font-semibold transition-all border border-slate-700">
                                         <i class="fa-solid fa-copy mr-1"></i> Copiar Link
                                     </button>
                                     <a href="/{{ p.port_number }}.pac" download="{{ p.port_number }}.pac" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition-all border border-slate-700" title="Baixar arquivo .pac">
@@ -330,7 +330,7 @@
                         <i class="fa-solid fa-copy mr-1"></i> Copiar Comando
                     </button>
                 </div>
-                <div class="bg-[#07080f] p-3 rounded-lg border border-slate-800 font-mono text-[11px] text-cyan-300 select-all overflow-x-auto" id="ps-cmd-text">Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name AutoConfigURL -Value 'http://10.40.90.99/9010.pac'</div>
+                <div class="bg-[#07080f] p-3 rounded-lg border border-slate-800 font-mono text-[11px] text-cyan-300 select-all overflow-x-auto" id="ps-cmd-text">Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name AutoConfigURL -Value 'http://10.40.88.5/9010.pac'</div>
             </div>
         </div>
     </div>

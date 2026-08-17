@@ -12,6 +12,9 @@ from .models import (
     UserProfile
 )
 
+from .system_metrics import get_full_system_telemetry
+from django.http import JsonResponse
+
 # ==========================================
 # 1. DASHBOARD PRINCIPAL
 # ==========================================
@@ -19,7 +22,7 @@ from .models import (
 @login_required
 def dashboard_view(request):
     """
-    Painel de controle principal exibindo métricas, status das portas e resumo de grupos autorizados.
+    Painel de controle principal exibindo telemetria do hardware, status do proxy e portas.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
 
@@ -49,6 +52,9 @@ def dashboard_view(request):
     blocked_ports_count = ports.filter(current_status='BLOCKED').count()
     total_rules = DomainRule.objects.count()
 
+    # Telemetria do Servidor (CPU, RAM, Disco, Internet e Uptime)
+    system_metrics = get_full_system_telemetry()
+
     return render(request, 'dashboard/index.html', {
         'profile': profile,
         'groups': groups,
@@ -58,8 +64,18 @@ def dashboard_view(request):
         'whitelist_ports_count': whitelist_ports_count,
         'blocked_ports_count': blocked_ports_count,
         'total_rules': total_rules,
+        'system_metrics': system_metrics,
+        'server_ip': system_metrics.get('server_ip', '10.40.88.5'),
         'active_menu': 'dashboard'
     })
+
+
+@login_required
+def system_metrics_api_view(request):
+    """
+    Endpoint AJAX para atualização contínua em tempo real da telemetria de hardware no Dashboard.
+    """
+    return JsonResponse(get_full_system_telemetry())
 
 
 # ==========================================
