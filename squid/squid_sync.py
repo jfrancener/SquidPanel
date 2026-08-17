@@ -77,6 +77,38 @@ def _write_file_safely(filepath, content):
             raise
 
 
+def optimize_domain_set(domains):
+    """
+    Remove subdomínios redundantes quando o domínio pai já estiver presente
+    (ex: se tiver '.cloudflare.com', remove '.cdnjs.cloudflare.com'),
+    pois o Squid não permite subdomínios repetidos no mesmo arquivo dstdomain.
+    """
+    cleaned = set()
+    for d in domains:
+        d = d.strip().lower()
+        if not d:
+            continue
+        cleaned.add(d)
+
+    # Ordena por número de pontos e comprimento (domínios pais antes)
+    sorted_domains = sorted(cleaned, key=lambda x: (x.count('.'), len(x)))
+    final_domains = []
+
+    for candidate in sorted_domains:
+        cand_norm = candidate.lstrip('.')
+        is_subdomain = False
+        for parent in final_domains:
+            parent_norm = parent.lstrip('.')
+            if cand_norm == parent_norm or cand_norm.endswith('.' + parent_norm):
+                is_subdomain = True
+                break
+        
+        if not is_subdomain:
+            final_domains.append(candidate)
+
+    return sorted(final_domains)
+
+
 def generate_squid_config_and_lists():
     """
     Gera dinamicamente todos os arquivos de Whitelist/Blacklist e o /etc/squid/squid.conf
@@ -93,9 +125,10 @@ def generate_squid_config_and_lists():
         domains = ml.domains.filter(is_active=True).values_list('domain', flat=True)
         mandatory_domains.update(domains)
 
+    opt_mandatory = optimize_domain_set(mandatory_domains)
     mandatory_file_path = os.path.join(lists_dir, 'mandatory_whitelist.txt')
     mandatory_content = ["# Whitelists Obrigatorias do Sistema (SquidPanel)"]
-    for d in sorted(mandatory_domains):
+    for d in opt_mandatory:
         mandatory_content.append(f"{d}")
     _write_file_safely(mandatory_file_path, "\n".join(mandatory_content) + "\n")
 
@@ -110,9 +143,10 @@ def generate_squid_config_and_lists():
         for wl in g.whitelists.filter(is_active=True):
             g_wl_domains.update(wl.domains.filter(is_active=True).values_list('domain', flat=True))
 
+        opt_wl = optimize_domain_set(g_wl_domains)
         wl_file_path = os.path.join(lists_dir, f"group_{g.id}_whitelist.txt")
         wl_content = [f"# Whitelist do Grupo: {g.name}"]
-        for d in sorted(g_wl_domains):
+        for d in opt_wl:
             wl_content.append(f"{d}")
         _write_file_safely(wl_file_path, "\n".join(wl_content) + "\n")
 
@@ -121,17 +155,18 @@ def generate_squid_config_and_lists():
         for bl in g.blacklists.filter(is_active=True):
             g_bl_domains.update(bl.domains.filter(is_active=True).values_list('domain', flat=True))
 
+        opt_bl = optimize_domain_set(g_bl_domains)
         bl_file_path = os.path.join(lists_dir, f"group_{g.id}_blacklist.txt")
         bl_content = [f"# Blacklist do Grupo: {g.name}"]
-        for d in sorted(g_bl_domains):
+        for d in opt_bl:
             bl_content.append(f"{d}")
         _write_file_safely(bl_file_path, "\n".join(bl_content) + "\n")
 
         group_list_files[g.id] = {
             'wl_path': wl_file_path,
             'bl_path': bl_file_path,
-            'has_wl': len(g_wl_domains) > 0,
-            'has_bl': len(g_bl_domains) > 0,
+            'has_wl': len(opt_wl) > 0,
+            'has_bl': len(opt_bl) > 0,
         }
 
     # 3. Monta o conteúdo completo do squid.conf
