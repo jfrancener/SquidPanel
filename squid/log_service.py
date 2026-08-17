@@ -118,7 +118,7 @@ def parse_squid_log_line(line, port_map):
 
 def sync_logs_from_squid_file():
     """
-    Lê incrementalmente as novas linhas do arquivo /var/log/squid/access.log
+    Lê incrementalmente as novas linhas completas do arquivo /var/log/squid/access.log
     e insere os registros reais no banco de dados.
     """
     log_file_path = get_squid_log_path()
@@ -135,27 +135,43 @@ def sync_logs_from_squid_file():
     except Exception:
         last_offset = 0
 
-    current_size = os.path.getsize(log_file_path)
+    try:
+        current_size = os.path.getsize(log_file_path)
+    except Exception:
+        return 0
 
     # Se o arquivo foi rotacionado (tamanho menor que o offset), recomeça do início
     if current_size < last_offset:
         last_offset = 0
 
     new_logs = []
+    valid_offset = last_offset
 
     try:
         with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
             f.seek(last_offset)
-            for line in f:
+            while True:
+                line_start_pos = f.tell()
+                line = f.readline()
+                if not line:
+                    break
+                # Garante que só processa linhas terminadas em quebra de linha
+                if not line.endswith('\n') and not line.endswith('\r'):
+                    # Linha incompleta sendo escrita pelo Squid, recua para tentar no próximo polling
+                    f.seek(line_start_pos)
+                    break
+                
+                valid_offset = f.tell()
                 parsed_log = parse_squid_log_line(line, port_map)
                 if parsed_log:
                     new_logs.append(parsed_log)
-            new_offset = f.tell()
 
         if new_logs:
             AccessLog.objects.bulk_create(new_logs)
 
-        SystemSetting.set_value('squid_log_file_offset', str(new_offset), 'Offset do arquivo access.log')
+        SystemSetting.set_value('squid_log_file_offset', str(valid_offset), 'Offset do arquivo access.log')
         return len(new_logs)
     except Exception as e:
+        print(f"Erro ao ler access.log do Squid: {e}")
         return 0
+
