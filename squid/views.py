@@ -1073,6 +1073,41 @@ def sync_ad_devices_view(request):
     return redirect(request.META.get('HTTP_REFERER', 'logs'))
 
 
+def pac_by_port_view(request, port_number):
+    """
+    Endpoint público para servir script PAC de uma porta específica (ex: /9010.pac ou /pac/9010.pac).
+    Suporta parâmetro ?strict=1 para desativar fallback DIRECT se desejado.
+    """
+    fallback_direct = request.GET.get('strict') != '1'
+    from .pac_service import pac_response
+    return pac_response(port_number=port_number, fallback_direct=fallback_direct, filename=f"{port_number}.pac")
+
+
+def pac_by_slug_view(request, port_slug):
+    """
+    Endpoint público para servir script PAC pelo nome/slug da sala (ex: /pac/galeria.pac).
+    """
+    port = ProxyPort.objects.filter(slug=port_slug, is_active=True).first()
+    if not port:
+        raise Http404("Porta não encontrada.")
+    
+    fallback_direct = request.GET.get('strict') != '1'
+    from .pac_service import pac_response
+    return pac_response(port_number=port.port_number, fallback_direct=fallback_direct, filename=f"{port_slug}.pac")
+
+
+def pac_global_view(request):
+    """
+    Endpoint público para servir o script PAC global (/proxy.pac ou /wpad.dat).
+    """
+    port_param = request.GET.get('port')
+    port_number = int(port_param) if port_param and port_param.isdigit() else None
+    fallback_direct = request.GET.get('strict') != '1'
+    from .pac_service import pac_response
+    return pac_response(port_number=port_number, fallback_direct=fallback_direct, filename="proxy.pac")
+
+
+
 
 
 

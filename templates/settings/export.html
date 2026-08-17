@@ -216,6 +216,125 @@
 
     </div>
 
+    <!-- ============================================================ -->
+    <!-- CARD 3: SCRIPTS PAC & WPAD (AUTO-CONFIGURAÇÃO COM FAILOVER) -->
+    <!-- ============================================================ -->
+    <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+        <div class="p-6 border-b border-slate-800 bg-[#121422] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-bolt text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold text-white">Scripts PAC / WPAD (Auto-Configuração de Proxy)</h2>
+                    <p class="text-[11px] text-slate-400">Links dinâmicos de auto-configuração com Failover Transparente (Navega direto caso o servidor Squid fique offline)</p>
+                </div>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold font-mono">
+                <i class="fa-solid fa-shield-check mr-1"></i>Alta Disponibilidade (DIRECT)
+            </span>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- Banner Explicativo -->
+            <div class="p-4 rounded-xl bg-[#111422] border border-slate-800 text-xs text-slate-300 space-y-2">
+                <div class="flex items-center gap-2 font-semibold text-white">
+                    <i class="fa-solid fa-circle-check text-cyan-400"></i>
+                    <span>Como funciona a resiliência dos scripts PAC gerados:</span>
+                </div>
+                <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] pl-1">
+                    <li><strong class="text-slate-200">Squid ONLINE:</strong> As máquinas Windows navegam pelo proxy Squid na porta indicada, aplicando regras e gravando logs.</li>
+                    <li><strong class="text-slate-200">Squid OFFLINE:</strong> Se o servidor cair, o Windows faz <em>failover</em> automático para <strong class="text-emerald-400 font-mono">DIRECT</strong> (navega direto sem travar a internet).</li>
+                    <li><strong class="text-slate-200">Rede Local:</strong> Requisições para a intranet, IPs internos (<span class="font-mono text-cyan-400">10.x.x.x</span>) e domínio <span class="font-mono text-cyan-400">*.pij.local</span> navegam sempre direto.</li>
+                </ul>
+            </div>
+
+            <!-- Tabela de Links PAC por Sala / Porta -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-[#111422] text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800">
+                            <th class="p-3 pl-4">Sala / Porta</th>
+                            <th class="p-3">Grupo de Proxy</th>
+                            <th class="p-3">URL do Script PAC / WPAD (Padrão de Mercado)</th>
+                            <th class="p-3 text-right pr-4">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 text-xs">
+                        
+                        <!-- PAC Global Padrão -->
+                        <tr class="bg-indigo-950/20 hover:bg-indigo-900/25 transition-colors">
+                            <td class="p-3 pl-4 font-bold text-white flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                                <span>Global (Padrão WPAD)</span>
+                            </td>
+                            <td class="p-3 text-slate-400 font-mono text-[11px]">Todas as Portas</td>
+                            <td class="p-3 font-mono text-cyan-300 text-[11px]">
+                                <div class="flex items-center gap-2">
+                                    <span class="bg-[#090b13] px-2.5 py-1 rounded-lg border border-slate-800 select-all">http://10.40.90.99/proxy.pac</span>
+                                    <span class="text-slate-500 text-[10px]">ou /wpad.dat</span>
+                                </div>
+                            </td>
+                            <td class="p-3 text-right pr-4 whitespace-nowrap">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button onclick="copyToClipboard('http://10.40.90.99/proxy.pac', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white text-[11px] font-semibold transition-all border border-slate-700">
+                                        <i class="fa-solid fa-copy mr-1"></i> Copiar Link
+                                    </button>
+                                    <a href="/proxy.pac" download="proxy.pac" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition-all border border-slate-700" title="Baixar arquivo .pac">
+                                        <i class="fa-solid fa-download"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- PAC por Porta Específica -->
+                        {% for p in all_ports %}
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="p-3 pl-4 font-bold text-white">
+                                <span class="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 font-mono text-[10px] mr-1.5 border border-indigo-500/25">
+                                    {{ p.port_number }}
+                                </span>
+                                <span>{{ p.name }}</span>
+                            </td>
+                            <td class="p-3 text-slate-300 text-[11px]">{{ p.group.name }}</td>
+                            <td class="p-3 font-mono text-cyan-300 text-[11px]">
+                                <div class="flex items-center gap-2">
+                                    <span class="bg-[#090b13] px-2.5 py-1 rounded-lg border border-slate-800 select-all">http://10.40.90.99/{{ p.port_number }}.pac</span>
+                                    <span class="text-slate-500 text-[10px]">ou /{{ p.port_number }}.dat</span>
+                                </div>
+                            </td>
+                            <td class="p-3 text-right pr-4 whitespace-nowrap">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button onclick="copyToClipboard('http://10.40.90.99/{{ p.port_number }}.pac', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white text-[11px] font-semibold transition-all border border-slate-700">
+                                        <i class="fa-solid fa-copy mr-1"></i> Copiar Link
+                                    </button>
+                                    <a href="/{{ p.port_number }}.pac" download="{{ p.port_number }}.pac" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition-all border border-slate-700" title="Baixar arquivo .pac">
+                                        <i class="fa-solid fa-download"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Comando de 1 linha para o Windows (PowerShell) -->
+            <div class="p-4 rounded-xl bg-[#0b0e18] border border-slate-800 space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-brands fa-windows text-cyan-400"></i>
+                        <span>Comando PowerShell de 1 linha para configurar no Windows das máquinas:</span>
+                    </span>
+                    <button onclick="copyToClipboard(document.getElementById('ps-cmd-text').textContent, this)" class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow transition-all">
+                        <i class="fa-solid fa-copy mr-1"></i> Copiar Comando
+                    </button>
+                </div>
+                <div class="bg-[#07080f] p-3 rounded-lg border border-slate-800 font-mono text-[11px] text-cyan-300 select-all overflow-x-auto" id="ps-cmd-text">Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name AutoConfigURL -Value 'http://10.40.90.99/9010.pac'</div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -226,6 +345,18 @@ function toggleCustomDates(show) {
     } else {
         container.classList.add('hidden');
     }
+}
+
+function copyToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check text-emerald-400 mr-1"></i> Copiado!';
+        btn.classList.add('bg-emerald-600/30', 'text-emerald-300');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('bg-emerald-600/30', 'text-emerald-300');
+        }, 1800);
+    });
 }
 </script>
 {% endblock %}

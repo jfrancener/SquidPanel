@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 from dashboard import views as dashboard_views
+from squid import views as squid_views
 
 urlpatterns = [
     # Favicon para eliminar 404
@@ -14,7 +15,15 @@ urlpatterns = [
     path('proxy/', include('squid.urls')),
 
     # Download Direto do Certificado SSL Raiz
-    path('certificate/download/', include('squid.urls')),
+    path('certificate/download/', squid_views.download_certificate_view, name='root_download_certificate'),
+
+    # Scripts PAC / WPAD Globais e por Porta (Padrão de Mercado)
+    path('proxy.pac', squid_views.pac_global_view, name='root_proxy_pac'),
+    path('wpad.dat', squid_views.pac_global_view, name='root_wpad_dat'),
+    path('<int:port_number>.pac', squid_views.pac_by_port_view, name='root_port_pac'),
+    path('<int:port_number>.dat', squid_views.pac_by_port_view, name='root_port_dat'),
+    path('pac/<int:port_number>.pac', squid_views.pac_by_port_view, name='root_pac_by_port'),
+    path('pac/<slug:port_slug>.pac', squid_views.pac_by_slug_view, name='root_pac_by_slug'),
 
     # App Dashboard (Painel Principal e Configurações)
     path('', dashboard_views.dashboard_view, name='dashboard'),

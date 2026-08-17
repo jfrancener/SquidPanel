@@ -43,5 +43,13 @@ urlpatterns = [
 
     # Download do Certificado Raiz SSL (Público)
     path('certificate/download/', views.download_certificate_view, name='download_certificate'),
+
+    # Scripts PAC / WPAD (Proxy Auto-Configuration)
+    path('pac/<int:port_number>.pac', views.pac_by_port_view, name='pac_by_port'),
+    path('pac/<int:port_number>.dat', views.pac_by_port_view, name='pac_by_port_dat'),
+    path('pac/<slug:port_slug>.pac', views.pac_by_slug_view, name='pac_by_slug'),
+    path('proxy.pac', views.pac_global_view, name='pac_global'),
+    path('wpad.dat', views.pac_global_view, name='wpad_global'),
 ]
+
 

@@ -240,6 +240,12 @@
                                         </button>
                                     </div>
 
+                                    <!-- Botão PAC com Failover -->
+                                    <button type="button" onclick="openPacModal('{{ port.port_number }}', '{{ port.name|escapejs }}')" class="px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-white text-[11px] font-bold transition-all border border-cyan-500/30 flex items-center gap-1 shadow-sm" title="Gerar Script PAC / Auto-Configuração para esta Porta">
+                                        <i class="fa-solid fa-bolt text-[10px]"></i>
+                                        <span>PAC</span>
+                                    </button>
+
                                     <!-- Excluir Porta -->
                                     {% if request.user.profile.is_admin %}
                                     <a href="{% url 'port_delete' port.id %}" onclick="return confirm('Excluir a porta {{ port.port_number }} ({{ port.name }})?')" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white transition-all border border-slate-700/60" title="Excluir porta">
@@ -755,5 +761,88 @@ async function togglePortStatusAjax(event, portId, status) {
         console.error('Erro ao alternar status da porta:', err);
     }
 }
+
+// ==========================================
+// MODAL: SCRIPT PAC / WPAD DA PORTA
+// ==========================================
+function openPacModal(portNumber, portName) {
+    document.getElementById('modal-pac-title').textContent = `Script PAC - Porta ${portNumber} (${portName})`;
+    const pacUrl = `http://10.40.90.99/${portNumber}.pac`;
+    document.getElementById('modal-pac-url').value = pacUrl;
+    document.getElementById('modal-pac-ps').value = `Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings' -Name AutoConfigURL -Value '${pacUrl}'`;
+    document.getElementById('modal-pac-download').href = `/${portNumber}.pac`;
+    document.getElementById('modal-pac-download').download = `${portNumber}.pac`;
+    document.getElementById('modal-pac').classList.remove('hidden');
+}
+
+function closePacModal() {
+    document.getElementById('modal-pac').classList.add('hidden');
+}
+
+function copyToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check text-emerald-400 mr-1"></i> Copiado!';
+        btn.classList.add('bg-emerald-600/30', 'text-emerald-300');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('bg-emerald-600/30', 'text-emerald-300');
+        }, 1800);
+    });
+}
 </script>
+
+<!-- ========================================== -->
+<!-- MODAL: SCRIPT PAC / WPAD DA PORTA -->
+<!-- ========================================== -->
+<div id="modal-pac" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-bolt text-cyan-400"></i>
+                <span id="modal-pac-title">Auto-Configuração de Proxy (PAC / WPAD)</span>
+            </h3>
+            <button onclick="closePacModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="p-6 space-y-4 text-xs">
+            <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
+                <i class="fa-solid fa-shield-check text-base text-emerald-400"></i>
+                <span><strong>Alta Disponibilidade:</strong> Se o servidor Squid cair, o Windows navega direto (DIRECT) sem interrupção de internet.</span>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1">URL do Script PAC / WPAD:</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="modal-pac-url" readonly class="w-full bg-[#0d101a] border border-slate-700 text-cyan-300 font-mono text-xs rounded-xl p-3 outline-none font-bold">
+                    <button type="button" onclick="copyToClipboard(document.getElementById('modal-pac-url').value, this)" class="px-3 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold whitespace-nowrap" title="Copiar URL">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1">Comando PowerShell (Configuração no Windows em 1 clique):</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="modal-pac-ps" readonly class="w-full bg-[#0d101a] border border-slate-700 text-slate-300 font-mono text-[11px] rounded-xl p-3 outline-none">
+                    <button type="button" onclick="copyToClipboard(document.getElementById('modal-pac-ps').value, this)" class="px-3 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold whitespace-nowrap" title="Copiar Comando PowerShell">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-between items-center">
+                <a id="modal-pac-download" href="#" download class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold flex items-center gap-1.5 border border-slate-700">
+                    <i class="fa-solid fa-download text-xs text-cyan-400"></i>
+                    <span>Baixar arquivo .pac</span>
+                </a>
+                <button type="button" onclick="closePacModal()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
