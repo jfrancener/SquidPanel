@@ -39,4 +39,8 @@ urlpatterns = [
     # Domínios dentro de uma lista
     path('lists/<int:list_id>/domains/<int:domain_id>/delete/', views.domain_delete_view, name='domain_delete'),
     path('lists/<int:list_id>/bulk-add/', views.domain_bulk_add_view, name='domain_bulk_add'),
+
+    # Download do Certificado Raiz SSL (Público)
+    path('certificate/download/', views.download_certificate_view, name='download_certificate'),
 ]
+

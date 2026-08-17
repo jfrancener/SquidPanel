@@ -29,6 +29,53 @@ def get_squid_paths():
         }
 
 
+def ensure_ssl_ca_certificate():
+    """
+    Garante a existência do certificado raiz CA do SquidPanel (validade de 10 anos / 3650 dias).
+    Gera a chave e o certificado PEM/CRT se ainda não existirem.
+    """
+    paths = get_squid_paths()
+    if paths['is_linux']:
+        certs_dir = '/etc/squid/certs'
+        ca_key = os.path.join(certs_dir, 'squidpanel_ca.key')
+        ca_pem = os.path.join(certs_dir, 'squidpanel_ca.pem')
+        ca_crt = os.path.join(certs_dir, 'squidpanel_ca.crt')
+        
+        if os.path.exists(ca_crt) and os.path.exists(ca_key):
+            return ca_crt
+            
+        try:
+            prefix = ['sudo'] if hasattr(os, 'geteuid') and os.geteuid() != 0 else []
+            subprocess.run(prefix + ['mkdir', '-p', certs_dir], capture_output=True)
+            # Gera chave e certificado raiz com 3650 dias (10 anos)
+            subj = "/C=BR/ST=Parana/L=Curitiba/O=SquidPanel Proxy/CN=SquidPanel Root CA"
+            cmd_gen = prefix + [
+                'openssl', 'req', '-new', '-newkey', 'rsa:2048', '-sha256', '-days', '3650',
+                '-nodes', '-x509', '-extensions', 'v3_ca',
+                '-keyout', ca_key,
+                '-out', ca_pem,
+                '-subj', subj
+            ]
+            subprocess.run(cmd_gen, capture_output=True, check=True)
+            # Cria cópia no formato .crt para download e instalação no Windows
+            subprocess.run(prefix + ['cp', ca_pem, ca_crt], capture_output=True)
+            subprocess.run(prefix + ['chown', '-R', 'proxy:www-data', certs_dir], capture_output=True)
+            subprocess.run(prefix + ['chmod', '600', ca_key], capture_output=True)
+            subprocess.run(prefix + ['chmod', '644', ca_pem, ca_crt], capture_output=True)
+            return ca_crt
+        except Exception as e:
+            print(f"Erro ao gerar certificado SSL CA: {e}")
+            return None
+    else:
+        mock_dir = os.path.join(settings.BASE_DIR, 'scratch', 'squid_config', 'certs')
+        os.makedirs(mock_dir, exist_ok=True)
+        mock_crt = os.path.join(mock_dir, 'squidpanel_ca.crt')
+        if not os.path.exists(mock_crt):
+            with open(mock_crt, 'w') as f:
+                f.write("-----BEGIN CERTIFICATE-----\nSquidPanel Mock CA Certificate (10 anos de validade)\n-----END CERTIFICATE-----\n")
+        return mock_crt
+
+
 def mark_squid_sync_needed():
     """
     Marca que existem alterações pendentes de sincronização com o Squid.

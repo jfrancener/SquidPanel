@@ -115,8 +115,17 @@
             </form>
         </div>
 
+        <!-- Opção Discreta de Instalação de Certificado SSL nas Estações -->
+        <div class="mt-4 text-center">
+            <a href="{% url 'download_certificate' %}" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#111422]/90 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 text-[11px] font-medium border border-slate-800/80 transition-all shadow-sm group">
+                <i class="fa-solid fa-shield-halved text-cyan-400 text-[11px] group-hover:scale-110 transition-transform"></i>
+                <span>Instalar Certificado SSL do Proxy (.crt)</span>
+                <i class="fa-solid fa-download text-[9px] text-slate-500 group-hover:text-cyan-400"></i>
+            </a>
+        </div>
+
         <!-- Rodapé do Login -->
-        <div class="text-center mt-6 text-[11px] text-slate-500 space-y-0.5">
+        <div class="text-center mt-5 text-[11px] text-slate-500 space-y-0.5">
             <p><strong class="text-slate-400 font-semibold">SquidPanel</strong> • Sistema seguro de acesso a internet</p>
             <p class="text-[10px] text-slate-600">&copy; 2026 desenvolvido por Juliano Francener</p>
         </div>

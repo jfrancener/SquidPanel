@@ -13,6 +13,9 @@ urlpatterns = [
     # App Squid (Proxy, Whitelists e Regras)
     path('proxy/', include('squid.urls')),
 
+    # Download Direto do Certificado SSL Raiz
+    path('certificate/download/', include('squid.urls')),
+
     # App Dashboard (Painel Principal e Configurações)
     path('', dashboard_views.dashboard_view, name='dashboard'),
     path('settings/general/', dashboard_views.settings_general_view, name='settings_general'),

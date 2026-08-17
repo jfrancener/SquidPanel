@@ -1007,4 +1007,38 @@ def squid_restart_view(request):
     return redirect(request.META.get('HTTP_REFERER', 'groups'))
 
 
+def download_certificate_view(request):
+    """
+    Endpoint público para download do Certificado Raiz SSL (CA) do SquidPanel
+    para instalação nos computadores clientes (Windows, Linux, macOS).
+    """
+    cert_paths = [
+        '/etc/squid/certs/squidpanel_ca.crt',
+        '/etc/squid/certs/squidpanel_ca.pem',
+        os.path.join(settings.BASE_DIR, 'scratch', 'squid_config', 'certs', 'squidpanel_ca.crt'),
+        os.path.join(settings.BASE_DIR, 'scratch', 'squid_config', 'certs', 'squidpanel_ca.pem'),
+    ]
+
+    cert_file = None
+    for p in cert_paths:
+        if os.path.exists(p):
+            cert_file = p
+            break
+
+    if not cert_file:
+        from .squid_sync import ensure_ssl_ca_certificate
+        cert_file = ensure_ssl_ca_certificate()
+
+    if not cert_file or not os.path.exists(cert_file):
+        from django.http import Http404
+        raise Http404("Certificado SSL ainda não gerado no servidor.")
+
+    from django.http import HttpResponse
+    with open(cert_file, 'rb') as f:
+        response = HttpResponse(f.read(), content_type='application/x-x509-ca-cert')
+        response['Content-Disposition'] = 'attachment; filename="SquidPanel_CA.crt"'
+        return response
+
+
+
 
