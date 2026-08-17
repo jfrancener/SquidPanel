@@ -199,6 +199,13 @@
             <!-- Card de Usuário e Ações -->
             <div class="flex items-center gap-3">
                 
+                <!-- Relógio Oficial do Servidor (America/Sao_Paulo UTC-3) -->
+                <div class="flex items-center gap-2 bg-[#0c0f1d] border border-slate-800/90 px-3 py-1.5 rounded-xl text-xs font-mono shadow-inner group hover:border-slate-700 transition-all" title="Horário Oficial do Servidor (America/Sao_Paulo UTC-3)">
+                    <i class="fa-solid fa-clock text-cyan-400 text-xs animate-pulse"></i>
+                    <span id="server-live-time" class="font-bold text-slate-200 tracking-wider text-[11px]">--:--:--</span>
+                    <span class="text-[9px] text-slate-500 font-sans font-semibold">UTC-3</span>
+                </div>
+
                 {% if request.user.profile.is_admin %}
                 <!-- Botões de Controle do Squid -->
                 <div class="flex items-center gap-2">
@@ -303,6 +310,28 @@
             window.location.href = url;
         }
     }
+
+    // Relógio em Tempo Real do Servidor (America/Sao_Paulo UTC-3)
+    (function initServerClock() {
+        const timeEl = document.getElementById('server-live-time');
+        if (!timeEl) return;
+
+        const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+
+        function updateTime() {
+            const now = new Date();
+            timeEl.textContent = timeFormatter.format(now);
+        }
+
+        updateTime();
+        setInterval(updateTime, 1000);
+    })();
     </script>
 
     {% block extra_scripts %}{% endblock %}
