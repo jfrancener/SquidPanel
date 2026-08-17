@@ -398,13 +398,27 @@
 
                 <!-- Seletor de Sala / Porta para Live -->
                 <div class="flex items-center gap-2">
-                    <label class="text-xs text-slate-400 font-semibold">Sala / Porta:</label>
+                    <label class="text-xs text-slate-400 font-semibold">Porta:</label>
                     <select id="live-port-select" onchange="resetLiveStream()" class="bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-2 focus:border-indigo-500 outline-none">
                         <option value="">Todas as Portas</option>
                         {% for p in all_ports %}
-                        <option value="{{ p.id }}">{{ p.port_number }} - {{ p.name }} ({{ p.group.name }})</option>
+                        <option value="{{ p.id }}">{{ p.port_number }} - {{ p.name }}</option>
                         {% endfor %}
                     </select>
+                </div>
+
+                <!-- Filtro por Hostname / Equipamento no Live -->
+                <div class="flex items-center gap-2">
+                    <label class="text-xs text-slate-400 font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-desktop text-cyan-400 text-[11px]"></i> Hostname / IP:
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="live-hostname-input" oninput="debounceLiveReset()" placeholder="Filtrar por Hostname ou IP..." class="bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl pl-7 pr-7 py-2 focus:border-indigo-500 outline-none w-48 sm:w-60 font-mono placeholder-slate-500">
+                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-[10px] text-slate-500"></i>
+                        <button type="button" onclick="clearLiveHostnameFilter()" id="btn-clear-live-host" class="absolute right-2.5 top-2 text-slate-500 hover:text-white text-[11px] hidden">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -962,6 +976,7 @@ async function submitAddDomainToList(e) {
 let liveTimer = null;
 let lastLogId = 0;
 let isPaused = false;
+let liveDebounceTimer = null;
 
 function startLivePolling() {
     if (liveTimer) clearInterval(liveTimer);
@@ -977,6 +992,30 @@ function resetLiveStream() {
     lastLogId = 0;
     document.getElementById('live-logs-container').innerHTML = '';
     fetchLiveLogs();
+}
+
+function debounceLiveReset() {
+    const input = document.getElementById('live-hostname-input');
+    const clearBtn = document.getElementById('btn-clear-live-host');
+    if (clearBtn) {
+        if (input.value.trim().length > 0) {
+            clearBtn.classList.remove('hidden');
+        } else {
+            clearBtn.classList.add('hidden');
+        }
+    }
+    if (liveDebounceTimer) clearTimeout(liveDebounceTimer);
+    liveDebounceTimer = setTimeout(() => {
+        resetLiveStream();
+    }, 350);
+}
+
+function clearLiveHostnameFilter() {
+    const input = document.getElementById('live-hostname-input');
+    if (input) input.value = '';
+    const clearBtn = document.getElementById('btn-clear-live-host');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    resetLiveStream();
 }
 
 function toggleLivePause() {
@@ -1009,7 +1048,13 @@ async function fetchLiveLogs() {
     if (isPaused) return;
 
     const portId = document.getElementById('live-port-select').value;
-    const url = `/proxy/logs/live-stream/?port_id=${portId}&last_id=${lastLogId}`;
+    const hostInput = document.getElementById('live-hostname-input');
+    const hostnameVal = hostInput ? hostInput.value.trim() : '';
+
+    let url = `/proxy/logs/live-stream/?port_id=${portId}&last_id=${lastLogId}`;
+    if (hostnameVal) {
+        url += `&hostname=${encodeURIComponent(hostnameVal)}`;
+    }
 
     try {
         const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -1032,7 +1077,7 @@ async function fetchLiveLogs() {
                 }`;
 
                 const deviceDisplay = l.hostname 
-                    ? `<span class="font-bold text-cyan-300"><i class="fa-solid fa-desktop text-[9px] text-indigo-400 mr-1"></i>${l.hostname}</span> <span class="text-slate-500 font-mono text-[10px]">(${l.client_ip})</span>`
+                    ? `<span class="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 font-bold border border-cyan-500/25 text-[11px] inline-flex items-center gap-1.5"><i class="fa-solid fa-desktop text-[10px] text-cyan-400"></i>${l.hostname}</span> <span class="text-slate-500 font-mono text-[10px]">${l.client_ip}</span>`
                     : `<span class="text-slate-400 font-mono text-[11px]">${l.client_ip}</span>`;
 
                 row.innerHTML = `

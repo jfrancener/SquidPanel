@@ -822,13 +822,14 @@ def logs_view(request):
 @login_required
 def logs_live_stream_view(request):
     """
-    Endpoint AJAX para o Monitor em Tempo Real (Live Stream) de uma porta ou grupo específico.
+    Endpoint AJAX para o Monitor em Tempo Real (Live Stream) com suporte a filtro por Porta, Grupo e Hostname/IP.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     sync_logs_from_squid_file()
     last_id = request.GET.get('last_id')
     port_id = request.GET.get('port_id')
     group_id = request.GET.get('group_id')
+    hostname_filter = request.GET.get('hostname', '').strip()
 
     logs_qs = AccessLog.objects.select_related('port', 'group').all()
 
@@ -837,12 +838,18 @@ def logs_live_stream_view(request):
     elif group_id and group_id.isdigit():
         logs_qs = logs_qs.filter(group_id=int(group_id))
 
+    if hostname_filter:
+        logs_qs = logs_qs.filter(
+            models.Q(hostname__icontains=hostname_filter) |
+            models.Q(client_ip__icontains=hostname_filter)
+        )
+
     if last_id and last_id.isdigit() and int(last_id) > 0:
         # Busca registros com ID maior em ordem cronológica (id ASC)
         new_logs = list(logs_qs.filter(id__gt=int(last_id)).order_by('id')[:100])
     else:
-        # Carga inicial: pega os 25 mais recentes e inverte para exibição correta
-        recent_logs = list(logs_qs.order_by('-id')[:25])
+        # Carga inicial: pega os 35 mais recentes e inverte para exibição correta
+        recent_logs = list(logs_qs.order_by('-id')[:35])
         new_logs = list(reversed(recent_logs))
 
     device_map = {d.ip_address: d for d in DeviceHost.objects.all()}
@@ -851,12 +858,13 @@ def logs_live_stream_view(request):
     for l in new_logs:
         dev = device_map.get(l.client_ip)
         local_ts = timezone.localtime(l.timestamp)
+        effective_hostname = l.hostname or (dev.hostname if dev else None)
         data.append({
             'id': l.id,
             'timestamp': local_ts.strftime('%H:%M:%S'),
             'date': local_ts.strftime('%d/%m/%Y'),
             'client_ip': l.client_ip,
-            'hostname': dev.hostname if dev else None,
+            'hostname': effective_hostname,
             'device_desc': dev.description if dev else None,
             'port_number': l.port_number,
             'port_name': l.port.name if l.port else f"Porta {l.port_number}",
