@@ -828,22 +828,25 @@ def logs_live_stream_view(request):
     port_id = request.GET.get('port_id')
     group_id = request.GET.get('group_id')
 
-    logs_qs = AccessLog.objects.select_related('port', 'group').order_by('-id')
+    logs_qs = AccessLog.objects.select_related('port', 'group').all()
 
-    if port_id:
-        logs_qs = logs_qs.filter(port_id=port_id)
-    elif group_id:
-        logs_qs = logs_qs.filter(group_id=group_id)
+    if port_id and port_id.isdigit():
+        logs_qs = logs_qs.filter(port_id=int(port_id))
+    elif group_id and group_id.isdigit():
+        logs_qs = logs_qs.filter(group_id=int(group_id))
 
-    if last_id and last_id.isdigit():
-        new_logs = list(logs_qs.filter(id__gt=int(last_id))[:30])
+    if last_id and last_id.isdigit() and int(last_id) > 0:
+        # Busca registros com ID maior em ordem cronológica (id ASC)
+        new_logs = list(logs_qs.filter(id__gt=int(last_id)).order_by('id')[:100])
     else:
-        new_logs = list(logs_qs[:20])
+        # Carga inicial: pega os 25 mais recentes e inverte para exibição correta
+        recent_logs = list(logs_qs.order_by('-id')[:25])
+        new_logs = list(reversed(recent_logs))
 
     device_map = {d.ip_address: d for d in DeviceHost.objects.all()}
 
     data = []
-    for l in reversed(new_logs):
+    for l in new_logs:
         dev = device_map.get(l.client_ip)
         data.append({
             'id': l.id,

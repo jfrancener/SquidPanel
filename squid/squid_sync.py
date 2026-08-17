@@ -216,6 +216,12 @@ def generate_squid_config_and_lists():
     return conf_file, lists_dir
 
 
+def _get_cmd_prefix():
+    if sys.platform != 'win32' and hasattr(os, 'geteuid') and os.geteuid() != 0:
+        return ['sudo']
+    return []
+
+
 def apply_squid_changes():
     """
     Gera a configuração atualizada e aplica imediatamente no Squid (squid -k reconfigure).
@@ -224,16 +230,17 @@ def apply_squid_changes():
     paths = get_squid_paths()
 
     if paths['is_linux']:
+        prefix = _get_cmd_prefix()
         # Testa sintaxe primeiro
-        res_test = subprocess.run(['squid', '-k', 'parse'], capture_output=True, text=True)
+        res_test = subprocess.run(prefix + ['squid', '-k', 'parse'], capture_output=True, text=True)
         if res_test.returncode != 0:
             return False, f"Erro de sintaxe no Squid: {res_test.stderr}"
 
         # Recarrega configurações
-        res_reconfig = subprocess.run(['squid', '-k', 'reconfigure'], capture_output=True, text=True)
+        res_reconfig = subprocess.run(prefix + ['squid', '-k', 'reconfigure'], capture_output=True, text=True)
         if res_reconfig.returncode != 0:
             # Se não estiver rodando, tenta iniciar
-            subprocess.run(['systemctl', 'restart', 'squid'], capture_output=True, text=True)
+            subprocess.run(prefix + ['systemctl', 'restart', 'squid'], capture_output=True, text=True)
 
     mark_squid_sync_completed()
     return True, "Configurações aplicadas e recarregadas no Squid com sucesso!"
@@ -247,9 +254,11 @@ def restart_squid_service():
     paths = get_squid_paths()
 
     if paths['is_linux']:
-        res = subprocess.run(['systemctl', 'restart', 'squid'], capture_output=True, text=True)
+        prefix = _get_cmd_prefix()
+        res = subprocess.run(prefix + ['systemctl', 'restart', 'squid'], capture_output=True, text=True)
         if res.returncode != 0:
             return False, f"Erro ao reiniciar o Squid: {res.stderr}"
 
     mark_squid_sync_completed()
     return True, "Serviço do Squid reiniciado com sucesso!"
+
