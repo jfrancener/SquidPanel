@@ -49,6 +49,12 @@ class ProxyList(models.Model):
     def domain_count(self):
         return self.domains.filter(is_active=True).count()
 
+    @property
+    def applied_groups(self):
+        if self.list_type == 'WHITELIST':
+            return self.applied_groups_whitelist.filter(is_active=True)
+        return self.applied_groups_blacklist.filter(is_active=True)
+
 
 class DomainItem(models.Model):
     """

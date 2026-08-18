@@ -1140,7 +1140,7 @@ def proxy_tester_view(request):
 
         # 1. Busca em TODAS as Whitelists ativas do sistema
         matched_whitelists = []
-        all_wl = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).prefetch_related('domains')
+        all_wl = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).prefetch_related('domains', 'applied_groups_whitelist')
         for wl in all_wl:
             for item in wl.domains.filter(is_active=True):
                 if domain_matches(cleaned_domain, item.domain):
@@ -1148,20 +1148,20 @@ def proxy_tester_view(request):
                         'list': wl,
                         'matched_pattern': item.domain,
                         'is_mandatory': wl.is_mandatory,
-                        'groups': list(wl.groups.filter(is_active=True)) if hasattr(wl, 'groups') else []
+                        'groups': list(wl.applied_groups_whitelist.filter(is_active=True))
                     })
                     break
 
         # 2. Busca em TODAS as Blacklists ativas do sistema
         matched_blacklists = []
-        all_bl = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).prefetch_related('domains')
+        all_bl = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).prefetch_related('domains', 'applied_groups_blacklist')
         for bl in all_bl:
             for item in bl.domains.filter(is_active=True):
                 if domain_matches(cleaned_domain, item.domain):
                     matched_blacklists.append({
                         'list': bl,
                         'matched_pattern': item.domain,
-                        'groups': list(bl.groups.filter(is_active=True)) if hasattr(bl, 'groups') else []
+                        'groups': list(bl.applied_groups_blacklist.filter(is_active=True))
                     })
                     break
 
@@ -1680,7 +1680,7 @@ def portal_link_create_view(request):
         port = ProxyPort.objects.filter(id=int(port_id)).first() if port_id and port_id.isdigit() else None
         order = int(display_order) if display_order.isdigit() else 0
 
-        PortalLink.objects.create(
+        plink = PortalLink.objects.create(
             title=title,
             url=url,
             category=category,
@@ -1691,7 +1691,27 @@ def portal_link_create_view(request):
             is_active=True
         )
 
-        messages.success(request, f"Link '{title}' adicionado ao Portal com sucesso!")
+        # Adiciona o domínio automaticamente na Whitelist Educacional e sincroniza o Squid
+        try:
+            from urllib.parse import urlparse
+            parsed_host = urlparse(url).hostname
+            if parsed_host:
+                clean_host = parsed_host.lower().lstrip('.')
+                educ_list = ProxyList.objects.filter(list_type='WHITELIST', name__icontains='educa').first()
+                if educ_list:
+                    # Adiciona com ponto inicial para cobrir subdomínios
+                    pat = f".{clean_host}" if not clean_host.startswith('.') else clean_host
+                    if not educ_list.domains.filter(domain=pat).exists() and not educ_list.domains.filter(domain=clean_host).exists():
+                        DomainItem.objects.create(
+                            proxy_list=educ_list,
+                            domain=pat,
+                            description=f"Atalho do Portal: {title}"
+                        )
+                apply_squid_changes()
+        except Exception:
+            pass
+
+        messages.success(request, f"Link '{title}' adicionado ao Portal e liberado na Whitelist com sucesso!")
         return redirect('portal_links_admin')
 
     return redirect('portal_links_admin')
@@ -1737,6 +1757,25 @@ def portal_link_edit_view(request, link_id):
         link.display_order = order
         link.is_active = is_active
         link.save()
+
+        # Adiciona o domínio automaticamente na Whitelist Educacional e sincroniza o Squid
+        try:
+            from urllib.parse import urlparse
+            parsed_host = urlparse(url).hostname
+            if parsed_host and is_active:
+                clean_host = parsed_host.lower().lstrip('.')
+                educ_list = ProxyList.objects.filter(list_type='WHITELIST', name__icontains='educa').first()
+                if educ_list:
+                    pat = f".{clean_host}" if not clean_host.startswith('.') else clean_host
+                    if not educ_list.domains.filter(domain=pat).exists() and not educ_list.domains.filter(domain=clean_host).exists():
+                        DomainItem.objects.create(
+                            proxy_list=educ_list,
+                            domain=pat,
+                            description=f"Atalho do Portal: {title}"
+                        )
+                apply_squid_changes()
+        except Exception:
+            pass
 
         messages.success(request, f"Link '{title}' atualizado com sucesso!")
         return redirect('portal_links_admin')
