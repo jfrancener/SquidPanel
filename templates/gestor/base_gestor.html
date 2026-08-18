@@ -69,40 +69,104 @@
     </style>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-full bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
+<body class="h-full bg-slate-950 text-slate-100 flex overflow-hidden selection:bg-indigo-500 selection:text-white">
 
-    <!-- Luz de Fundo Ambiente -->
-    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-indigo-600/15 via-cyan-500/5 to-transparent blur-3xl pointer-events-none -z-10"></div>
-
-    <!-- Header / Barra Superior do Gestor -->
-    <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
-            
-            <!-- Logo e Identificação -->
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
-                    <i class="fa-solid fa-graduation-cap text-lg"></i>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-base font-extrabold tracking-tight text-white">SquidPanel</span>
-                        <span class="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-[10px] font-bold text-indigo-300 uppercase tracking-wider">Gestor</span>
-                    </div>
-                    <p class="text-[11px] text-slate-400">Controle e Monitoramento de Salas de Aula</p>
+    <!-- ========================================== -->
+    <!-- 1. SIDEBAR LATERAL DO GESTOR -->
+    <!-- ========================================== -->
+    <aside class="w-64 bg-[#141726] border-r border-slate-800/80 flex flex-col flex-shrink-0 z-30 transition-all duration-300">
+        
+        <!-- Header do Menu Lateral -->
+        <div class="h-16 px-5 flex items-center gap-3 border-b border-slate-800/80 bg-[#121422]">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-graduation-cap text-base"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300">
+                    Squid<span class="text-indigo-400">Panel</span>
+                </h1>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-[10px] font-medium text-emerald-400/90 tracking-wide uppercase">Painel do Gestor</span>
                 </div>
             </div>
+        </div>
 
-            <!-- Informações do Usuário e Controles -->
-            <div class="flex items-center gap-3.5">
+        <!-- Links de Navegação Lateral -->
+        <div class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+            
+            <div>
+                <span class="px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Salas de Aula</span>
+                <nav class="space-y-1">
+                    <!-- Dashboard -->
+                    <a href="{% url 'gestor_dashboard' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all {% if active_menu == 'dashboard' %}bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 shadow-sm font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+                        <i class="fa-solid fa-chalkboard-user w-4 text-center text-sm {% if active_menu == 'dashboard' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
+                        <span>Controle de Salas</span>
+                    </a>
+
+                    <!-- Agendamentos -->
+                    <a href="{% url 'gestor_schedules' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all {% if active_menu == 'schedules' %}bg-indigo-600/20 text-cyan-300 border border-cyan-500/30 shadow-sm font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+                        <i class="fa-solid fa-calendar-days w-4 text-center text-sm {% if active_menu == 'schedules' %}text-cyan-400{% else %}text-slate-500{% endif %}"></i>
+                        <span>Agendamentos</span>
+                    </a>
+                </nav>
+            </div>
+
+            {% if profile.is_admin %}
+            <div>
+                <span class="px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Administração</span>
+                <nav class="space-y-1">
+                    <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all">
+                        <i class="fa-solid fa-shield-halved w-4 text-center text-sm text-slate-500"></i>
+                        <span>Painel Geral TI</span>
+                    </a>
+                </nav>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- Rodapé do Menu Lateral -->
+        <div class="p-3 border-t border-slate-800/80 bg-[#121422]">
+            <div class="px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800/60 flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="text-[11px] text-slate-400">Ambiente Seguro</span>
+                </div>
+                <span class="text-[10px] text-slate-500 font-mono">v2.4</span>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ========================================== -->
+    <!-- 2. CONTEÚDO PRINCIPAL (ÁREA CENTRAL) -->
+    <!-- ========================================== -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        
+        <!-- Luz de Fundo Ambiente -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-80 bg-gradient-to-b from-indigo-600/10 via-cyan-500/5 to-transparent blur-3xl pointer-events-none -z-10"></div>
+
+        <!-- Topo / Header da Área de Trabalho -->
+        <header class="h-16 border-b border-slate-800/80 bg-[#0f111a]/80 backdrop-blur-md px-6 flex items-center justify-between flex-shrink-0 z-20">
+            
+            <div class="flex items-center gap-3">
+                <h2 class="text-sm font-bold text-white tracking-tight">
+                    {% block page_title %}Painel do Gestor{% endblock %}
+                </h2>
+            </div>
+
+            <!-- Informações do Usuário e Relógio -->
+            <div class="flex items-center gap-4">
                 <!-- Relógio Servidor -->
-                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-xs text-slate-300">
+                <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-xs text-slate-300">
                     <i class="fa-regular fa-clock text-indigo-400 text-xs"></i>
                     <span id="gestor-live-time" class="font-mono font-medium">--:--:--</span>
                 </div>
 
                 <!-- Perfil do Usuário Logado -->
                 <div class="flex items-center gap-3 pl-3 border-l border-slate-800">
-                    <div class="text-right hidden sm:block">
+                    <div class="text-right hidden md:block">
                         <div class="text-xs font-bold text-white flex items-center justify-end gap-1.5">
                             {{ request.user.get_full_name|default:request.user.username }}
                             {% if profile.is_admin %}
@@ -129,26 +193,31 @@
 
             </div>
 
-        </div>
-    </header>
+        </header>
 
-    <!-- Conteúdo Principal -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {% block content %}{% endblock %}
-    </main>
+        <!-- Área Rolável de Conteúdo -->
+        <main class="flex-1 overflow-y-auto p-6 space-y-6">
+            <!-- Mensagens do Django -->
+            {% if messages %}
+            <div class="space-y-2">
+                {% for message in messages %}
+                <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-3 border animate-fadeIn {% if message.tags == 'error' %}bg-rose-500/10 border-rose-500/30 text-rose-300{% elif message.tags == 'warning' %}bg-amber-500/10 border-amber-500/30 text-amber-300{% else %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% endif %}">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% elif message.tags == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white text-xs">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
 
-    <!-- Rodapé -->
-    <footer class="border-t border-slate-800/60 bg-slate-900/40 py-4 text-center text-xs text-slate-500">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div>
-                <span>SquidPanel Gestor</span> • Ambiente Seguro de Acesso à Internet
-            </div>
-            <div class="flex items-center gap-2 text-[11px] text-slate-400">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Serviço Proxy Operante</span>
-            </div>
-        </div>
-    </footer>
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
 
     <!-- Container Flutuante para Mensagens Toast -->
     <div id="gestor-toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md pointer-events-none"></div>

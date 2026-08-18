@@ -1821,7 +1821,248 @@ def portal_toggle_port_view(request, port_id):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'success': True, 'use_custom_portal': port.use_custom_portal, 'port_number': port.port_number})
 
-    return redirect('portal_links_admin')
+# ==========================================
+# 11. GESTÃO ADMINISTRATIVA DE AGENDAMENTOS (SCHEDULER)
+# ==========================================
+
+from dashboard.models import RoomSchedule
+from gestor.scheduler_service import process_room_schedules
+from datetime import datetime
+
+@login_required
+def admin_schedules_view(request):
+    """
+    Listagem e gerenciamento de todos os Agendamentos de Salas do sistema.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado: apenas Administradores e Coordenadores.")
+
+    ports = ProxyPort.objects.filter(is_active=True).order_by('port_number')
+    query = request.GET.get('q', '').strip()
+    port_filter = request.GET.get('port_id', '').strip()
+
+    schedules_qs = RoomSchedule.objects.all().select_related('port', 'created_by')
+
+    if query:
+        schedules_qs = schedules_qs.filter(
+            models.Q(name__icontains=query) |
+            models.Q(port__name__icontains=query)
+        )
+
+    if port_filter and port_filter.isdigit():
+        schedules_qs = schedules_qs.filter(port_id=int(port_filter))
+
+    schedules = list(schedules_qs.order_by('-is_enabled', 'start_time'))
+
+    now = timezone.localtime(timezone.now())
+    for s in schedules:
+        s.is_active_now = s.is_in_effect_now(now)
+
+    total_schedules = len(schedules)
+    active_now_count = sum(1 for s in schedules if s.is_active_now)
+
+    return render(request, 'squid/schedules_admin.html', {
+        'profile': profile,
+        'schedules': schedules,
+        'ports': ports,
+        'query': query,
+        'port_filter': port_filter,
+        'total_schedules': total_schedules,
+        'active_now_count': active_now_count,
+        'active_menu': 'schedules',
+    })
+
+
+@login_required
+def admin_schedule_create_view(request):
+    """
+    Criação de agendamento pelo painel administrativo.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    if request.method == 'POST':
+        port_id = request.POST.get('port_id', '').strip()
+        name = request.POST.get('name', '').strip()
+        schedule_type = request.POST.get('schedule_type', 'RECURRENT').strip()
+        specific_date_str = request.POST.get('specific_date', '').strip()
+        days_list = request.POST.getlist('days_of_week')
+        start_time_str = request.POST.get('start_time', '').strip()
+        end_time_str = request.POST.get('end_time', '').strip()
+        action = request.POST.get('action', 'ALLOWED').strip().upper()
+        revert_action = request.POST.get('revert_action', 'BLOCKED').strip().upper()
+        is_enabled = request.POST.get('is_enabled') == 'on'
+
+        if not name or not port_id or not start_time_str or not end_time_str:
+            messages.error(request, 'Preencha todos os campos obrigatórios.')
+            return redirect('admin_schedules')
+
+        port = get_object_or_404(ProxyPort, id=int(port_id))
+
+        try:
+            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+        except ValueError:
+            messages.error(request, 'Formato de horário inválido.')
+            return redirect('admin_schedules')
+
+        specific_date = None
+        if schedule_type == 'ONETIME':
+            if not specific_date_str:
+                messages.error(request, 'Informe a data específica para o agendamento pontual.')
+                return redirect('admin_schedules')
+            try:
+                specific_date = datetime.strptime(specific_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                messages.error(request, 'Formato de data inválido.')
+                return redirect('admin_schedules')
+            days_str = ''
+        else:
+            if not days_list:
+                messages.error(request, 'Selecione ao menos um dia da semana.')
+                return redirect('admin_schedules')
+            days_str = ",".join(sorted(days_list))
+
+        RoomSchedule.objects.create(
+            port=port,
+            name=name,
+            schedule_type=schedule_type,
+            specific_date=specific_date,
+            days_of_week=days_str,
+            start_time=start_time,
+            end_time=end_time,
+            action=action,
+            revert_action=revert_action,
+            is_enabled=is_enabled,
+            created_by=request.user
+        )
+
+        process_room_schedules()
+        messages.success(request, f"Agendamento '{name}' para a sala '{port.name}' criado com sucesso!")
+
+    return redirect('admin_schedules')
+
+
+@login_required
+def admin_schedule_edit_view(request, schedule_id):
+    """
+    Edição de agendamento pelo painel administrativo.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    schedule = get_object_or_404(RoomSchedule, id=schedule_id)
+
+    if request.method == 'POST':
+        port_id = request.POST.get('port_id', '').strip()
+        name = request.POST.get('name', '').strip()
+        schedule_type = request.POST.get('schedule_type', 'RECURRENT').strip()
+        specific_date_str = request.POST.get('specific_date', '').strip()
+        days_list = request.POST.getlist('days_of_week')
+        start_time_str = request.POST.get('start_time', '').strip()
+        end_time_str = request.POST.get('end_time', '').strip()
+        action = request.POST.get('action', 'ALLOWED').strip().upper()
+        revert_action = request.POST.get('revert_action', 'BLOCKED').strip().upper()
+        is_enabled = request.POST.get('is_enabled') == 'on'
+
+        if not name or not port_id or not start_time_str or not end_time_str:
+            messages.error(request, 'Preencha todos os campos obrigatórios.')
+            return redirect('admin_schedules')
+
+        port = get_object_or_404(ProxyPort, id=int(port_id))
+
+        try:
+            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+        except ValueError:
+            messages.error(request, 'Formato de horário inválido.')
+            return redirect('admin_schedules')
+
+        specific_date = None
+        if schedule_type == 'ONETIME':
+            if not specific_date_str:
+                messages.error(request, 'Informe a data específica.')
+                return redirect('admin_schedules')
+            try:
+                specific_date = datetime.strptime(specific_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                messages.error(request, 'Formato de data inválido.')
+                return redirect('admin_schedules')
+            days_str = ''
+        else:
+            if not days_list:
+                messages.error(request, 'Selecione ao menos um dia da semana.')
+                return redirect('admin_schedules')
+            days_str = ",".join(sorted(days_list))
+
+        schedule.port = port
+        schedule.name = name
+        schedule.schedule_type = schedule_type
+        schedule.specific_date = specific_date
+        schedule.days_of_week = days_str
+        schedule.start_time = start_time
+        schedule.end_time = end_time
+        schedule.action = action
+        schedule.revert_action = revert_action
+        schedule.is_enabled = is_enabled
+        schedule.save()
+
+        process_room_schedules()
+        messages.success(request, f"Agendamento '{name}' atualizado com sucesso!")
+
+    return redirect('admin_schedules')
+
+
+@login_required
+def admin_schedule_toggle_view(request, schedule_id):
+    """
+    Ativa ou pausa um agendamento.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    schedule = get_object_or_404(RoomSchedule, id=schedule_id)
+    schedule.is_enabled = not schedule.is_enabled
+    schedule.save()
+
+    process_room_schedules()
+
+    status_str = "habilitado" if schedule.is_enabled else "pausado"
+    messages.success(request, f"Agendamento '{schedule.name}' {status_str} com sucesso!")
+    return redirect('admin_schedules')
+
+
+@login_required
+def admin_schedule_delete_view(request, schedule_id):
+    """
+    Exclusão de um agendamento.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    schedule = get_object_or_404(RoomSchedule, id=schedule_id)
+    name = schedule.name
+    was_active = schedule.current_state == 'ACTIVE'
+    port = schedule.port
+    revert_action = schedule.revert_action
+
+    schedule.delete()
+
+    if was_active:
+        port.current_status = revert_action
+        port.save()
+        apply_squid_changes()
+
+    process_room_schedules()
+
+    messages.success(request, f"Agendamento '{name}' excluído com sucesso!")
+    return redirect('admin_schedules')
+
 
 
 

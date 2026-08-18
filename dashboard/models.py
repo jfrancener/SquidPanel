@@ -109,19 +109,99 @@ class ProxyPort(models.Model):
 
 class RoomSchedule(models.Model):
     """
-    Agendamentos recorrentes de horários para liberação automática das salas.
+    Agendamentos de horários para liberação/bloqueio automático das salas.
+    Suporta regras recorrentes por dias da semana e agendamentos pontuais (data específica).
     """
-    port = models.ForeignKey(ProxyPort, on_delete=models.CASCADE, related_name='schedules')
-    name = models.CharField(max_length=100, blank=True)
-    days_of_week = models.CharField(max_length=10, default='MTWHF') # M=Seg, T=Ter, W=Qua, H=Qui, F=Sex, A=Sab, S=Dom
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    action = models.CharField(max_length=20, default='ALLOW_ALL')
-    is_enabled = models.BooleanField(default=True)
-    created_at = models.DateTimeField(default=timezone.now)
+    SCHEDULE_TYPE_CHOICES = [
+        ('RECURRENT', 'Recorrente (Dias da Semana)'),
+        ('ONETIME', 'Pontual (Data Específica)'),
+    ]
+    ACTION_CHOICES = [
+        ('ALLOWED', 'Livre (Acesso Total)'),
+        ('WHITELIST', 'Whitelist (Apenas Permitidos)'),
+        ('BLACKLIST', 'Blacklist (Livre com Restrições)'),
+        ('BLOCKED', 'Bloqueado'),
+    ]
+
+    port = models.ForeignKey(ProxyPort, on_delete=models.CASCADE, related_name='schedules', verbose_name="Sala / Porta")
+    name = models.CharField(max_length=150, verbose_name="Nome do Agendamento")
+    schedule_type = models.CharField(max_length=20, choices=SCHEDULE_TYPE_CHOICES, default='RECURRENT', verbose_name="Tipo de Agendamento")
+    
+    # Campo para data específica (quando schedule_type == 'ONETIME')
+    specific_date = models.DateField(null=True, blank=True, verbose_name="Data Específica")
+    
+    # Dias da semana: '0,1,2,3,4' onde 0=Segunda, 1=Terça, 2=Quarta, 3=Quinta, 4=Sexta, 5=Sábado, 6=Domingo
+    days_of_week = models.CharField(max_length=50, default='0,1,2,3,4', verbose_name="Dias da Semana")
+    
+    start_time = models.TimeField(verbose_name="Horário de Início")
+    end_time = models.TimeField(verbose_name="Horário de Término")
+    
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, default='ALLOWED', verbose_name="Ação no Período")
+    revert_action = models.CharField(max_length=20, choices=ACTION_CHOICES, default='BLOCKED', verbose_name="Ação Após Término")
+    
+    is_enabled = models.BooleanField(default=True, verbose_name="Ativo / Habilitado")
+    current_state = models.CharField(max_length=20, default='INACTIVE', verbose_name="Estado Atual") # 'ACTIVE' ou 'INACTIVE'
+    last_run_at = models.DateTimeField(null=True, blank=True, verbose_name="Última Execução")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='schedules_created')
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Criado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        verbose_name = "Agendamento de Sala"
+        verbose_name_plural = "Agendamentos de Salas"
+        ordering = ['start_time', 'name']
 
     def __str__(self):
-        return f"{self.port.name} - {self.days_of_week} ({self.start_time} - {self.end_time})"
+        return f"{self.name} - {self.port.name} ({self.start_time.strftime('%H:%M')} às {self.end_time.strftime('%H:%M')})"
+
+    @property
+    def days_display(self):
+        if self.schedule_type == 'ONETIME':
+            return self.specific_date.strftime('%d/%m/%Y') if self.specific_date else 'Data Não Definida'
+        
+        day_map = {
+            '0': 'Seg', '1': 'Ter', '2': 'Qua', '3': 'Qui',
+            '4': 'Sex', '5': 'Sáb', '6': 'Dom'
+        }
+        days = [d.strip() for d in (self.days_of_week or '').split(',') if d.strip() in day_map]
+        
+        if set(days) == {'0', '1', '2', '3', '4'}:
+            return "Seg a Sex (Dias Úteis)"
+        elif len(days) == 7:
+            return "Todos os Dias"
+        elif not days:
+            return "Nenhum dia"
+        return ", ".join([day_map[d] for d in sorted(days)])
+
+    def is_in_effect_now(self, check_dt=None):
+        """
+        Verifica se o agendamento deve estar em vigor no instante fornecido (ou agora).
+        """
+        if not self.is_enabled:
+            return False
+        
+        if check_dt is None:
+            check_dt = timezone.localtime(timezone.now())
+        
+        current_date = check_dt.date()
+        current_time = check_dt.time()
+        current_weekday = str(check_dt.weekday()) # 0=Segunda, 6=Domingo
+
+        # Validação do dia
+        if self.schedule_type == 'ONETIME':
+            if self.specific_date != current_date:
+                return False
+        else:
+            active_days = [d.strip() for d in (self.days_of_week or '').split(',')]
+            if current_weekday not in active_days:
+                return False
+
+        # Validação do horário
+        if self.start_time <= self.end_time:
+            return self.start_time <= current_time < self.end_time
+        else:
+            # Caso atravesse a meia-noite (ex: 22:00 às 06:00)
+            return current_time >= self.start_time or current_time < self.end_time
 
 
 class DomainRule(models.Model):

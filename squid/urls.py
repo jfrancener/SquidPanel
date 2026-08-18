@@ -60,7 +60,12 @@ urlpatterns = [
     path('portal-links/create/', views.portal_link_create_view, name='portal_link_create'),
     path('portal-links/<int:link_id>/edit/', views.portal_link_edit_view, name='portal_link_edit'),
     path('portal-links/<int:link_id>/delete/', views.portal_link_delete_view, name='portal_link_delete'),
-    path('portal-links/ports/<int:port_id>/toggle-portal/', views.portal_toggle_port_view, name='portal_toggle_port'),
+    # Agendamentos de Horários de Salas (Scheduler)
+    path('schedules/', views.admin_schedules_view, name='admin_schedules'),
+    path('schedules/create/', views.admin_schedule_create_view, name='admin_schedule_create'),
+    path('schedules/<int:schedule_id>/edit/', views.admin_schedule_edit_view, name='admin_schedule_edit'),
+    path('schedules/<int:schedule_id>/toggle/', views.admin_schedule_toggle_view, name='admin_schedule_toggle'),
+    path('schedules/<int:schedule_id>/delete/', views.admin_schedule_delete_view, name='admin_schedule_delete'),
 
     # Scripts PAC / WPAD (Proxy Auto-Configuration)
     path('pac/<int:port_number>.pac', views.pac_by_port_view, name='pac_by_port'),

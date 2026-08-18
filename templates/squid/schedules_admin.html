@@ -1,0 +1,504 @@
+{% extends 'base.html' %}
+
+{% block title %}Agendamentos de Salas{% endblock %}
+{% block page_title %}Agendamentos de Salas & Horários{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho da Página -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+        <h1 class="text-xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
+            <i class="fa-solid fa-calendar-days text-cyan-400"></i>
+            Agendamentos Automáticos das Salas
+        </h1>
+        <p class="text-xs text-slate-400 mt-1">
+            Programação e automação de horários para liberação e bloqueio das portas de acesso à internet.
+        </p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <!-- Botão de Verificação Imediata -->
+        <button onclick="runScheduleCheck()" id="btn-admin-run-check" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm" title="Executa a verificação dos agendamentos no momento atual">
+            <i class="fa-solid fa-rotate text-xs text-indigo-400"></i>
+            <span>Verificar Agora</span>
+        </button>
+
+        <!-- Botão Novo Agendamento -->
+        <button onclick="openCreateModal()" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Novo Agendamento</span>
+        </button>
+    </div>
+</div>
+
+<!-- Filtros e Estatísticas -->
+<div class="glass-panel rounded-2xl p-4 border border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <form method="GET" class="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2.5 flex-1">
+        <!-- Campo de Busca -->
+        <div class="relative w-full sm:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+            <input type="text" name="q" value="{{ query }}" placeholder="Buscar por nome ou sala..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-3.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <!-- Filtro de Sala -->
+        <select name="port_id" onchange="this.form.submit()" class="w-full sm:w-auto bg-slate-900 border border-slate-700/80 text-xs text-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500">
+            <option value="">Todas as salas</option>
+            {% for p in ports %}
+            <option value="{{ p.id }}" {% if port_filter == p.id|stringformat:"i" %}selected{% endif %}>{{ p.name }} (Porta {{ p.port_number }})</option>
+            {% endfor %}
+        </select>
+
+        {% if query or port_filter %}
+        <a href="{% url 'admin_schedules' %}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-xs font-medium transition-all">
+            Limpar Filtros
+        </a>
+        {% endif %}
+    </form>
+
+    <div class="flex items-center gap-2 text-xs">
+        <span class="px-3 py-1 rounded-xl bg-slate-800/60 border border-slate-700/60 text-slate-300">
+            Total: <strong class="text-white">{{ total_schedules }}</strong>
+        </span>
+        <span class="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Em vigor agora: <strong class="text-emerald-200">{{ active_now_count }}</strong>
+        </span>
+    </div>
+</div>
+
+<!-- Grid de Agendamentos -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for s in schedules %}
+    <div class="glass-panel rounded-2xl p-5 border border-slate-800/80 shadow-lg hover:border-slate-700/80 transition-all flex flex-col justify-between relative overflow-hidden">
+        
+        <!-- Faixa lateral de status -->
+        <div class="absolute top-0 left-0 bottom-0 w-1.5 {% if s.is_active_now %}bg-emerald-500 animate-pulse{% elif s.is_enabled %}bg-indigo-500{% else %}bg-slate-700{% endif %}"></div>
+
+        <div>
+            <!-- Topo do Card -->
+            <div class="flex items-start justify-between gap-3 pl-2">
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                        <i class="fa-solid fa-clock text-cyan-400 text-sm"></i>
+                        {{ s.name }}
+                    </h3>
+                    <div class="text-xs font-semibold text-indigo-300 mt-1 flex items-center gap-2">
+                        <span><i class="fa-solid fa-door-open text-slate-500 text-[11px] mr-1"></i>{{ s.port.name }}</span>
+                        <span class="px-1.5 py-0.2 bg-slate-800 rounded text-[10px] font-mono text-slate-400">Porta {{ s.port.port_number }}</span>
+                    </div>
+                </div>
+
+                <!-- Badge de Estado -->
+                <div>
+                    {% if s.is_active_now %}
+                    <span class="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Em Vigor
+                    </span>
+                    {% elif s.is_enabled %}
+                    <span class="px-2.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold flex items-center gap-1.5">
+                        <i class="fa-regular fa-calendar-check text-[10px]"></i>
+                        Agendado
+                    </span>
+                    {% else %}
+                    <span class="px-2.5 py-1 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 text-[11px] font-medium">
+                        Pausado
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Detalhes do Horário e Recorrência -->
+            <div class="mt-4 pt-3 border-t border-slate-800/60 pl-2 space-y-2 text-xs">
+                <!-- Tipo e Dias -->
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Recorrência:</span>
+                    <span class="font-medium text-white flex items-center gap-1">
+                        {% if s.schedule_type == 'ONETIME' %}
+                        <i class="fa-regular fa-calendar text-amber-400 text-[11px]"></i>
+                        {{ s.days_display }}
+                        {% else %}
+                        <i class="fa-solid fa-arrows-rotate text-cyan-400 text-[11px]"></i>
+                        {{ s.days_display }}
+                        {% endif %}
+                    </span>
+                </div>
+
+                <!-- Intervalo de Horário -->
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Horário:</span>
+                    <span class="font-mono font-bold text-cyan-300 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
+                        {{ s.start_time|time:"H:i" }} às {{ s.end_time|time:"H:i" }}
+                    </span>
+                </div>
+
+                <!-- Ação durante o horário -->
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Modo no Horário:</span>
+                    <span>
+                        {% if s.action == 'ALLOWED' %}
+                        <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-globe text-[10px] mr-1"></i>Livre</span>
+                        {% elif s.action == 'WHITELIST' %}
+                        <span class="text-indigo-400 font-semibold"><i class="fa-solid fa-shield-halved text-[10px] mr-1"></i>Whitelist</span>
+                        {% elif s.action == 'BLACKLIST' %}
+                        <span class="text-amber-400 font-semibold"><i class="fa-solid fa-ban text-[10px] mr-1"></i>Blacklist</span>
+                        {% else %}
+                        <span class="text-rose-400 font-semibold"><i class="fa-solid fa-lock text-[10px] mr-1"></i>Bloqueado</span>
+                        {% endif %}
+                    </span>
+                </div>
+
+                <!-- Ação após término -->
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Após Término:</span>
+                    <span class="text-slate-400 font-medium">
+                        {{ s.get_revert_action_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Ações do Card -->
+        <div class="mt-4 pt-3 border-t border-slate-800/80 pl-2 flex items-center justify-between gap-2">
+            <!-- Toggle Ativo / Pausado -->
+            <a href="{% url 'admin_schedule_toggle' schedule_id=s.id %}" class="px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all {% if s.is_enabled %}bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-white border-amber-500/30{% else %}bg-emerald-500/10 hover:bg-emerald-500 text-emerald-300 hover:text-white border-emerald-500/30{% endif %}">
+                <i class="fa-solid {% if s.is_enabled %}fa-pause{% else %}fa-play{% endif %} text-[11px]"></i>
+                <span>{% if s.is_enabled %}Pausar{% else %}Ativar{% endif %}</span>
+            </a>
+
+            <div class="flex items-center gap-1.5">
+                <!-- Botão Editar -->
+                <button onclick='openEditModal({{ s.id }}, {{ s|safe|default:"{}" }})' data-schedule='{"id": {{ s.id }}, "name": "{{ s.name|escapejs }}", "port_id": {{ s.port_id }}, "schedule_type": "{{ s.schedule_type }}", "specific_date": "{{ s.specific_date|date:"Y-m-d"|default:"" }}", "days_of_week": "{{ s.days_of_week }}", "start_time": "{{ s.start_time|time:"H:i" }}", "end_time": "{{ s.end_time|time:"H:i" }}", "action": "{{ s.action }}", "revert_action": "{{ s.revert_action }}", "is_enabled": {{ s.is_enabled|yesno:"true,false" }}}' class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all text-xs" title="Editar agendamento">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+
+                <!-- Botão Excluir -->
+                <a href="{% url 'admin_schedule_delete' schedule_id=s.id %}" onclick="return confirm('Deseja realmente excluir o agendamento \'{{ s.name|escapejs }}\'?')" class="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all text-xs" title="Excluir agendamento">
+                    <i class="fa-solid fa-trash-can"></i>
+                </a>
+            </div>
+        </div>
+
+    </div>
+    {% empty %}
+    <div class="col-span-full py-12 text-center glass-panel rounded-2xl border border-slate-800">
+        <i class="fa-solid fa-calendar-xmark text-3xl text-slate-600 mb-3"></i>
+        <h3 class="text-base font-bold text-slate-300">Nenhum agendamento cadastrado</h3>
+        <p class="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+            Crie agendamentos automáticos para horários específicos ou recorrentes por dias da semana.
+        </p>
+        <button onclick="openCreateModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-indigo-600/20">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Criar Primeiro Agendamento</span>
+        </button>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL DE CRIAÇÃO / EDIÇÃO DE AGENDAMENTO -->
+<!-- ========================================== -->
+<div id="schedule-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[90vh]">
+        
+        <!-- Header do Modal -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+            <h3 id="modal-title" class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-calendar-plus text-indigo-400"></i>
+                Novo Agendamento de Sala
+            </h3>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Form do Modal -->
+        <form id="schedule-form" method="POST" action="{% url 'admin_schedule_create' %}" class="p-6 space-y-4 overflow-y-auto">
+            {% csrf_token %}
+
+            <!-- Nome do Agendamento -->
+            <div>
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Nome do Agendamento *
+                </label>
+                <input type="text" id="sched-name" name="name" required placeholder="Ex: Aula de Informática 3º Ano, Bloqueio Noturno..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <!-- Seleção de Sala -->
+            <div>
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Sala de Aula / Laboratório *
+                </label>
+                <select id="sched-port" name="port_id" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                    <option value="">Selecione a sala...</option>
+                    {% for p in ports %}
+                    <option value="{{ p.id }}">{{ p.name }} (Porta {{ p.port_number }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Tipo de Agendamento: Recorrente vs Pontual -->
+            <div>
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                    Tipo de Programação
+                </label>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-indigo-500/50 transition-all">
+                        <input type="radio" name="schedule_type" value="RECURRENT" checked onchange="toggleScheduleType('RECURRENT')" class="text-indigo-600 focus:ring-0">
+                        <div>
+                            <div class="text-xs font-bold text-white">Dias da Semana</div>
+                            <div class="text-[10px] text-slate-400">Recorrente semanal</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-indigo-500/50 transition-all">
+                        <input type="radio" name="schedule_type" value="ONETIME" onchange="toggleScheduleType('ONETIME')" class="text-indigo-600 focus:ring-0">
+                        <div>
+                            <div class="text-xs font-bold text-white">Data Específica</div>
+                            <div class="text-[10px] text-slate-400">Pontual / Evento</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Campo Data Específica (condicional) -->
+            <div id="box-specific-date" class="hidden">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Data do Agendamento *
+                </label>
+                <input type="date" id="sched-date" name="specific_date" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <!-- Seletor de Dias da Semana (condicional) -->
+            <div id="box-recurrent-days">
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Dias da Semana Ativos *
+                    </label>
+                    <div class="flex items-center gap-2 text-[10px]">
+                        <button type="button" onclick="selectWeekdays('weekdays')" class="text-indigo-400 hover:text-indigo-300 font-semibold">Dias Úteis</button>
+                        <span class="text-slate-600">•</span>
+                        <button type="button" onclick="selectWeekdays('all')" class="text-indigo-400 hover:text-indigo-300 font-semibold">Todos</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-7 gap-1.5 text-center">
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="days_of_week" value="0" checked class="peer sr-only">
+                        <div class="py-2 rounded-xl bg-slate-950 border border-slate-800 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:text-white text-xs font-bold text-slate-400 transition-all">Seg</div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="days_of_week" value="1" checked class="peer sr-only">
+                        <div class="py-2 rounded-xl bg-slate-950 border border-slate-800 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:text-white text-xs font-bold text-slate-400 transition-all">Ter</div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="days_of_week" value="2" checked class="peer sr-only">
+                        <div class="py-2 rounded-xl bg-slate-950 border border-slate-800 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:text-white text-xs font-bold text-slate-400 transition-all">Qua</div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="days_of_week" value="3" checked class="peer sr-only">
+                        <div class="py-2 rounded-xl bg-slate-950 border border-slate-800 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:text-white text-xs font-bold text-slate-400 transition-all">Qui</div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="days_of_week" value="4" checked class="peer sr-only">
+                        <div class="py-2 rounded-xl bg-slate-950 border border-slate-800 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:text-white text-xs font-bold text-slate-400 transition-all">Sex</div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="days_of_week" value="5" class="peer sr-only">
+                        <div class="py-2 rounded-xl bg-slate-950 border border-slate-800 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:text-white text-xs font-bold text-slate-400 transition-all">Sáb</div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="days_of_week" value="6" class="peer sr-only">
+                        <div class="py-2 rounded-xl bg-slate-950 border border-slate-800 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:text-white text-xs font-bold text-slate-400 transition-all">Dom</div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Intervalo de Horários -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Horário de Início *
+                    </label>
+                    <input type="time" id="sched-start" name="start_time" required value="08:00" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Horário de Término *
+                    </label>
+                    <input type="time" id="sched-end" name="end_time" required value="12:00" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <!-- Modos de Navegação (Ação Ativa e Reversão) -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Modo no Horário
+                    </label>
+                    <select id="sched-action" name="action" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold">
+                        <option value="ALLOWED" class="text-emerald-400">🟢 Livre (Acesso Total)</option>
+                        <option value="WHITELIST" class="text-indigo-400">🔵 Whitelist (Permitidos)</option>
+                        <option value="BLACKLIST" class="text-amber-400">🟡 Blacklist (Com Restrições)</option>
+                        <option value="BLOCKED" class="text-rose-400">🔴 Bloqueado Total</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Após Término
+                    </label>
+                    <select id="sched-revert" name="revert_action" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold">
+                        <option value="BLOCKED" class="text-rose-400">🔴 Bloquear Sala</option>
+                        <option value="WHITELIST" class="text-indigo-400">🔵 Voltar para Whitelist</option>
+                        <option value="BLACKLIST" class="text-amber-400">🟡 Voltar para Blacklist</option>
+                        <option value="ALLOWED" class="text-emerald-400">🟢 Manter Livre</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Checkbox Ativo -->
+            <div class="pt-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="sched-enabled" name="is_enabled" checked class="rounded border-slate-800 text-indigo-600 focus:ring-0">
+                    <span class="text-xs text-slate-300 font-medium">Habilitar este agendamento imediatamente</span>
+                </label>
+            </div>
+
+            <!-- Footer com Botões -->
+            <div class="pt-4 border-t border-slate-800 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all">
+                    Salvar Agendamento
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleScheduleType(type) {
+    const boxDate = document.getElementById('box-specific-date');
+    const boxDays = document.getElementById('box-recurrent-days');
+    const dateInput = document.getElementById('sched-date');
+
+    if (type === 'ONETIME') {
+        boxDate.classList.remove('hidden');
+        boxDays.classList.add('hidden');
+        dateInput.required = true;
+    } else {
+        boxDate.classList.add('hidden');
+        boxDays.classList.remove('hidden');
+        dateInput.required = false;
+    }
+}
+
+function selectWeekdays(mode) {
+    const checkboxes = document.querySelectorAll('input[name="days_of_week"]');
+    checkboxes.forEach(cb => {
+        if (mode === 'all') {
+            cb.checked = true;
+        } else if (mode === 'weekdays') {
+            cb.checked = ['0', '1', '2', '3', '4'].includes(cb.value);
+        }
+    });
+}
+
+function openCreateModal() {
+    document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-calendar-plus text-indigo-400"></i> Novo Agendamento de Sala`;
+    document.getElementById('schedule-form').action = "{% url 'admin_schedule_create' %}";
+    document.getElementById('sched-name').value = '';
+    document.getElementById('sched-port').value = '';
+    document.getElementById('sched-date').value = '';
+    document.getElementById('sched-start').value = '08:00';
+    document.getElementById('sched-end').value = '12:00';
+    document.getElementById('sched-action').value = 'ALLOWED';
+    document.getElementById('sched-revert').value = 'BLOCKED';
+    document.getElementById('sched-enabled').checked = true;
+
+    document.querySelector('input[name="schedule_type"][value="RECURRENT"]').checked = true;
+    toggleScheduleType('RECURRENT');
+    selectWeekdays('weekdays');
+
+    const modal = document.getElementById('schedule-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function openEditModal(schedId, schedData) {
+    const btn = document.querySelector(`button[data-schedule*='"id": ${schedId}']`) || document.querySelector(`button[data-schedule*='"id":${schedId}']`);
+    let data = schedData;
+    if (btn && btn.dataset.schedule) {
+        try {
+            data = JSON.parse(btn.dataset.schedule);
+        } catch(e){}
+    }
+
+    if (!data || !data.id) return;
+
+    document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-cyan-400"></i> Editar Agendamento`;
+    document.getElementById('schedule-form').action = `/proxy/schedules/${data.id}/edit/`;
+    document.getElementById('sched-name').value = data.name || '';
+    document.getElementById('sched-port').value = data.port_id || '';
+    document.getElementById('sched-date').value = data.specific_date || '';
+    document.getElementById('sched-start').value = data.start_time || '08:00';
+    document.getElementById('sched-end').value = data.end_time || '12:00';
+    document.getElementById('sched-action').value = data.action || 'ALLOWED';
+    document.getElementById('sched-revert').value = data.revert_action || 'BLOCKED';
+    document.getElementById('sched-enabled').checked = data.is_enabled !== false;
+
+    const schedType = data.schedule_type || 'RECURRENT';
+    const typeRadio = document.querySelector(`input[name="schedule_type"][value="${schedType}"]`);
+    if (typeRadio) typeRadio.checked = true;
+    toggleScheduleType(schedType);
+
+    if (schedType === 'RECURRENT') {
+        const activeDays = (data.days_of_week || '').split(',').map(d => d.trim());
+        document.querySelectorAll('input[name="days_of_week"]').forEach(cb => {
+            cb.checked = activeDays.includes(cb.value);
+        });
+    }
+
+    const modal = document.getElementById('schedule-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeModal() {
+    const modal = document.getElementById('schedule-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function runScheduleCheck() {
+    const btn = document.getElementById('btn-admin-run-check');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Verificando...</span>`;
+
+    try {
+        const res = await fetch("{% url 'gestor_schedule_run_check' %}", {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert(data.changed_count > 0 ? 
+                `Verificação concluída com sucesso: ${data.changed_count} sala(s) atualizada(s) no Squid!` : 
+                `Verificação concluída: Nenhuma alteração de status necessária neste momento.`
+            );
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            alert('Erro ao processar verificação.');
+        }
+    } catch(e) {
+        alert('Erro de comunicação ao verificar agendamentos: ' + e);
+    } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}
