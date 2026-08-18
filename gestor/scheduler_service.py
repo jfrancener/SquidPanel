@@ -39,7 +39,10 @@ def process_room_schedules():
             if port.current_status != active_schedule.action or active_schedule.current_state != 'ACTIVE':
                 old_status = port.current_status
                 port.current_status = active_schedule.action
-                port.save(update_fields=['current_status', 'updated_at'])
+                port.last_status_source = 'SCHEDULE'
+                port.active_schedule = active_schedule
+                port.last_modified_by = None
+                port.save(update_fields=['current_status', 'last_status_source', 'active_schedule', 'last_modified_by', 'updated_at'])
                 
                 active_schedule.current_state = 'ACTIVE'
                 active_schedule.last_run_at = now
@@ -56,7 +59,10 @@ def process_room_schedules():
                 if s.current_state == 'ACTIVE':
                     old_status = port.current_status
                     port.current_status = s.revert_action
-                    port.save(update_fields=['current_status', 'updated_at'])
+                    port.last_status_source = 'SCHEDULE'
+                    port.active_schedule = None
+                    port.last_modified_by = None
+                    port.save(update_fields=['current_status', 'last_status_source', 'active_schedule', 'last_modified_by', 'updated_at'])
 
                     s.current_state = 'INACTIVE'
                     s.last_run_at = now

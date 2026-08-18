@@ -96,8 +96,85 @@ class ProxyPort(models.Model):
         help_text="Redireciona acessos negados para o portal educacional com lista de links permitidos"
     )
 
+    # Rastreamento de quem/o que alterou o status da sala (Usuário ou Agendamento)
+    last_status_source = models.CharField(max_length=50, default='MANUAL', verbose_name="Origem da Última Alteração") # 'MANUAL' ou 'SCHEDULE'
+    last_modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='ports_modified', verbose_name="Último Usuário a Modificar")
+    active_schedule = models.ForeignKey('RoomSchedule', on_delete=models.SET_NULL, null=True, blank=True, related_name='active_on_ports', verbose_name="Agendamento em Vigor")
+
     def __str__(self):
         return f"{self.name} (Porta {self.port_number})"
+
+    @property
+    def status_source_info(self):
+        """
+        Retorna informações formatadas sobre quem/o que definiu o status atual da sala.
+        """
+        now = timezone.localtime(timezone.now())
+
+        # 1. Se estiver sob efeito de um agendamento ativo
+        if self.last_status_source == 'SCHEDULE' and self.active_schedule and self.active_schedule.is_in_effect_now(now):
+            end_t = self.active_schedule.end_time.strftime('%H:%M')
+            if self.current_status == 'ALLOWED':
+                return {
+                    'type': 'SCHEDULE',
+                    'title': 'Liberado por agendamento',
+                    'detail': f"Agendamento '{self.active_schedule.name}' (bloqueia às {end_t})",
+                    'short': f"Agendamento (até {end_t})",
+                    'badge_class': 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30',
+                    'icon': 'fa-solid fa-calendar-check text-cyan-400',
+                    'end_time': end_t
+                }
+            elif self.current_status == 'BLOCKED':
+                return {
+                    'type': 'SCHEDULE',
+                    'title': 'Bloqueado por agendamento',
+                    'detail': f"Agendamento '{self.active_schedule.name}' (até às {end_t})",
+                    'short': f"Agendamento (até {end_t})",
+                    'badge_class': 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
+                    'icon': 'fa-solid fa-calendar-xmark text-rose-400',
+                    'end_time': end_t
+                }
+            else:
+                return {
+                    'type': 'SCHEDULE',
+                    'title': f"{self.get_current_status_display()} por agendamento",
+                    'detail': f"Agendamento '{self.active_schedule.name}' (até às {end_t})",
+                    'short': f"Agendamento (até {end_t})",
+                    'badge_class': 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
+                    'icon': 'fa-solid fa-calendar-days text-indigo-400',
+                    'end_time': end_t
+                }
+
+        # 2. Se foi alterado por usuário manualmente
+        if self.last_modified_by:
+            user_name = self.last_modified_by.first_name or self.last_modified_by.username
+            if self.current_status == 'ALLOWED':
+                action_word = "Liberado"
+            elif self.current_status == 'BLOCKED':
+                action_word = "Bloqueado"
+            else:
+                action_word = "Alterado"
+
+            return {
+                'type': 'MANUAL',
+                'title': f"{action_word} por {user_name}",
+                'detail': f"{action_word} manualmente pelo usuário {user_name}",
+                'short': f"Usuário: {user_name}",
+                'badge_class': 'bg-slate-800 text-slate-300 border border-slate-700',
+                'icon': 'fa-solid fa-user-gear text-slate-400',
+                'end_time': ''
+            }
+
+        # 3. Padrão do sistema
+        return {
+            'type': 'DEFAULT',
+            'title': 'Padrão do Sistema',
+            'detail': 'Configuração padrão do sistema',
+            'short': 'Padrão',
+            'badge_class': 'bg-slate-800/60 text-slate-400 border border-slate-700/60',
+            'icon': 'fa-solid fa-server text-slate-500',
+            'end_time': ''
+        }
 
     def save(self, *args, **kwargs):
         if not self.slug:

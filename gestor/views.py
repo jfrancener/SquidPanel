@@ -87,6 +87,9 @@ def gestor_set_port_mode_api(request, port_id):
         return JsonResponse({'success': False, 'error': f'Modo inválido. Opções válidas: {", ".join(valid_modes)}'}, status=400)
 
     port.current_status = new_mode
+    port.last_status_source = 'MANUAL'
+    port.last_modified_by = request.user
+    port.active_schedule = None
     port.save()
 
     # Aplica imediatamente no Squid
@@ -105,6 +108,7 @@ def gestor_set_port_mode_api(request, port_id):
         'port_name': port.name,
         'new_mode': new_mode,
         'mode_label': mode_labels.get(new_mode, new_mode),
+        'status_source_info': port.status_source_info,
         'squid_synced': ok,
         'message': f"Modo da sala '{port.name}' alterado para {mode_labels.get(new_mode, new_mode)} e aplicado no Squid com sucesso!"
     })

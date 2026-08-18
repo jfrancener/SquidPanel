@@ -357,7 +357,13 @@ def port_toggle_status_view(request, port_id):
     new_status = request.POST.get('status') or request.GET.get('status')
     if new_status in ['ALLOWED', 'BLACKLIST', 'WHITELIST', 'BLOCKED']:
         port.current_status = new_status
+        port.last_status_source = 'MANUAL'
+        port.last_modified_by = request.user
+        port.active_schedule = None
         port.save()
+
+        # Aplica alterações no Squid
+        apply_squid_changes()
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
@@ -366,7 +372,8 @@ def port_toggle_status_view(request, port_id):
                 'port_number': port.port_number,
                 'port_name': port.name,
                 'new_status': port.current_status,
-                'status_display': port.get_current_status_display()
+                'status_display': port.get_current_status_display(),
+                'status_source_info': port.status_source_info
             })
 
         messages.success(request, f"Status da sala '{port.name}' (Porta {port.port_number}) alterado para {port.get_current_status_display()}.")
