@@ -1,10 +1,17 @@
 db.sqlite3
 *.pyc
+**/__pycache__/
 __pycache__/
 venv/
 .env
 .vscode/
 *.log
+
+# Pastas locais de utilitários e scripts operacionais
+scratch/
+scripts/
+
+# Scripts raiz de deploy e teste
 deploy_vps.py
 deploy_finish.py
 setup_services.py
@@ -12,3 +19,4 @@ check_*.py
 setup_git_vps*.py
 configure_ssh_vps.py
 test_ssh443.py
+
