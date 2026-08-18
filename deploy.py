@@ -98,16 +98,35 @@ def trigger_server_deploy():
                 
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode('utf-8', errors='ignore')
-        print(f"\n[!] Erro HTTP {e.code} ao conectar no servidor: {err_msg}")
-        return False
+        print(f"\n[!] Endpoint HTTP retornou codigo {e.code}.")
+        print("[*] Acionando deploy alternativo via SSH...")
+        try:
+            from deploy_ssh import load_config, execute_remote_ssh
+            cfg = load_config()
+            return execute_remote_ssh(cfg)
+        except Exception as ssh_err:
+            print(f"[!] Erro no fallback SSH: {ssh_err}")
+            return False
     except Exception as e:
-        print(f"\n[!] Falha na conexao com o servidor de producao: {e}")
-        print("[i] Dica: Verifique se o servidor 10.40.88.5 esta acessivel na rede.")
-        return False
+        print(f"\n[!] Falha na conexao HTTP com o servidor de producao: {e}")
+        print("[*] Tentando conexao direta via SSH...")
+        try:
+            from deploy_ssh import load_config, execute_remote_ssh
+            cfg = load_config()
+            return execute_remote_ssh(cfg)
+        except Exception as ssh_err:
+            print(f"[!] Erro no fallback SSH: {ssh_err}")
+            return False
 
 
 def main():
     print_banner()
+    if '--ssh' in sys.argv:
+        sys.argv.remove('--ssh')
+        import deploy_ssh
+        deploy_ssh.main()
+        return
+
     commit_msg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else None
     
     try:
@@ -115,7 +134,7 @@ def main():
         success = trigger_server_deploy()
         sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"\n💥 Erro inesperado durante o deploy: {e}")
+        print(f"\n[!] Erro inesperado durante o deploy: {e}")
         sys.exit(1)
 
 
