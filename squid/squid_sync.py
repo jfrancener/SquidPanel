@@ -175,6 +175,12 @@ def generate_squid_config_and_lists():
         mandatory_domains.add(server_ip)
     mandatory_domains.add('localhost')
     mandatory_domains.add('127.0.0.1')
+    
+    # Domínios essenciais do Governo de SC / CIASC sempre permitidos em todas as salas
+    mandatory_domains.add('.sc.gov.br')
+    mandatory_domains.add('.ciasc.sc.gov.br')
+    mandatory_domains.add('apim.ciasc.sc.gov.br')
+    mandatory_domains.add('keycloak-prod.prod.okd4.ciasc.sc.gov.br')
 
     mandatory_lists = ProxyList.objects.filter(list_type='WHITELIST', is_mandatory=True, is_active=True)
     for ml in mandatory_lists:
@@ -291,12 +297,23 @@ def generate_squid_config_and_lists():
         conf_lines.append(f"http_port {p.port_number} name=port_{p.port_number}")
     conf_lines.append("")
 
-    # ACLs Básicas de Rede e Segurança
+    # ACLs Básicas de Rede e Segurança (Suporte permanente a HTTPS padrão e portas customizadas como CIASC/Governo/APIs)
     conf_lines.append("# --- ACLs Padroes de Seguranca ---")
     conf_lines.append("acl SSL_ports port 443")
+    conf_lines.append("acl SSL_ports port 8243         # CIASC / SC Gov WSO2 APIM HTTPS")
+    conf_lines.append("acl SSL_ports port 8280         # CIASC / SC Gov WSO2 APIM HTTP")
+    conf_lines.append("acl SSL_ports port 8443         # Alternate HTTPS / Tomcat")
+    conf_lines.append("acl SSL_ports port 9443         # WSO2 / Management HTTPS")
+    conf_lines.append("acl SSL_ports port 8080         # Alternate HTTP / Web")
+    conf_lines.append("acl SSL_ports port 1025-65535  # Portas altas e servicos dinamicos SSL/TLS")
     conf_lines.append("acl Safe_ports port 80          # http")
     conf_lines.append("acl Safe_ports port 21          # ftp")
     conf_lines.append("acl Safe_ports port 443         # https")
+    conf_lines.append("acl Safe_ports port 8243        # CIASC APIM")
+    conf_lines.append("acl Safe_ports port 8280        # CIASC APIM HTTP")
+    conf_lines.append("acl Safe_ports port 8443        # Alternate HTTPS")
+    conf_lines.append("acl Safe_ports port 9443        # Alternate HTTPS")
+    conf_lines.append("acl Safe_ports port 8080        # Alternate HTTP")
     conf_lines.append("acl Safe_ports port 1025-65535  # portas altas")
     conf_lines.append("acl CONNECT method CONNECT\n")
 
