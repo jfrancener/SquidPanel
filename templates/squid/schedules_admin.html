@@ -168,7 +168,21 @@
 
             <div class="flex items-center gap-1.5">
                 <!-- Botão Editar -->
-                <button onclick='openEditModal({{ s.id }}, {{ s|safe|default:"{}" }})' data-schedule='{"id": {{ s.id }}, "name": "{{ s.name|escapejs }}", "port_id": {{ s.port_id }}, "schedule_type": "{{ s.schedule_type }}", "specific_date": "{{ s.specific_date|date:"Y-m-d"|default:"" }}", "days_of_week": "{{ s.days_of_week }}", "start_time": "{{ s.start_time|time:"H:i" }}", "end_time": "{{ s.end_time|time:"H:i" }}", "action": "{{ s.action }}", "revert_action": "{{ s.revert_action }}", "is_enabled": {{ s.is_enabled|yesno:"true,false" }}}' class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all text-xs" title="Editar agendamento">
+                <button 
+                    onclick="openEditModal(this)"
+                    data-id="{{ s.id }}"
+                    data-name="{{ s.name|escape }}"
+                    data-port="{{ s.port_id }}"
+                    data-type="{{ s.schedule_type }}"
+                    data-date="{{ s.specific_date|date:'Y-m-d'|default:'' }}"
+                    data-days="{{ s.days_of_week }}"
+                    data-start="{{ s.start_time|time:'H:i' }}"
+                    data-end="{{ s.end_time|time:'H:i' }}"
+                    data-action="{{ s.action }}"
+                    data-revert="{{ s.revert_action }}"
+                    data-enabled="{{ s.is_enabled|yesno:'true,false' }}"
+                    class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all text-xs" 
+                    title="Editar agendamento">
                     <i class="fa-solid fa-pen-to-square"></i>
                 </button>
 
@@ -428,35 +442,37 @@ function openCreateModal() {
     modal.classList.add('flex');
 }
 
-function openEditModal(schedId, schedData) {
-    const btn = document.querySelector(`button[data-schedule*='"id": ${schedId}']`) || document.querySelector(`button[data-schedule*='"id":${schedId}']`);
-    let data = schedData;
-    if (btn && btn.dataset.schedule) {
-        try {
-            data = JSON.parse(btn.dataset.schedule);
-        } catch(e){}
-    }
-
-    if (!data || !data.id) return;
+function openEditModal(btn) {
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const name = btn.dataset.name || '';
+    const portId = btn.dataset.port || '';
+    const schedType = btn.dataset.type || 'RECURRENT';
+    const specificDate = btn.dataset.date || '';
+    const daysOfWeek = btn.dataset.days || '';
+    const startTime = btn.dataset.start || '08:00';
+    const endTime = btn.dataset.end || '12:00';
+    const action = btn.dataset.action || 'ALLOWED';
+    const revertAction = btn.dataset.revert || 'BLOCKED';
+    const isEnabled = btn.dataset.enabled === 'true';
 
     document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-cyan-400"></i> Editar Agendamento`;
-    document.getElementById('schedule-form').action = `/proxy/schedules/${data.id}/edit/`;
-    document.getElementById('sched-name').value = data.name || '';
-    document.getElementById('sched-port').value = data.port_id || '';
-    document.getElementById('sched-date').value = data.specific_date || '';
-    document.getElementById('sched-start').value = data.start_time || '08:00';
-    document.getElementById('sched-end').value = data.end_time || '12:00';
-    document.getElementById('sched-action').value = data.action || 'ALLOWED';
-    document.getElementById('sched-revert').value = data.revert_action || 'BLOCKED';
-    document.getElementById('sched-enabled').checked = data.is_enabled !== false;
+    document.getElementById('schedule-form').action = `/proxy/schedules/${id}/edit/`;
+    document.getElementById('sched-name').value = name;
+    document.getElementById('sched-port').value = portId;
+    document.getElementById('sched-date').value = specificDate;
+    document.getElementById('sched-start').value = startTime;
+    document.getElementById('sched-end').value = endTime;
+    document.getElementById('sched-action').value = action;
+    document.getElementById('sched-revert').value = revertAction;
+    document.getElementById('sched-enabled').checked = isEnabled;
 
-    const schedType = data.schedule_type || 'RECURRENT';
     const typeRadio = document.querySelector(`input[name="schedule_type"][value="${schedType}"]`);
     if (typeRadio) typeRadio.checked = true;
     toggleScheduleType(schedType);
 
     if (schedType === 'RECURRENT') {
-        const activeDays = (data.days_of_week || '').split(',').map(d => d.trim());
+        const activeDays = daysOfWeek.split(',').map(d => d.trim());
         document.querySelectorAll('input[name="days_of_week"]').forEach(cb => {
             cb.checked = activeDays.includes(cb.value);
         });
