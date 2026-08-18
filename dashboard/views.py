@@ -408,14 +408,23 @@ def auto_deploy_api_view(request):
     })
 
 
-@login_required
+@csrf_exempt
 def check_system_update_api_view(request):
     """
     Verifica de forma assíncrona se existem novos commits no repositório remoto (Git).
     Retorna se há atualização pendente e a quantidade de commits a aplicar.
     """
-    profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    if not profile.is_admin:
+    expected_token = SystemSetting.get_value('deploy_token', 'squidpanel-deploy-secret-2026')
+    token = (
+        request.headers.get('X-Deploy-Token') or
+        request.META.get('HTTP_X_DEPLOY_TOKEN') or
+        request.GET.get('token') or
+        request.POST.get('token')
+    )
+
+    is_authenticated_admin = request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.is_admin
+
+    if not is_authenticated_admin and (not token or token != expected_token):
         return JsonResponse({'success': False, 'error': 'Acesso restrito.'}, status=403)
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
