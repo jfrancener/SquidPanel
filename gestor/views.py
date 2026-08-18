@@ -96,10 +96,10 @@ def gestor_set_port_mode_api(request, port_id):
     ok, msg = apply_squid_changes()
 
     mode_labels = {
-        'ALLOWED': 'Livre (Acesso Total)',
-        'BLOCKED': 'Bloqueado',
-        'WHITELIST': 'Whitelist (Apenas Permitidos)',
-        'BLACKLIST': 'Blacklist (Livre com Restrições)',
+        'ALLOWED': 'Livre',
+        'BLACKLIST': 'Livre',
+        'WHITELIST': 'Somente Liberados',
+        'BLOCKED': 'Bloqueio Total',
     }
 
     return JsonResponse({

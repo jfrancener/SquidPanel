@@ -136,14 +136,12 @@
                 <div class="flex items-center justify-between text-slate-300">
                     <span class="text-slate-400">Modo no Horário:</span>
                     <span>
-                        {% if s.action == 'ALLOWED' %}
+                        {% if s.action == 'ALLOWED' or s.action == 'BLACKLIST' %}
                         <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-globe text-[10px] mr-1"></i>Livre</span>
                         {% elif s.action == 'WHITELIST' %}
-                        <span class="text-indigo-400 font-semibold"><i class="fa-solid fa-shield-halved text-[10px] mr-1"></i>Whitelist</span>
-                        {% elif s.action == 'BLACKLIST' %}
-                        <span class="text-amber-400 font-semibold"><i class="fa-solid fa-ban text-[10px] mr-1"></i>Blacklist</span>
+                        <span class="text-indigo-400 font-semibold"><i class="fa-solid fa-shield-halved text-[10px] mr-1"></i>Somente Liberados</span>
                         {% else %}
-                        <span class="text-rose-400 font-semibold"><i class="fa-solid fa-lock text-[10px] mr-1"></i>Bloqueado</span>
+                        <span class="text-rose-400 font-semibold"><i class="fa-solid fa-lock text-[10px] mr-1"></i>Bloqueio Total</span>
                         {% endif %}
                     </span>
                 </div>
@@ -151,8 +149,14 @@
                 <!-- Ação após término -->
                 <div class="flex items-center justify-between text-slate-300">
                     <span class="text-slate-400">Após Término:</span>
-                    <span class="text-slate-400 font-medium">
-                        {{ s.get_revert_action_display }}
+                    <span>
+                        {% if s.revert_action == 'BLOCKED' %}
+                        <span class="text-rose-400 font-medium">Bloqueio Total</span>
+                        {% elif s.revert_action == 'WHITELIST' %}
+                        <span class="text-indigo-400 font-medium">Somente Liberados</span>
+                        {% else %}
+                        <span class="text-emerald-400 font-medium">Livre</span>
+                        {% endif %}
                     </span>
                 </div>
             </div>
@@ -349,10 +353,9 @@
                         Modo no Horário
                     </label>
                     <select id="sched-action" name="action" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold">
-                        <option value="ALLOWED" class="text-emerald-400">🟢 Livre (Acesso Total)</option>
-                        <option value="WHITELIST" class="text-indigo-400">🔵 Whitelist (Permitidos)</option>
-                        <option value="BLACKLIST" class="text-amber-400">🟡 Blacklist (Com Restrições)</option>
-                        <option value="BLOCKED" class="text-rose-400">🔴 Bloqueado Total</option>
+                        <option value="BLACKLIST" class="text-emerald-400">🟢 Livre</option>
+                        <option value="WHITELIST" class="text-indigo-400">🔵 Somente Liberados</option>
+                        <option value="BLOCKED" class="text-rose-400">🔴 Bloqueio Total</option>
                     </select>
                 </div>
                 <div>
@@ -360,10 +363,9 @@
                         Após Término
                     </label>
                     <select id="sched-revert" name="revert_action" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold">
-                        <option value="BLOCKED" class="text-rose-400">🔴 Bloquear Sala</option>
-                        <option value="WHITELIST" class="text-indigo-400">🔵 Voltar para Whitelist</option>
-                        <option value="BLACKLIST" class="text-amber-400">🟡 Voltar para Blacklist</option>
-                        <option value="ALLOWED" class="text-emerald-400">🟢 Manter Livre</option>
+                        <option value="BLOCKED" class="text-rose-400">🔴 Bloqueio Total</option>
+                        <option value="WHITELIST" class="text-indigo-400">🔵 Somente Liberados</option>
+                        <option value="BLACKLIST" class="text-emerald-400">🟢 Livre</option>
                     </select>
                 </div>
             </div>
@@ -429,7 +431,7 @@ function openCreateModal() {
     document.getElementById('sched-date').value = '';
     document.getElementById('sched-start').value = '08:00';
     document.getElementById('sched-end').value = '12:00';
-    document.getElementById('sched-action').value = 'ALLOWED';
+    document.getElementById('sched-action').value = 'BLACKLIST';
     document.getElementById('sched-revert').value = 'BLOCKED';
     document.getElementById('sched-enabled').checked = true;
 

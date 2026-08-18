@@ -114,7 +114,7 @@ class ProxyPort(models.Model):
         # 1. Se estiver sob efeito de um agendamento ativo
         if self.last_status_source == 'SCHEDULE' and self.active_schedule and self.active_schedule.is_in_effect_now(now):
             end_t = self.active_schedule.end_time.strftime('%H:%M')
-            if self.current_status == 'ALLOWED':
+            if self.current_status in ['ALLOWED', 'BLACKLIST']:
                 return {
                     'type': 'SCHEDULE',
                     'title': 'Liberado por agendamento',
@@ -127,7 +127,7 @@ class ProxyPort(models.Model):
             elif self.current_status == 'BLOCKED':
                 return {
                     'type': 'SCHEDULE',
-                    'title': 'Bloqueado por agendamento',
+                    'title': 'Bloqueio Total por agendamento',
                     'detail': f"Agendamento '{self.active_schedule.name}' (até às {end_t})",
                     'short': f"Agendamento (até {end_t})",
                     'badge_class': 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
@@ -137,7 +137,7 @@ class ProxyPort(models.Model):
             else:
                 return {
                     'type': 'SCHEDULE',
-                    'title': f"{self.get_current_status_display()} por agendamento",
+                    'title': 'Somente Liberados por agendamento',
                     'detail': f"Agendamento '{self.active_schedule.name}' (até às {end_t})",
                     'short': f"Agendamento (até {end_t})",
                     'badge_class': 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
@@ -148,12 +148,12 @@ class ProxyPort(models.Model):
         # 2. Se foi alterado por usuário manualmente
         if self.last_modified_by:
             user_name = self.last_modified_by.first_name or self.last_modified_by.username
-            if self.current_status == 'ALLOWED':
+            if self.current_status in ['ALLOWED', 'BLACKLIST']:
                 action_word = "Liberado"
             elif self.current_status == 'BLOCKED':
-                action_word = "Bloqueado"
+                action_word = "Bloqueio Total"
             else:
-                action_word = "Alterado"
+                action_word = "Somente Liberados"
 
             return {
                 'type': 'MANUAL',
@@ -207,12 +207,12 @@ class ProxyPort(models.Model):
 
         action_map = {
             'ALLOWED': 'Livre',
-            'WHITELIST': 'Whitelist',
-            'BLACKLIST': 'Blacklist',
-            'BLOCKED': 'Bloqueado'
+            'BLACKLIST': 'Livre',
+            'WHITELIST': 'Somente Liberados',
+            'BLOCKED': 'Bloqueio Total'
         }
         act_label = action_map.get(target.action, target.action)
-        rev_label = action_map.get(target.revert_action, 'Bloqueado')
+        rev_label = action_map.get(target.revert_action, 'Bloqueio Total')
 
         return {
             'has_schedule': True,
