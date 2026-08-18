@@ -1828,6 +1828,8 @@ def portal_toggle_port_view(request, port_id):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'success': True, 'use_custom_portal': port.use_custom_portal, 'port_number': port.port_number})
 
+    return redirect('portal_links_admin')
+
 # ==========================================
 # 11. GESTÃO ADMINISTRATIVA DE AGENDAMENTOS (SCHEDULER)
 # ==========================================
