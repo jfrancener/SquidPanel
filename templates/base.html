@@ -126,6 +126,14 @@
                         <i class="fa-solid fa-ban w-4 text-center text-sm {% if active_menu == 'blacklists' %}text-rose-400{% else %}text-slate-500{% endif %}"></i>
                         <span>Blacklists</span>
                     </a>
+                    <a href="{% url 'portal_links_admin' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all {% if active_menu == 'portal_links' %}bg-indigo-600/20 text-amber-300 border border-amber-500/30 font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+                        <i class="fa-solid fa-compass w-4 text-center text-sm {% if active_menu == 'portal_links' %}text-amber-400{% else %}text-slate-500{% endif %}"></i>
+                        <span>Portal de Links</span>
+                    </a>
+                    <a href="{% url 'proxy_tester' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all {% if active_menu == 'tester' %}bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+                        <i class="fa-solid fa-vial-circle-check w-4 text-center text-sm {% if active_menu == 'tester' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
+                        <span>Testador de Políticas</span>
+                    </a>
                 </nav>
             </div>
             {% endif %}

@@ -14,6 +14,7 @@ urlpatterns = [
     path('ports/<int:port_id>/edit/', views.port_edit_view, name='port_edit'),
     path('ports/<int:port_id>/delete/', views.port_delete_view, name='port_delete'),
     path('ports/<int:port_id>/toggle-status/', views.port_toggle_status_view, name='port_toggle_status'),
+    path('ports/<int:port_id>/lists/', views.port_lists_view, name='port_lists'),
 
     # Logs de Acesso & Monitor em Tempo Real
     path('logs/', views.logs_view, name='logs'),
@@ -22,6 +23,14 @@ urlpatterns = [
     path('logs/cleanup/', views.logs_cleanup_view, name='logs_cleanup'),
     path('devices/save/', views.device_save_view, name='device_save'),
     path('devices/sync-ad/', views.sync_ad_devices_view, name='sync_ad_devices'),
+
+    # Domínios Ocultos no Live Stream
+    path('logs/hidden-domains/add/', views.hidden_domain_add_view, name='hidden_domain_add'),
+    path('logs/hidden-domains/<int:hidden_id>/delete/', views.hidden_domain_delete_view, name='hidden_domain_delete'),
+    path('logs/hidden-domains/list-json/', views.hidden_domain_list_json_view, name='hidden_domain_list_json'),
+
+    # Testador de Políticas e Navegação
+    path('tester/', views.proxy_tester_view, name='proxy_tester'),
 
     # Controle & Sincronização do Serviço Squid
     path('service/apply/', views.squid_apply_view, name='squid_apply'),
@@ -43,6 +52,14 @@ urlpatterns = [
 
     # Download do Certificado Raiz SSL (Público)
     path('certificate/download/', views.download_certificate_view, name='download_certificate'),
+
+    # Portal Educacional / Página de Bloqueio Personalizada
+    path('portal/<int:port_number>/', views.portal_view, name='portal'),
+    path('portal-links/', views.portal_links_admin_view, name='portal_links_admin'),
+    path('portal-links/create/', views.portal_link_create_view, name='portal_link_create'),
+    path('portal-links/<int:link_id>/edit/', views.portal_link_edit_view, name='portal_link_edit'),
+    path('portal-links/<int:link_id>/delete/', views.portal_link_delete_view, name='portal_link_delete'),
+    path('portal-links/ports/<int:port_id>/toggle-portal/', views.portal_toggle_port_view, name='portal_toggle_port'),
 
     # Scripts PAC / WPAD (Proxy Auto-Configuration)
     path('pac/<int:port_number>.pac', views.pac_by_port_view, name='pac_by_port'),

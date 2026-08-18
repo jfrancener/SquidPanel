@@ -1,0 +1,489 @@
+{% extends 'base.html' %}
+
+{% block title %}Portal de Links & Páginas de Bloqueio | SquidPanel{% endblock %}
+
+{% block content %}
+<div class="space-y-8 animate-fadeIn">
+
+    <!-- Header da Página -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-compass text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-tight">
+                        Portal de Links & Páginas de Bloqueio
+                    </h1>
+                    <p class="text-xs text-slate-400">
+                        Configure a página personalizada de erro/estudo exibida aos usuários quando uma URL for bloqueada em portas específicas (ex: 9030 • Sala EAD).
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button 
+                onclick="openNewLinkModal()"
+                class="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-500/25 transition-all"
+            >
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Novo Link Autorizado</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- SEÇÃO 1: STATUS DO PORTAL POR SALA / PORTA -->
+    <div class="bg-[#141726] border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/60 pb-3">
+            <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-door-open text-indigo-400"></i>
+                    <span>Ativação do Portal Educacional por Sala / Porta</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Portas ativadas redirecionam bloqueios para a página de estudos com links permitidos. Portas desativadas exibem o erro nativo padrão do Squid.
+                </p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
+            {% for p in ports %}
+            <div class="p-4 rounded-xl border {% if p.use_custom_portal %}bg-indigo-950/30 border-indigo-500/40 shadow-md shadow-indigo-950/20{% else %}bg-slate-900/40 border-slate-800/80{% endif %} flex flex-col justify-between transition-all">
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">
+                                {{ p.port_number }}
+                            </span>
+                            <span class="text-xs font-bold text-white truncate max-w-[130px]" title="{{ p.name }}">
+                                {{ p.name }}
+                            </span>
+                        </div>
+                        <span class="text-[10px] text-slate-400">
+                            {{ p.group.name }}
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs pt-1">
+                        <span class="text-[11px] text-slate-400">Página de Bloqueio:</span>
+                        {% if p.use_custom_portal %}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                            <i class="fa-solid fa-check text-[9px]"></i> Portal Ativo
+                        </span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                            Erro Padrão
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between gap-2">
+                    <a 
+                        href="{% url 'portal' port_number=p.port_number %}" 
+                        target="_blank"
+                        class="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition-colors"
+                        title="Abrir pré-visualização do portal desta porta"
+                    >
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Pré-visualizar
+                    </a>
+
+                    <a 
+                        href="{% url 'portal_toggle_port' port_id=p.id %}" 
+                        class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all {% if p.use_custom_portal %}bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30{% else %}bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30{% endif %}"
+                    >
+                        {% if p.use_custom_portal %}Desativar{% else %}Ativar Portal{% endif %}
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- SEÇÃO 2: CATÁLOGO DE LINKS AUTORIZADOS -->
+    <div class="bg-[#141726] border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-5">
+        
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-amber-400"></i>
+                    <span>Links e Recursos Cadastrados no Portal</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-normal">
+                        {{ links|length }} cadastrados
+                    </span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Estes links aparecem organizados por categoria na tela de erro/portal para os alunos.
+                </p>
+            </div>
+
+            <!-- Filtros de Busca -->
+            <form method="GET" class="flex flex-wrap items-center gap-2.5">
+                <select 
+                    name="category" 
+                    onchange="this.form.submit()" 
+                    class="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
+                >
+                    <option value="">Todas as Categorias</option>
+                    {% for cat_val, cat_label in categories_choices %}
+                    <option value="{{ cat_val }}" {% if category_filter == cat_val %}selected{% endif %}>{{ cat_label }}</option>
+                    {% endfor %}
+                </select>
+
+                <select 
+                    name="port" 
+                    onchange="this.form.submit()" 
+                    class="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
+                >
+                    <option value="">Todas as Portas</option>
+                    {% for p in ports %}
+                    <option value="{{ p.id }}" {% if port_filter == p.id|stringformat:"i" %}selected{% endif %}>{{ p.port_number }} - {{ p.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        name="q" 
+                        value="{{ query }}" 
+                        placeholder="Buscar link ou site..." 
+                        class="bg-slate-900 border border-slate-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    >
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-500 text-xs"></i>
+                </div>
+
+                {% if query or category_filter or port_filter %}
+                <a href="{% url 'portal_links_admin' %}" class="px-2.5 py-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs transition-colors" title="Limpar Filtros">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- Tabela de Links -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-900/80 text-slate-400 font-semibold border-b border-slate-800">
+                    <tr>
+                        <th class="py-3 px-4">Site / Título</th>
+                        <th class="py-3 px-4">URL</th>
+                        <th class="py-3 px-4">Categoria</th>
+                        <th class="py-3 px-4">Destino / Sala</th>
+                        <th class="py-3 px-4 text-center">Ordem</th>
+                        <th class="py-3 px-4 text-center">Status</th>
+                        <th class="py-3 px-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 bg-[#121422]">
+                    {% for link in links %}
+                    <tr class="hover:bg-slate-800/30 transition-colors group">
+                        <td class="py-3.5 px-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-xl bg-slate-800 text-amber-400 flex items-center justify-center text-sm border border-slate-700 flex-shrink-0">
+                                    <i class="fa-solid {{ link.icon|default:'fa-globe' }}"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-white group-hover:text-amber-300 transition-colors truncate max-w-[200px]">
+                                        {{ link.title }}
+                                    </div>
+                                    {% if link.description %}
+                                    <div class="text-[11px] text-slate-400 truncate max-w-[260px]">
+                                        {{ link.description }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="py-3.5 px-4">
+                            <a href="{{ link.url }}" target="_blank" class="font-mono text-cyan-400 hover:underline flex items-center gap-1.5 truncate max-w-[220px]">
+                                <span>{{ link.url }}</span>
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-500"></i>
+                            </a>
+                        </td>
+
+                        <td class="py-3.5 px-4">
+                            <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                {{ link.get_category_display }}
+                            </span>
+                        </td>
+
+                        <td class="py-3.5 px-4">
+                            {% if link.port %}
+                            <span class="font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700 text-[11px]">
+                                Porta {{ link.port.port_number }} ({{ link.port.name }})
+                            </span>
+                            {% else %}
+                            <span class="text-slate-400 text-[11px]">Todas as Salas</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="py-3.5 px-4 text-center font-mono text-slate-400">
+                            {{ link.display_order }}
+                        </td>
+
+                        <td class="py-3.5 px-4 text-center">
+                            {% if link.is_active %}
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" title="Ativo"></span>
+                            {% else %}
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-600 inline-block" title="Inativo"></span>
+                            {% endif %}
+                        </td>
+
+                        <td class="py-3.5 px-4 text-right">
+                            <div class="flex items-center justify-end gap-1.5">
+                                <button 
+                                    onclick="openEditLinkModal({{ link.id }}, '{{ link.title|escapejs }}', '{{ link.url|escapejs }}', '{{ link.category }}', '{{ link.description|escapejs }}', '{{ link.icon|escapejs }}', '{{ link.port_id|default:'' }}', '{{ link.display_order }}', {{ link.is_active|yesno:'true,false' }})"
+                                    class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all"
+                                    title="Editar Link"
+                                >
+                                    <i class="fa-solid fa-pen text-[10px]"></i>
+                                </button>
+
+                                <a 
+                                    href="{% url 'portal_link_delete' link_id=link.id %}" 
+                                    onclick="return confirm('Deseja realmente remover o link \'{{ link.title|escapejs }}\' do Portal?');"
+                                    class="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center transition-all"
+                                    title="Excluir Link"
+                                >
+                                    <i class="fa-solid fa-trash text-[10px]"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-10 text-slate-500">
+                            <i class="fa-solid fa-circle-info text-2xl mb-2"></i>
+                            <p>Nenhum link cadastrado no portal.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: NOVO LINK DO PORTAL -->
+<!-- ========================================== -->
+<div id="new-link-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#16192b] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
+        
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm border border-amber-500/30">
+                    <i class="fa-solid fa-plus"></i>
+                </div>
+                <h3 class="text-base font-bold text-white">Novo Link Autorizado</h3>
+            </div>
+            <button onclick="closeNewLinkModal()" class="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-xs">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="{% url 'portal_link_create' %}" class="p-5 space-y-4 text-xs">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Título / Nome do Site *</label>
+                <input type="text" name="title" required placeholder="Ex: Portal EAD UNIFACVEST" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
+            </div>
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Endereço URL *</label>
+                <input type="text" name="url" required placeholder="Ex: https://ead.unifacvest.edu.br" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 font-mono text-xs focus:outline-none focus:border-amber-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Categoria *</label>
+                    <select name="category" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-amber-500">
+                        {% for cat_val, cat_label in categories_choices %}
+                        <option value="{{ cat_val }}">{{ cat_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Ícone (FontAwesome)</label>
+                    <select name="icon" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-amber-500">
+                        <option value="fa-graduation-cap">🎓 Formatura / Acadêmico</option>
+                        <option value="fa-university">🏛️ Universidade / Faculdade</option>
+                        <option value="fa-book-bookmark">📚 Livro / Biblioteca</option>
+                        <option value="fa-magnifying-glass">🔍 Pesquisa / Busca</option>
+                        <option value="fa-spell-check">📖 Dicionário / Gramática</option>
+                        <option value="fa-toolbox">🛠️ Ferramenta / Utilidade</option>
+                        <option value="fa-globe">🌐 Web / Geral</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Descrição Curta</label>
+                <input type="text" name="description" placeholder="Ex: Ambiente Virtual de Aprendizagem e Aulas Online" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Porta / Sala Específica</label>
+                    <select name="port_id" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-amber-500">
+                        <option value="">Todas as Salas com Portal</option>
+                        {% for p in ports %}
+                        <option value="{{ p.id }}">{{ p.port_number }} - {{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Ordem de Exibição</label>
+                    <input type="number" name="display_order" value="0" min="0" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500">
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeNewLinkModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-amber-500/25">
+                    Salvar Link
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: EDITAR LINK DO PORTAL -->
+<!-- ========================================== -->
+<div id="edit-link-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#16192b] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
+        
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm border border-indigo-500/30">
+                    <i class="fa-solid fa-pen"></i>
+                </div>
+                <h3 class="text-base font-bold text-white">Editar Link do Portal</h3>
+            </div>
+            <button onclick="closeEditLinkModal()" class="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-xs">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="edit-link-form" method="POST" action="" class="p-5 space-y-4 text-xs">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Título / Nome do Site *</label>
+                <input type="text" id="edit-title" name="title" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Endereço URL *</label>
+                <input type="text" id="edit-url" name="url" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Categoria *</label>
+                    <select id="edit-category" name="category" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                        {% for cat_val, cat_label in categories_choices %}
+                        <option value="{{ cat_val }}">{{ cat_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Ícone (FontAwesome)</label>
+                    <select id="edit-icon" name="icon" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                        <option value="fa-graduation-cap">🎓 Formatura / Acadêmico</option>
+                        <option value="fa-university">🏛️ Universidade / Faculdade</option>
+                        <option value="fa-book-bookmark">📚 Livro / Biblioteca</option>
+                        <option value="fa-magnifying-glass">🔍 Pesquisa / Busca</option>
+                        <option value="fa-spell-check">📖 Dicionário / Gramática</option>
+                        <option value="fa-toolbox">🛠️ Ferramenta / Utilidade</option>
+                        <option value="fa-globe">🌐 Web / Geral</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Descrição Curta</label>
+                <input type="text" id="edit-description" name="description" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Porta / Sala Específica</label>
+                    <select id="edit-port-id" name="port_id" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                        <option value="">Todas as Salas com Portal</option>
+                        {% for p in ports %}
+                        <option value="{{ p.id }}">{{ p.port_number }} - {{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Ordem de Exibição</label>
+                    <input type="number" id="edit-display-order" name="display_order" value="0" min="0" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+                <input type="checkbox" id="edit-is-active" name="is_active" class="w-4 h-4 text-indigo-600 rounded bg-slate-900 border-slate-700 focus:ring-0">
+                <label for="edit-is-active" class="text-slate-300 font-semibold cursor-pointer">Link Ativo e Visível no Portal</label>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeEditLinkModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/25">
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openNewLinkModal() {
+    document.getElementById('new-link-modal').classList.remove('hidden');
+}
+
+function closeNewLinkModal() {
+    document.getElementById('new-link-modal').classList.add('hidden');
+}
+
+function openEditLinkModal(id, title, url, category, description, icon, portId, displayOrder, isActive) {
+    const form = document.getElementById('edit-link-form');
+    form.action = `/proxy/portal-links/${id}/edit/`;
+    
+    document.getElementById('edit-title').value = title;
+    document.getElementById('edit-url').value = url;
+    document.getElementById('edit-category').value = category;
+    document.getElementById('edit-description').value = description;
+    document.getElementById('edit-icon').value = icon || 'fa-graduation-cap';
+    document.getElementById('edit-port-id').value = portId || '';
+    document.getElementById('edit-display-order').value = displayOrder || 0;
+    document.getElementById('edit-is-active').checked = isActive;
+
+    document.getElementById('edit-link-modal').classList.remove('hidden');
+}
+
+function closeEditLinkModal() {
+    document.getElementById('edit-link-modal').classList.add('hidden');
+}
+</script>
+{% endblock %}

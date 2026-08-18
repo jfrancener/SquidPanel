@@ -399,7 +399,7 @@
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" id="live-indicator"></span>
-                    <span class="text-xs font-bold text-white uppercase tracking-wider">Console em Tempo Real</span>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">Live Stream</span>
                 </div>
 
                 <!-- Seletor de Sala / Porta para Live -->
@@ -413,19 +413,54 @@
                     </select>
                 </div>
 
+                <!-- Filtro por Status no Live (Botões Rápidos) -->
+                <div class="flex items-center gap-1 bg-[#0f121e] p-1 rounded-xl border border-slate-700">
+                    <button type="button" onclick="setLiveActionFilter('ALL')" id="btn-live-filter-all" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow">
+                        Todos
+                    </button>
+                    <button type="button" onclick="setLiveActionFilter('ALLOWED')" id="btn-live-filter-allowed" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-emerald-300 hover:bg-slate-800 flex items-center gap-1">
+                        <i class="fa-solid fa-check text-[10px] text-emerald-400"></i>
+                        <span>Liberados</span>
+                    </button>
+                    <button type="button" onclick="setLiveActionFilter('BLOCKED_PROXY')" id="btn-live-filter-proxy" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-slate-800 flex items-center gap-1">
+                        <i class="fa-solid fa-ban text-[10px] text-rose-400"></i>
+                        <span>Bloq. Proxy</span>
+                    </button>
+                    <button type="button" onclick="setLiveActionFilter('BLOCKED_DEST')" id="btn-live-filter-dest" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-amber-300 hover:bg-slate-800 flex items-center gap-1">
+                        <i class="fa-solid fa-triangle-exclamation text-[10px] text-amber-400"></i>
+                        <span>Bloq. Destino</span>
+                    </button>
+                    <button type="button" onclick="setLiveActionFilter('BLOCKED')" id="btn-live-filter-blocked" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-slate-800 flex items-center gap-1">
+                        <i class="fa-solid fa-shield-halved text-[10px] text-slate-400"></i>
+                        <span>Todos Bloq.</span>
+                    </button>
+                    <input type="hidden" id="live-action-select" value="ALL">
+                </div>
+
                 <!-- Filtro por Hostname / Equipamento no Live -->
                 <div class="flex items-center gap-2">
-                    <label class="text-xs text-slate-400 font-semibold flex items-center gap-1">
-                        <i class="fa-solid fa-desktop text-cyan-400 text-[11px]"></i> Hostname / IP:
-                    </label>
                     <div class="relative">
-                        <input type="text" id="live-hostname-input" oninput="debounceLiveReset()" placeholder="Filtrar por Hostname ou IP..." class="bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl pl-7 pr-7 py-2 focus:border-indigo-500 outline-none w-48 sm:w-60 font-mono placeholder-slate-500">
+                        <input type="text" id="live-hostname-input" oninput="debounceLiveReset()" placeholder="Filtrar por Hostname ou IP..." class="bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl pl-7 pr-7 py-2 focus:border-indigo-500 outline-none w-44 sm:w-56 font-mono placeholder-slate-500">
                         <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-[10px] text-slate-500"></i>
                         <button type="button" onclick="clearLiveHostnameFilter()" id="btn-clear-live-host" class="absolute right-2.5 top-2 text-slate-500 hover:text-white text-[11px] hidden">
                             <i class="fa-solid fa-circle-xmark"></i>
                         </button>
                     </div>
                 </div>
+
+                <!-- Toggle Ocultar Silenciados & Botão de Gerenciamento de Domínios Ocultos -->
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="toggleHideCdns()" id="btn-toggle-cdns" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25" title="Ocultar domínios silenciados (telemetria, ruído de rede e CDNs)">
+                        <i class="fa-solid fa-eye-slash text-emerald-400 text-[11px]" id="icon-cdns"></i>
+                        <span id="label-cdns">Ocultar Silenciados</span>
+                    </button>
+
+                    <button type="button" onclick="openHiddenDomainsModal()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-all border border-slate-700 flex items-center gap-1" title="Gerenciar Base de Domínios Silenciados">
+                        <i class="fa-solid fa-gear text-[10px] text-amber-400"></i>
+                        <span id="badge-hidden-count" class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">0</span>
+                    </button>
+                </div>
+
             </div>
 
             <!-- Botões de Controle do Live -->
@@ -437,7 +472,7 @@
 
                 <button type="button" onclick="clearLiveConsole()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700">
                     <i class="fa-solid fa-trash-can text-[10px] text-slate-400"></i>
-                    <span>Limpar Console</span>
+                    <span>Limpar</span>
                 </button>
             </div>
 
@@ -564,33 +599,76 @@
     </div>
 </div>
 
+<!-- MODAL: GERENCIAR BASE DE DOMÍNIOS OCULTOS -->
 <!-- ========================================== -->
-<!-- SCRIPTS DE INTERATIVIDADE & AUTO-SYNC -->
+<div id="modal-hidden-domains" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+        
+        <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <i class="fa-solid fa-eye-slash text-sm"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-white">Base de Domínios Ocultos no Live Stream</h3>
+                    <p class="text-[10px] text-slate-400">Domínios cadastrados aqui não poluem o console em tempo real quando o filtro estiver ativo.</p>
+                </div>
+            </div>
+            <button onclick="closeHiddenDomainsModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+            <!-- Formulário para Adicionar Novo Domínio Oculto -->
+            <form id="form-add-hidden-domain" onsubmit="submitAddHiddenDomain(event)" class="p-3.5 bg-[#0f121e] border border-slate-800 rounded-xl space-y-3">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                    <div class="sm:col-span-6">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Domínio a Ocultar:</label>
+                        <input type="text" id="input-new-hidden-domain" name="domain" required placeholder="ex: telemetry.microsoft.com, googleapis.com" class="w-full bg-[#16192b] border border-slate-700 text-white font-mono text-xs rounded-xl p-2.5 outline-none focus:border-amber-500">
+                    </div>
+                    <div class="sm:col-span-4">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Motivo (Opcional):</label>
+                        <input type="text" id="input-new-hidden-desc" name="description" placeholder="ex: Telemetria Windows" class="w-full bg-[#16192b] border border-slate-700 text-white text-xs rounded-xl p-2.5 outline-none focus:border-amber-500">
+                    </div>
+                    <div class="sm:col-span-2 flex items-end">
+                        <button type="submit" id="btn-add-hidden" class="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>Ocultar</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="hidden-domain-form-feedback" class="text-[11px]"></div>
+            </form>
+
+            <!-- Lista de Domínios Atualmente Ocultos -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between text-slate-400 text-[11px] font-semibold px-1">
+                    <span>Domínios Silenciados (<span id="hidden-domains-total-counter" class="font-mono text-amber-400">0</span>):</span>
+                </div>
+                <div id="hidden-domains-list-container" class="space-y-1.5 max-h-[300px] overflow-y-auto">
+                    <!-- Inserido dinamicamente via JS -->
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-800 flex justify-end bg-[#121422]">
+            <button type="button" onclick="closeHiddenDomainsModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold text-xs">
+                Fechar
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- SCRIPTS DE INTERATIVIDADE & MONITOR -->
 <!-- ========================================== -->
 <script>
-const whitelistsData = [
-    {% for wl in whitelists %}
-    { id: {{ wl.id }}, name: "{{ wl.name|escapejs }}", is_mandatory: {{ wl.is_mandatory|lower }} },
-    {% endfor %}
-];
-
-const blacklistsData = [
-    {% for bl in blacklists %}
-    { id: {{ bl.id }}, name: "{{ bl.name|escapejs }}" },
-    {% endfor %}
-];
-
-// ID mais recente na tabela inicial
-let maxTableLogId = {% if logs.object_list.0 %}{{ logs.object_list.0.id }}{% else %}0{% endif %};
-let isTableSyncActive = true;
-let tableSyncTimer = null;
-
-// Contadores globais
-let totalFilteredCount = {{ total_filtered_count }};
-let allowedCount = {{ allowed_count }};
-let blockedCount = {{ blocked_count }};
-
-// 1. Filtro dinâmico de portas por Grupo Selecionado
+// ==========================================
+// 1. FILTRO DINÂMICO DE PORTAS POR GRUPO
+// ==========================================
 function filterPortsByGroup() {
     const groupSelect = document.getElementById('filter-group');
     const portSelect = document.getElementById('filter-port');
@@ -621,181 +699,16 @@ function filterPortsByGroup() {
     }
 }
 
-// 2. Auto-Atualização em Tempo Real da Tabela de Histórico
-function toggleTableLiveSync() {
-    isTableSyncActive = !isTableSyncActive;
-    const btn = document.getElementById('btn-toggle-table-sync');
-    const label = document.getElementById('label-table-sync');
-    const dot = document.getElementById('table-live-dot');
-    const statusText = document.getElementById('table-sync-status');
-
-    if (isTableSyncActive) {
-        label.textContent = 'Pausar Auto-Sync';
-        btn.classList.remove('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
-        dot.classList.add('bg-emerald-400', 'animate-pulse');
-        dot.classList.remove('bg-amber-400');
-        if (statusText) statusText.textContent = 'Auto-Sync Ativo (2s)';
-        startTableSyncPolling();
-    } else {
-        label.textContent = 'Retomar Auto-Sync';
-        btn.classList.add('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
-        dot.classList.remove('bg-emerald-400', 'animate-pulse');
-        dot.classList.add('bg-amber-400');
-        if (statusText) statusText.textContent = 'Auto-Sync Pausado';
-        stopTableSyncPolling();
-    }
-}
-
-function startTableSyncPolling() {
-    if (tableSyncTimer) clearInterval(tableSyncTimer);
-    tableSyncTimer = setInterval(fetchNewTableLogs, 2500);
-}
-
-function stopTableSyncPolling() {
-    if (tableSyncTimer) clearInterval(tableSyncTimer);
-}
-
-async function fetchNewTableLogs() {
-    if (!isTableSyncActive) return;
-
-    // Apenas atualiza automaticamente se o usuário estiver na aba Histórico
-    const tabHistory = document.getElementById('tab-history');
-    if (tabHistory.classList.contains('hidden')) return;
-
-    // Se estiver em paginação (página > 1), não insere para não misturar
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentPage = urlParams.get('page');
-    if (currentPage && parseInt(currentPage) > 1) return;
-
-    const groupFilter = "{{ selected_group|default:'' }}";
-    const portFilter = "{{ selected_port|default:'' }}";
-    const queryTerm = "{{ query_term|default:'' }}";
-
-    let url = `/proxy/logs/live-stream/?last_id=${maxTableLogId}`;
-    if (portFilter) url += `&port_id=${portFilter}`;
-    else if (groupFilter) url += `&group_id=${groupFilter}`;
-
-    try {
-        const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-        const data = await res.json();
-
-        if (data.success && data.logs.length > 0) {
-            const tableBody = document.getElementById('table-logs-body');
-            const emptyRow = document.getElementById('empty-logs-row');
-            if (emptyRow) emptyRow.remove();
-
-            data.logs.forEach(l => {
-                if (l.id > maxTableLogId) {
-                    maxTableLogId = l.id;
-                }
-
-                // Verifica se já existe na tabela
-                if (document.getElementById(`row-log-${l.id}`)) return;
-
-                const statusInfo = getLogVisualStatus(l);
-                
-                // Atualiza contadores
-                totalFilteredCount++;
-                if (statusInfo.category === 'proxy_blocked' || statusInfo.category === 'dest_blocked') blockedCount++;
-                else allowedCount++;
-
-                const tr = document.createElement('tr');
-                tr.id = `row-log-${l.id}`;
-                tr.setAttribute('data-log-id', l.id);
-                tr.className = 'hover:bg-slate-800/30 transition-all animate-fade-in bg-indigo-500/5';
-
-                const deviceHtml = l.hostname 
-                    ? `<div>
-                        <div class="flex items-center gap-1.5 font-bold text-cyan-300 text-xs">
-                            <i class="fa-solid fa-desktop text-indigo-400 text-[10px]"></i>
-                            <span>${l.hostname}</span>
-                            <button type="button" onclick="openDeviceModal('${l.client_ip}', '${l.hostname.replace(/'/g, "\\'")}', '${(l.device_desc || '').replace(/'/g, "\\'")}')" class="text-slate-500 hover:text-indigo-300 text-[10px]" title="Editar Hostname">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </button>
-                        </div>
-                        <span class="text-slate-500 font-mono text-[10px]">${l.client_ip}</span>
-                       </div>`
-                    : `<div class="flex items-center gap-1.5">
-                        <span class="font-mono text-slate-300 text-[11px]">${l.client_ip}</span>
-                        <button type="button" onclick="openDeviceModal('${l.client_ip}', '', '')" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white text-[9px] font-semibold transition-all border border-slate-700" title="Atribuir Hostname a este IP">
-                            <i class="fa-solid fa-tag"></i> Nomear
-                        </button>
-                       </div>`;
-
-                const statusBadge = statusInfo.tableBadge;
-
-                tr.innerHTML = `
-                    <td class="p-3.5 pl-6 font-mono text-slate-300 text-[11px] whitespace-nowrap">
-                        <span class="text-white font-semibold">${l.date}</span>
-                        <span class="text-slate-400 ml-1">${l.timestamp}</span>
-                    </td>
-                    <td class="p-3.5 whitespace-nowrap">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                ${l.port_number}
-                            </span>
-                            <span class="text-white font-medium">
-                                ${l.port_name}
-                            </span>
-                        </div>
-                    </td>
-                    <td class="p-3.5 whitespace-nowrap">
-                        ${deviceHtml}
-                    </td>
-                    <td class="p-3.5">
-                        <div class="flex items-center gap-2 max-w-md">
-                            <span class="font-bold text-white tracking-wide font-mono text-[12px] truncate" title="${l.full_url}">
-                                ${l.domain}
-                            </span>
-                            ${l.method !== 'CONNECT' ? `<span class="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-400 font-mono uppercase">${l.method}</span>` : ''}
-                        </div>
-                    </td>
-                    <td class="p-3.5 text-center whitespace-nowrap">
-                        ${statusBadge}
-                    </td>
-                    <td class="p-3.5 text-center font-mono text-slate-400 text-[11px] whitespace-nowrap">
-                        ${l.bytes}
-                    </td>
-                    <td class="p-3.5 text-right pr-6 whitespace-nowrap">
-                        <div class="flex items-center justify-end gap-1.5">
-                            <button onclick="openAddToListModal('${l.domain.replace(/'/g, "\\'")}', 'WHITELIST')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all flex items-center gap-1" title="Adicionar este domínio a uma Whitelist">
-                                <i class="fa-solid fa-plus"></i> Whitelist
-                            </button>
-                            <button onclick="openAddToListModal('${l.domain.replace(/'/g, "\\'")}', 'BLACKLIST')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all flex items-center gap-1" title="Adicionar este domínio a uma Blacklist">
-                                <i class="fa-solid fa-ban"></i> Blacklist
-                            </button>
-                        </div>
-                    </td>
-                `;
-
-                // Insere a nova linha no topo da tabela
-                tableBody.prepend(tr);
-
-                // Remove o destaque suave após 3 segundos
-                setTimeout(() => {
-                    tr.classList.remove('bg-indigo-500/5');
-                }, 3000);
-            });
-
-            // Atualiza contadores visuais
-            document.getElementById('badge-total-count').textContent = `${totalFilteredCount} registros`;
-            document.getElementById('stat-total-count').textContent = totalFilteredCount;
-            document.getElementById('stat-allowed-count').textContent = allowedCount;
-            document.getElementById('stat-blocked-count').textContent = blockedCount;
-            const paginatorTotal = document.getElementById('paginator-total');
-            if (paginatorTotal) paginatorTotal.textContent = totalFilteredCount;
-        }
-    } catch (err) {
-        console.error('Erro na sincronização da tabela:', err);
-    }
-}
-
-// 3. Alternar Abas (Histórico vs Live)
+// ==========================================
+// 2. ALTERNAR ABAS (HISTÓRICO VS LIVE)
+// ==========================================
 function switchTab(tabId) {
     const tabHistory = document.getElementById('tab-history');
     const tabLive = document.getElementById('tab-live');
     const btnHistory = document.getElementById('btn-tab-history');
     const btnLive = document.getElementById('btn-tab-live');
+
+    if (!tabHistory || !tabLive || !btnHistory || !btnLive) return;
 
     if (tabId === 'tab-history') {
         tabHistory.classList.remove('hidden');
@@ -803,31 +716,46 @@ function switchTab(tabId) {
         btnHistory.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/20';
         btnLive.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800';
         stopLivePolling();
-        startTableSyncPolling();
     } else {
         tabHistory.classList.add('hidden');
         tabLive.classList.remove('hidden');
         btnLive.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-600/20';
         btnHistory.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800';
-        stopTableSyncPolling();
         startLivePolling();
     }
 }
 
-// 4. Modal Adicionar Domínio à Lista
+// ==========================================
+// 3. GERENCIAMENTO DE MODAIS (HOST / ADICIONAR / SILENCIAR)
+// ==========================================
+const allWhitelists = [
+    {% for wl in whitelists %}
+    { id: {{ wl.id }}, name: "{{ wl.name|escapejs }}", is_mandatory: {{ wl.is_mandatory|lower }} },
+    {% endfor %}
+];
+
+const allBlacklists = [
+    {% for bl in blacklists %}
+    { id: {{ bl.id }}, name: "{{ bl.name|escapejs }}" },
+    {% endfor %}
+];
+
 function openAddToListModal(domain, listType) {
     document.getElementById('target-domain-input').value = domain;
-    document.getElementById('target-desc-input').value = `Auditoria de Logs (${new Date().toLocaleDateString('pt-BR')})`;
+    document.getElementById('target-desc-input').value = `Adicionado via auditoria de logs (${new Date().toLocaleDateString('pt-BR')})`;
     document.getElementById('modal-domain-feedback').innerHTML = '';
 
     const select = document.getElementById('target-list-select');
     select.innerHTML = '';
 
     const titleEl = document.getElementById('modal-domain-title');
+    const submitBtn = document.getElementById('btn-submit-add-domain');
 
     if (listType === 'WHITELIST') {
         titleEl.innerHTML = '<i class="fa-solid fa-shield-check text-emerald-400"></i><span>Adicionar à Whitelist (Permitir)</span>';
-        whitelistsData.forEach(wl => {
+        submitBtn.className = 'px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20';
+        
+        allWhitelists.forEach(wl => {
             const opt = document.createElement('option');
             opt.value = wl.id;
             opt.textContent = `🛡️ ${wl.name}${wl.is_mandatory ? ' (Obrigatória)' : ''}`;
@@ -835,7 +763,9 @@ function openAddToListModal(domain, listType) {
         });
     } else {
         titleEl.innerHTML = '<i class="fa-solid fa-ban text-rose-400"></i><span>Adicionar à Blacklist (Bloquear)</span>';
-        blacklistsData.forEach(bl => {
+        submitBtn.className = 'px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20';
+        
+        allBlacklists.forEach(bl => {
             const opt = document.createElement('option');
             opt.value = bl.id;
             opt.textContent = `🚫 ${bl.name}`;
@@ -850,14 +780,12 @@ function closeAddToListModal() {
     document.getElementById('modal-add-domain-to-list').classList.add('hidden');
 }
 
-// 5. Modal Identificar Equipamento / Hostname
-function openDeviceModal(ipAddress, hostname = '', description = '') {
-    document.getElementById('device-ip-input').value = ipAddress;
-    document.getElementById('device-hostname-input').value = hostname;
-    document.getElementById('device-desc-input').value = description;
+function openDeviceModal(ip, hostname, desc) {
+    document.getElementById('device-ip-input').value = ip;
+    document.getElementById('device-hostname-input').value = hostname || '';
+    document.getElementById('device-desc-input').value = desc || '';
     document.getElementById('modal-device-feedback').innerHTML = '';
     document.getElementById('modal-device-host').classList.remove('hidden');
-    document.getElementById('device-hostname-input').focus();
 }
 
 function closeDeviceModal() {
@@ -879,22 +807,21 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Submissão do Modal de Equipamento
 async function submitSaveDevice(e) {
     e.preventDefault();
     const btn = document.getElementById('btn-submit-device');
     const feedback = document.getElementById('modal-device-feedback');
-    const ipAddress = document.getElementById('device-ip-input').value;
+    const ip = document.getElementById('device-ip-input').value;
     const hostname = document.getElementById('device-hostname-input').value;
-    const description = document.getElementById('device-desc-input').value;
+    const desc = document.getElementById('device-desc-input').value;
 
     btn.disabled = true;
     feedback.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Salvando...</span>';
 
     const formData = new URLSearchParams();
-    formData.append('ip_address', ipAddress);
+    formData.append('ip_address', ip);
     formData.append('hostname', hostname);
-    formData.append('description', description);
+    formData.append('description', desc);
 
     try {
         const res = await fetch('/proxy/devices/save/', {
@@ -925,7 +852,6 @@ async function submitSaveDevice(e) {
     }
 }
 
-// Submissão do Modal de Adicionar Domínio
 async function submitAddDomainToList(e) {
     e.preventDefault();
     const btn = document.getElementById('btn-submit-add-domain');
@@ -971,13 +897,177 @@ async function submitAddDomainToList(e) {
 }
 
 // ==========================================
-// FUNÇÃO AUXILIAR DE STATUS E CORES DOS LOGS
+// 4. BASE DE DOMÍNIOS OCULTOS / SILENCIADOS
+// ==========================================
+let isHideCdnsActive = true;
+
+async function loadHiddenDomains() {
+    try {
+        const res = await fetch('/proxy/logs/hidden-domains/list-json/');
+        const data = await res.json();
+        if (data.success) {
+            const badge = document.getElementById('badge-hidden-count');
+            const counter = document.getElementById('hidden-domains-total-counter');
+            if (badge) badge.textContent = data.total;
+            if (counter) counter.textContent = data.total;
+
+            const listContainer = document.getElementById('hidden-domains-list-container');
+            if (listContainer) {
+                if (data.domains.length === 0) {
+                    listContainer.innerHTML = '<div class="p-3 text-center text-slate-500 italic bg-slate-900/40 rounded-xl border border-dashed border-slate-800">Nenhum domínio silenciado cadastrado no momento.</div>';
+                } else {
+                    listContainer.innerHTML = data.domains.map(d => `
+                        <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#0f121e] border border-slate-800 hover:border-amber-500/30 transition-all text-xs">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <code class="font-mono text-amber-300 font-bold">${d.domain}</code>
+                                    <span class="text-[10px] text-slate-500 font-mono">${d.created_at}</span>
+                                </div>
+                                ${d.description ? `<p class="text-[10px] text-slate-400 mt-0.5">${d.description}</p>` : ''}
+                            </div>
+                            <button type="button" onclick="deleteHiddenDomain(${d.id}, '${d.domain}')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can text-[9px]"></i>
+                                <span>Remover</span>
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao carregar domínios ocultos:', e);
+    }
+}
+
+function openHiddenDomainsModal() {
+    document.getElementById('hidden-domain-form-feedback').innerHTML = '';
+    document.getElementById('modal-hidden-domains').classList.remove('hidden');
+    loadHiddenDomains();
+}
+
+function closeHiddenDomainsModal() {
+    document.getElementById('modal-hidden-domains').classList.add('hidden');
+}
+
+function toggleHideCdns() {
+    isHideCdnsActive = !isHideCdnsActive;
+    const btn = document.getElementById('btn-toggle-cdns');
+    const icon = document.getElementById('icon-cdns');
+    const label = document.getElementById('label-cdns');
+
+    if (isHideCdnsActive) {
+        btn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25';
+        icon.className = 'fa-solid fa-eye-slash text-emerald-400 text-[11px]';
+        label.textContent = 'Ocultar Silenciados';
+    } else {
+        btn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700';
+        icon.className = 'fa-solid fa-eye text-slate-400 text-[11px]';
+        label.textContent = 'Mostrando Tudo';
+    }
+
+    resetLiveStream();
+}
+
+async function quickHideDomain(domain) {
+    if (confirm(`Deseja silenciar o domínio '${domain}' do Live Stream? Ele será adicionado à base de domínios ocultos.`)) {
+        const formData = new URLSearchParams();
+        formData.append('domain', domain);
+        formData.append('description', 'Silenciado direto do Live Stream');
+
+        try {
+            const res = await fetch('/proxy/logs/hidden-domains/add/', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData
+            });
+            const data = await res.json();
+            if (data.success) {
+                loadHiddenDomains();
+                resetLiveStream();
+            } else {
+                alert(data.error);
+            }
+        } catch (e) {
+            alert('Erro ao silenciar domínio.');
+        }
+    }
+}
+
+async function submitAddHiddenDomain(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-add-hidden');
+    const feedback = document.getElementById('hidden-domain-form-feedback');
+    const domainInput = document.getElementById('input-new-hidden-domain');
+    const descInput = document.getElementById('input-new-hidden-desc');
+
+    btn.disabled = true;
+    feedback.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Cadastrando...</span>';
+
+    const formData = new URLSearchParams();
+    formData.append('domain', domainInput.value.trim());
+    formData.append('description', descInput.value.trim());
+
+    try {
+        const res = await fetch('/proxy/logs/hidden-domains/add/', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+            feedback.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check"></i> ${data.message}</span>`;
+            domainInput.value = '';
+            descInput.value = '';
+            loadHiddenDomains();
+            resetLiveStream();
+        } else {
+            feedback.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-circle-xmark"></i> ${data.error}</span>`;
+        }
+    } catch (err) {
+        feedback.innerHTML = '<span class="text-rose-400">Erro na requisição.</span>';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function deleteHiddenDomain(id, domain) {
+    if (confirm(`Deseja remover '${domain}' da base de domínios ocultos? Ele voltará a aparecer no Live Stream.`)) {
+        try {
+            const res = await fetch(`/proxy/logs/hidden-domains/${id}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+                }
+            });
+            const data = await res.json();
+            if (data.success) {
+                loadHiddenDomains();
+                resetLiveStream();
+            } else {
+                alert(data.error);
+            }
+        } catch (e) {
+            alert('Erro ao remover domínio oculto.');
+        }
+    }
+}
+
+// ==========================================
+// 5. FUNÇÃO AUXILIAR DE STATUS E CORES DOS LOGS
 // ==========================================
 function getLogVisualStatus(l) {
     const rawStatus = (l.http_status || '').toUpperCase();
     const action = (l.action || '').toUpperCase();
     
-    // Extrai o código numérico HTTP (ex: 200, 307, 403, 401, 502)
     let statusCode = l.status_code || '';
     if (!statusCode) {
         if (rawStatus.includes('/')) {
@@ -1032,7 +1122,7 @@ function getLogVisualStatus(l) {
 }
 
 // ==========================================
-// MONITOR AO VIVO (LIVE STREAM POLLING)
+// 6. MONITOR AO VIVO (LIVE STREAM POLLING)
 // ==========================================
 let liveTimer = null;
 let lastLogId = 0;
@@ -1051,14 +1141,15 @@ function stopLivePolling() {
 
 function resetLiveStream() {
     lastLogId = 0;
-    document.getElementById('live-logs-container').innerHTML = '';
+    const container = document.getElementById('live-logs-container');
+    if (container) container.innerHTML = '';
     fetchLiveLogs();
 }
 
 function debounceLiveReset() {
     const input = document.getElementById('live-hostname-input');
     const clearBtn = document.getElementById('btn-clear-live-host');
-    if (clearBtn) {
+    if (clearBtn && input) {
         if (input.value.trim().length > 0) {
             clearBtn.classList.remove('hidden');
         } else {
@@ -1100,6 +1191,38 @@ function clearLiveHostnameFilter() {
     resetLiveStream();
 }
 
+function setLiveActionFilter(actionVal) {
+    const hiddenInput = document.getElementById('live-action-select');
+    if (hiddenInput) hiddenInput.value = actionVal;
+
+    const btnAll = document.getElementById('btn-live-filter-all');
+    const btnAllowed = document.getElementById('btn-live-filter-allowed');
+    const btnProxy = document.getElementById('btn-live-filter-proxy');
+    const btnDest = document.getElementById('btn-live-filter-dest');
+    const btnBlocked = document.getElementById('btn-live-filter-blocked');
+
+    // Reset classes
+    [btnAll, btnAllowed, btnProxy, btnDest, btnBlocked].forEach(b => {
+        if (b) {
+            b.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-400 hover:bg-slate-800 flex items-center gap-1';
+        }
+    });
+
+    if (actionVal === 'ALL' && btnAll) {
+        btnAll.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow';
+    } else if (actionVal === 'ALLOWED' && btnAllowed) {
+        btnAllowed.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-emerald-600 text-white shadow flex items-center gap-1';
+    } else if (actionVal === 'BLOCKED_PROXY' && btnProxy) {
+        btnProxy.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-rose-600 text-white shadow flex items-center gap-1';
+    } else if (actionVal === 'BLOCKED_DEST' && btnDest) {
+        btnDest.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-amber-600 text-white shadow flex items-center gap-1';
+    } else if (actionVal === 'BLOCKED' && btnBlocked) {
+        btnBlocked.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition-all bg-rose-600 text-white shadow flex items-center gap-1';
+    }
+
+    resetLiveStream();
+}
+
 function toggleLivePause() {
     isPaused = !isPaused;
     const btn = document.getElementById('btn-pause-live');
@@ -1108,32 +1231,42 @@ function toggleLivePause() {
     const statusText = document.getElementById('live-status-text');
 
     if (isPaused) {
-        label.textContent = 'Retomar Live';
-        btn.classList.add('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
-        indicator.classList.remove('bg-emerald-400', 'animate-pulse');
-        indicator.classList.add('bg-amber-400');
-        statusText.textContent = 'Pausado';
+        if (label) label.textContent = 'Retomar Live';
+        if (btn) btn.classList.add('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
+        if (indicator) {
+            indicator.classList.remove('bg-emerald-400', 'animate-pulse');
+            indicator.classList.add('bg-amber-400');
+        }
+        if (statusText) statusText.textContent = 'Pausado';
     } else {
-        label.textContent = 'Pausar Live';
-        btn.classList.remove('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
-        indicator.classList.add('bg-emerald-400', 'animate-pulse');
-        indicator.classList.remove('bg-amber-400');
-        statusText.textContent = 'Conectado (polling 2s)';
+        if (label) label.textContent = 'Pausar Live';
+        if (btn) btn.classList.remove('bg-amber-600/30', 'text-amber-300', 'border-amber-500/40');
+        if (indicator) {
+            indicator.classList.add('bg-emerald-400', 'animate-pulse');
+            indicator.classList.remove('bg-amber-400');
+        }
+        if (statusText) statusText.textContent = 'Conectado (polling 2s)';
     }
 }
 
 function clearLiveConsole() {
-    document.getElementById('live-logs-container').innerHTML = '<div class="text-slate-600 italic text-center py-4">Console limpo. Aguardando novas requisições...</div>';
+    const container = document.getElementById('live-logs-container');
+    if (container) container.innerHTML = '<div class="text-slate-600 italic text-center py-4">Console limpo. Aguardando novas requisições...</div>';
 }
 
 async function fetchLiveLogs() {
     if (isPaused) return;
 
-    const portId = document.getElementById('live-port-select').value;
+    const portSelect = document.getElementById('live-port-select');
+    const portId = portSelect ? portSelect.value : '';
+    const actionVal = document.getElementById('live-action-select') ? document.getElementById('live-action-select').value : 'ALL';
     const hostInput = document.getElementById('live-hostname-input');
     const hostnameVal = hostInput ? hostInput.value.trim() : '';
 
-    let url = `/proxy/logs/live-stream/?port_id=${portId}&last_id=${lastLogId}`;
+    let url = `/proxy/logs/live-stream/?port_id=${portId}&last_id=${lastLogId}&hide_cdns=${isHideCdnsActive}`;
+    if (actionVal && actionVal !== 'ALL') {
+        url += `&action=${encodeURIComponent(actionVal)}`;
+    }
     if (hostnameVal) {
         url += `&hostname=${encodeURIComponent(hostnameVal)}`;
     }
@@ -1144,6 +1277,7 @@ async function fetchLiveLogs() {
 
         if (data.success && data.logs.length > 0) {
             const container = document.getElementById('live-logs-container');
+            if (!container) return;
             
             data.logs.forEach(l => {
                 if (l.id > lastLogId) {
@@ -1158,6 +1292,10 @@ async function fetchLiveLogs() {
                     ? `<span onclick="setLiveHostnameFilter('${l.hostname.replace(/'/g, "\\'")}')" class="px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 hover:text-white font-bold border border-cyan-500/25 hover:border-cyan-400 text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-all shadow-sm group" title="Filtrar Live Stream por ${l.hostname}"><i class="fa-solid fa-desktop text-[10px] text-cyan-400 group-hover:scale-110 transition-transform"></i>${l.hostname}</span> <span onclick="setLiveHostnameFilter('${l.client_ip}')" class="text-slate-500 hover:text-cyan-300 font-mono text-[10px] cursor-pointer hover:underline transition-colors" title="Filtrar Live Stream por IP ${l.client_ip}">(${l.client_ip})</span>`
                     : `<span onclick="setLiveHostnameFilter('${l.client_ip}')" class="text-slate-400 hover:text-cyan-300 font-mono text-[11px] cursor-pointer hover:underline px-1 py-0.5 rounded hover:bg-slate-800 transition-all" title="Filtrar Live Stream por IP ${l.client_ip}">${l.client_ip}</span>`;
 
+                const urlDisplay = (l.full_url && l.full_url.includes('/') && !l.full_url.endsWith(':443'))
+                    ? `<span class="text-white font-bold font-mono tracking-wide text-xs truncate max-w-lg" title="${l.full_url}">${l.full_url}</span>`
+                    : `<span class="text-white font-bold font-mono tracking-wide text-xs truncate max-w-lg" title="${l.full_url || l.domain}">${l.domain}</span>`;
+
                 row.innerHTML = `
                     <div class="flex flex-wrap items-center gap-2.5">
                         <span class="text-slate-500 font-mono text-[11px]">${l.timestamp}</span>
@@ -1165,7 +1303,7 @@ async function fetchLiveLogs() {
                             ${l.port_number} • ${l.port_name}
                         </span>
                         ${deviceDisplay}
-                        <span class="text-white font-bold font-mono tracking-wide text-xs truncate max-w-lg" title="${l.full_url || l.domain}">${l.domain}</span>
+                        ${urlDisplay}
                     </div>
 
                     <div class="flex items-center gap-2 self-end sm:self-center">
@@ -1180,6 +1318,9 @@ async function fetchLiveLogs() {
                             </button>
                             <button onclick="openAddToListModal('${l.domain.replace(/'/g, "\\'")}', 'BLACKLIST')" class="w-6 h-6 rounded bg-slate-800 hover:bg-rose-600 text-rose-400 hover:text-white flex items-center justify-center transition-all" title="Adicionar à Blacklist">
                                 <i class="fa-solid fa-ban text-[10px]"></i>
+                            </button>
+                            <button onclick="quickHideDomain('${l.domain.replace(/'/g, "\\'")}')" class="w-6 h-6 rounded bg-slate-800 hover:bg-amber-600 text-amber-400 hover:text-white flex items-center justify-center transition-all" title="Ocultar este domínio do Live Stream (Silenciar)">
+                                <i class="fa-solid fa-eye-slash text-[10px]"></i>
                             </button>
                         </div>
                     </div>
@@ -1200,7 +1341,7 @@ async function fetchLiveLogs() {
 // Inicializa na carga da página
 document.addEventListener('DOMContentLoaded', () => {
     filterPortsByGroup();
-    startTableSyncPolling();
+    loadHiddenDomains();
 });
 </script>
 {% endblock %}

@@ -59,11 +59,13 @@ class ProxyGroup(models.Model):
 class ProxyPort(models.Model):
     """
     Porta de escuta do Squid mapeada para uma sala ou setor.
+    Suporta listas exclusivas (override) que têm prioridade sobre as listas do grupo.
     """
     STATUS_CHOICES = [
         ('ALLOWED', 'Liberado Total (100% Livre)'),
         ('BLACKLIST', 'Liberado com Blacklist'),
         ('WHITELIST', 'Apenas Whitelist (Padrão Seguro)'),
+        ('BLOCKED', 'Bloqueio Total (Sem Acesso)'),
         ('SCHEDULED', 'Agendamento / Horário Automático'),
     ]
     group = models.ForeignKey(ProxyGroup, on_delete=models.CASCADE, related_name='ports')
@@ -76,6 +78,24 @@ class ProxyPort(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Listas exclusivas da porta (override do grupo)
+    port_whitelists = models.ManyToManyField(
+        'squid.ProxyList', blank=True,
+        related_name='applied_ports_whitelist',
+        help_text='Whitelists exclusivas desta porta (têm prioridade sobre as listas do grupo)'
+    )
+    port_blacklists = models.ManyToManyField(
+        'squid.ProxyList', blank=True,
+        related_name='applied_ports_blacklist',
+        help_text='Blacklists exclusivas desta porta (têm prioridade sobre as listas do grupo)'
+    )
+
+    use_custom_portal = models.BooleanField(
+        default=False,
+        verbose_name="Usar Portal de Bloqueio Personalizado",
+        help_text="Redireciona acessos negados para o portal educacional com lista de links permitidos"
+    )
+
     def __str__(self):
         return f"{self.name} (Porta {self.port_number})"
 
@@ -84,6 +104,7 @@ class ProxyPort(models.Model):
             from django.utils.text import slugify
             self.slug = slugify(f"{self.name}-{self.port_number}")
         super().save(*args, **kwargs)
+
 
 
 class RoomSchedule(models.Model):

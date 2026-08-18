@@ -160,6 +160,9 @@ def generate_squid_config_and_lists():
     """
     Gera dinamicamente todos os arquivos de Whitelist/Blacklist e o /etc/squid/squid.conf
     com base nos Grupos, Portas e Listas cadastrados no SquidPanel.
+    Suporta:
+    - Modo BLOCKED (bloqueio absoluto)
+    - Listas exclusivas por porta (override de grupo, com prioridade)
     """
     paths = get_squid_paths()
     lists_dir = paths['lists_dir']
@@ -167,6 +170,12 @@ def generate_squid_config_and_lists():
 
     # 1. Gera o arquivo de Whitelist Obrigatória do Sistema
     mandatory_domains = set()
+    server_ip = SystemSetting.get_value('server_ip', '10.40.88.5')
+    if server_ip:
+        mandatory_domains.add(server_ip)
+    mandatory_domains.add('localhost')
+    mandatory_domains.add('127.0.0.1')
+
     mandatory_lists = ProxyList.objects.filter(list_type='WHITELIST', is_mandatory=True, is_active=True)
     for ml in mandatory_lists:
         domains = ml.domains.filter(is_active=True).values_list('domain', flat=True)
@@ -216,9 +225,55 @@ def generate_squid_config_and_lists():
             'has_bl': len(opt_bl) > 0,
         }
 
-    # 3. Monta o conteúdo completo do squid.conf
+    # 3. Gera arquivos de listas exclusivas por Porta (override de grupo)
+    active_ports = list(ProxyPort.objects.select_related('group').prefetch_related(
+        'port_whitelists', 'port_blacklists'
+    ).filter(is_active=True).order_by('port_number'))
+
+    port_list_files = {}
+
+    for p in active_ports:
+        # Whitelists exclusivas da porta
+        p_wl_domains = set()
+        for wl in p.port_whitelists.filter(is_active=True):
+            p_wl_domains.update(wl.domains.filter(is_active=True).values_list('domain', flat=True))
+
+        has_port_wl = len(p_wl_domains) > 0
+        if has_port_wl:
+            opt_p_wl = optimize_domain_set(p_wl_domains)
+            p_wl_file = os.path.join(lists_dir, f"port_{p.id}_whitelist.txt")
+            p_wl_content = [f"# Whitelist exclusiva da Porta {p.port_number}: {p.name}"]
+            for d in opt_p_wl:
+                p_wl_content.append(f"{d}")
+            _write_file_safely(p_wl_file, "\n".join(p_wl_content) + "\n")
+        else:
+            p_wl_file = None
+
+        # Blacklists exclusivas da porta
+        p_bl_domains = set()
+        for bl in p.port_blacklists.filter(is_active=True):
+            p_bl_domains.update(bl.domains.filter(is_active=True).values_list('domain', flat=True))
+
+        has_port_bl = len(p_bl_domains) > 0
+        if has_port_bl:
+            opt_p_bl = optimize_domain_set(p_bl_domains)
+            p_bl_file = os.path.join(lists_dir, f"port_{p.id}_blacklist.txt")
+            p_bl_content = [f"# Blacklist exclusiva da Porta {p.port_number}: {p.name}"]
+            for d in opt_p_bl:
+                p_bl_content.append(f"{d}")
+            _write_file_safely(p_bl_file, "\n".join(p_bl_content) + "\n")
+        else:
+            p_bl_file = None
+
+        port_list_files[p.id] = {
+            'wl_path': p_wl_file,
+            'bl_path': p_bl_file,
+            'has_wl': has_port_wl,
+            'has_bl': has_port_bl,
+        }
+
+    # 4. Monta o conteúdo completo do squid.conf
     dns_servers = SystemSetting.get_value('server_dns', '1.1.1.1 8.8.8.8').replace(',', ' ')
-    active_ports = list(ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number'))
 
     conf_lines = []
     conf_lines.append("# ========================================================")
@@ -263,12 +318,35 @@ def generate_squid_config_and_lists():
         conf_lines.append(f'acl group_{g.id}_bl dstdomain "{files["bl_path"]}"')
     conf_lines.append("")
 
+    # ACLs de Domínios por Porta (override)
+    has_any_port_lists = False
+    for p in active_ports:
+        pf = port_list_files[p.id]
+        if pf['has_wl'] or pf['has_bl']:
+            if not has_any_port_lists:
+                conf_lines.append("# --- ACLs de Whitelists e Blacklists por Porta (Override) ---")
+                has_any_port_lists = True
+            if pf['has_wl']:
+                conf_lines.append(f'acl port_{p.id}_wl dstdomain "{pf["wl_path"]}"')
+            if pf['has_bl']:
+                conf_lines.append(f'acl port_{p.id}_bl dstdomain "{pf["bl_path"]}"')
+    if has_any_port_lists:
+        conf_lines.append("")
+
     # Regras de Segurança Padrão
     conf_lines.append("# --- Regras de Seguranca Basicas ---")
     conf_lines.append("http_access deny !Safe_ports")
     conf_lines.append("http_access deny CONNECT !SSL_ports")
     conf_lines.append("http_access allow localhost manager")
     conf_lines.append("http_access deny manager\n")
+
+    # Configuração de Páginas de Erro / Portal Educacional Personalizado (deny_info)
+    portal_ports = [p for p in active_ports if getattr(p, 'use_custom_portal', False)]
+    if portal_ports:
+        conf_lines.append("# --- Paginas de Bloqueio / Portal Educacional Personalizado (deny_info) ---")
+        for p in portal_ports:
+            conf_lines.append(f"deny_info http://{server_ip}:8000/portal/{p.port_number}/?blocked=%u myport_{p.port_number}")
+        conf_lines.append("")
 
     # Regras de Acesso por Porta e Status
     conf_lines.append("# ========================================================")
@@ -277,22 +355,35 @@ def generate_squid_config_and_lists():
 
     for p in active_ports:
         g = p.group
+        pf = port_list_files[p.id]
         conf_lines.append(f"\n# Porta {p.port_number}: {p.name} (Grupo: {g.name}) - Modo: {p.current_status}")
 
-        if p.current_status == 'ALLOWED':
+        if p.current_status == 'BLOCKED':
+            # Modo Bloqueio Total — nega absolutamente tudo nesta porta
+            conf_lines.append(f"http_access deny myport_{p.port_number}")
+
+        elif p.current_status == 'ALLOWED':
             # Modo Liberado Total (100% Livre)
             conf_lines.append(f"http_access allow myport_{p.port_number}")
 
         elif p.current_status == 'BLACKLIST':
-            # Modo Liberado com Blacklist (Whitelists Obrigatória e do Grupo têm precedência sobre a Blacklist)
+            # Modo Liberado com Blacklist
+            # Hierarquia: Sistema > WL porta > BL porta > WL grupo > BL grupo > Libera
             conf_lines.append(f"http_access allow myport_{p.port_number} mandatory_whitelist")
+            if pf['has_wl']:
+                conf_lines.append(f"http_access allow myport_{p.port_number} port_{p.id}_wl")
+            if pf['has_bl']:
+                conf_lines.append(f"http_access deny myport_{p.port_number} port_{p.id}_bl")
             conf_lines.append(f"http_access allow myport_{p.port_number} group_{g.id}_wl")
             conf_lines.append(f"http_access deny myport_{p.port_number} group_{g.id}_bl")
             conf_lines.append(f"http_access allow myport_{p.port_number}")
 
         else:
             # Modo Whitelist (Padrão Seguro: apenas Whitelists permitidas)
+            # Hierarquia: Sistema > WL porta > WL grupo > Nega
             conf_lines.append(f"http_access allow myport_{p.port_number} mandatory_whitelist")
+            if pf['has_wl']:
+                conf_lines.append(f"http_access allow myport_{p.port_number} port_{p.id}_wl")
             conf_lines.append(f"http_access allow myport_{p.port_number} group_{g.id}_wl")
             conf_lines.append(f"http_access deny myport_{p.port_number}")
 
@@ -308,7 +399,7 @@ def generate_squid_config_and_lists():
     conf_lines.append("buffered_logs off")
     conf_lines.append("logfile_rotate 10")
     conf_lines.append("coredump_dir /var/spool/squid")
-    conf_lines.append("visible_hostname SquidPanel")
+    conf_lines.append("visible_hostname 10.40.88.5")
     conf_lines.append("forwarded_for on")
     conf_lines.append("via on\n")
 
@@ -373,4 +464,10 @@ def restart_squid_service():
 
     mark_squid_sync_completed()
     return True, "Serviço do Squid reiniciado com sucesso!"
+
+
+# Aliases de compatibilidade
+sync_squid_rules = apply_squid_changes
+sync_squid_config = apply_squid_changes
+
 

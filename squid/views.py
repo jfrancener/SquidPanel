@@ -7,7 +7,7 @@ from django.http import HttpResponseForbidden, JsonResponse, HttpResponse, Http4
 from django.db import models
 from django.utils.text import slugify
 
-from .models import ProxyList, DomainItem
+from .models import ProxyList, DomainItem, PortalLink
 from .squid_sync import apply_squid_changes, restart_squid_service, mark_squid_sync_needed, is_squid_sync_needed
 from dashboard.models import ProxyGroup, ProxyPort, UserProfile
 
@@ -200,8 +200,8 @@ def port_create_view(request, group_id):
         )
 
         # Sincroniza imediatamente o squid.conf
-        from .squid_sync import sync_squid_rules
-        sync_ok, sync_msg = sync_squid_rules()
+        from .squid_sync import apply_squid_changes
+        sync_ok, sync_msg = apply_squid_changes()
 
         if sync_ok:
             messages.success(request, f"Sala '{name}' (Porta {port_number}) criada e aplicada no Squid com sucesso!")
@@ -258,8 +258,8 @@ def port_edit_view(request, port_id):
         port.save()
 
         # Sincroniza imediatamente o arquivo de configuração do Squid (/etc/squid/squid.conf)
-        from .squid_sync import sync_squid_rules
-        sync_ok, sync_msg = sync_squid_rules()
+        from .squid_sync import apply_squid_changes
+        sync_ok, sync_msg = apply_squid_changes()
 
         if sync_ok:
             if old_port_number != port.port_number:
@@ -289,8 +289,8 @@ def port_delete_view(request, port_id):
     port.delete()
 
     # Sincroniza imediatamente o squid.conf removendo a porta
-    from .squid_sync import sync_squid_rules
-    sync_ok, sync_msg = sync_squid_rules()
+    from .squid_sync import apply_squid_changes
+    sync_ok, sync_msg = apply_squid_changes()
 
     messages.success(request, f"Sala '{name}' (Porta {port_num}) excluída e removida do Squid com sucesso.")
     return redirect('groups')
@@ -355,7 +355,7 @@ def port_toggle_status_view(request, port_id):
         return HttpResponseForbidden("Você não tem permissão para controlar esta porta.")
 
     new_status = request.POST.get('status') or request.GET.get('status')
-    if new_status in ['ALLOWED', 'BLACKLIST', 'WHITELIST']:
+    if new_status in ['ALLOWED', 'BLACKLIST', 'WHITELIST', 'BLOCKED']:
         port.current_status = new_status
         port.save()
 
@@ -372,6 +372,64 @@ def port_toggle_status_view(request, port_id):
         messages.success(request, f"Status da sala '{port.name}' (Porta {port.port_number}) alterado para {port.get_current_status_display()}.")
 
     return redirect(request.META.get('HTTP_REFERER', 'groups'))
+
+
+@login_required
+def port_lists_view(request, port_id):
+    """
+    Gerencia listas exclusivas (override) de uma porta específica.
+    GET: retorna as listas atualmente vinculadas.
+    POST: atualiza as listas vinculadas (whitelists e blacklists).
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado'}, status=403)
+
+    port = get_object_or_404(ProxyPort, id=port_id)
+
+    if request.method == 'GET':
+        current_wl_ids = list(port.port_whitelists.values_list('id', flat=True))
+        current_bl_ids = list(port.port_blacklists.values_list('id', flat=True))
+        return JsonResponse({
+            'success': True,
+            'port_id': port.id,
+            'port_name': port.name,
+            'port_number': port.port_number,
+            'whitelist_ids': current_wl_ids,
+            'blacklist_ids': current_bl_ids,
+        })
+
+    if request.method == 'POST':
+        wl_ids = request.POST.getlist('port_whitelists')
+        bl_ids = request.POST.getlist('port_blacklists')
+
+        # Atualiza M2M
+        port.port_whitelists.set(
+            ProxyList.objects.filter(id__in=wl_ids, list_type='WHITELIST', is_active=True)
+        )
+        port.port_blacklists.set(
+            ProxyList.objects.filter(id__in=bl_ids, list_type='BLACKLIST', is_active=True)
+        )
+
+        # Sincroniza squid.conf
+        from .squid_sync import apply_squid_changes
+        sync_ok, sync_msg = apply_squid_changes()
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            wl_count = port.port_whitelists.count()
+            bl_count = port.port_blacklists.count()
+            return JsonResponse({
+                'success': True,
+                'message': f'Listas da porta {port.name} atualizadas com sucesso!',
+                'wl_count': wl_count,
+                'bl_count': bl_count,
+                'sync_ok': sync_ok,
+            })
+
+        messages.success(request, f"Listas exclusivas da porta '{port.name}' atualizadas!")
+        return redirect('groups')
+
+    return JsonResponse({'success': False, 'error': 'Método não suportado'}, status=405)
 
 
 # ==========================================
@@ -706,7 +764,7 @@ def domain_bulk_add_view(request, list_id):
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.core.paginator import Paginator
-from .models import AccessLog, DeviceHost
+from .models import AccessLog, DeviceHost, HiddenDomain
 from .log_service import cleanup_old_logs, sync_logs_from_squid_file
 from dashboard.models import SystemSetting
 
@@ -875,22 +933,56 @@ def logs_view(request):
 @login_required
 def logs_live_stream_view(request):
     """
-    Endpoint AJAX para o Monitor em Tempo Real (Live Stream) com suporte a filtro por Porta, Grupo e Hostname/IP.
+    Endpoint AJAX para o Monitor em Tempo Real (Live Stream) com suporte a filtros por Porta, Grupo,
+    Hostname/IP, Status (Liberados, Bloqueados no Proxy, Bloqueados no Destino) e Silenciamento de Domínios.
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     sync_logs_from_squid_file()
     last_id = request.GET.get('last_id')
     port_id = request.GET.get('port_id')
     group_id = request.GET.get('group_id')
+    action_filter = request.GET.get('action', 'ALL').strip().upper()
     hostname_filter = request.GET.get('hostname', '').strip()
+    hide_cdns = request.GET.get('hide_cdns', 'true').strip().lower() == 'true'
 
     logs_qs = AccessLog.objects.select_related('port', 'group').all()
 
+    # 1. Filtro para Ocultar Domínios Silenciados (HiddenDomain do Banco de Dados)
+    if hide_cdns:
+        hidden_patterns = list(HiddenDomain.objects.values_list('domain', flat=True))
+        if hidden_patterns:
+            q_hidden = models.Q()
+            for pat in hidden_patterns:
+                q_hidden |= models.Q(domain__icontains=pat)
+            logs_qs = logs_qs.exclude(q_hidden)
+
+    # 2. Filtro por Porta e Grupo
     if port_id and port_id.isdigit():
         logs_qs = logs_qs.filter(port_id=int(port_id))
     elif group_id and group_id.isdigit():
         logs_qs = logs_qs.filter(group_id=int(group_id))
 
+    # 3. Filtro por Ação / Status no Live
+    if action_filter == 'ALLOWED':
+        logs_qs = logs_qs.filter(action='ALLOWED').exclude(http_status__contains='/403').exclude(http_status__contains='/401')
+    elif action_filter == 'BLOCKED_PROXY':
+        logs_qs = logs_qs.filter(models.Q(action='BLOCKED') | models.Q(http_status__icontains='DENIED'))
+    elif action_filter == 'BLOCKED_DEST':
+        logs_qs = logs_qs.filter(action='ALLOWED').filter(
+            models.Q(http_status__contains='/403') |
+            models.Q(http_status__contains='/401') |
+            models.Q(http_status__contains='/429') |
+            models.Q(http_status__contains='/407')
+        )
+    elif action_filter == 'BLOCKED':
+        logs_qs = logs_qs.filter(
+            models.Q(action='BLOCKED') |
+            models.Q(http_status__icontains='DENIED') |
+            models.Q(http_status__contains='/403') |
+            models.Q(http_status__contains='/401')
+        )
+
+    # 4. Filtro por Hostname / IP
     if hostname_filter:
         logs_qs = logs_qs.filter(
             models.Q(hostname__icontains=hostname_filter) |
@@ -936,6 +1028,233 @@ def logs_live_stream_view(request):
         })
 
     return JsonResponse({'success': True, 'logs': data})
+
+
+@login_required
+def hidden_domain_add_view(request):
+    """
+    Endpoint AJAX para adicionar um domínio ao banco de domínios ocultos do Live Stream.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado'}, status=403)
+
+    if request.method == 'POST':
+        domain_str = request.POST.get('domain', '').strip()
+        description = request.POST.get('description', '').strip()
+
+        if not domain_str:
+            return JsonResponse({'success': False, 'error': 'Domínio é obrigatório.'})
+
+        item = HiddenDomain(domain=domain_str, description=description or f"Silenciado do Live Stream ({timezone.now().strftime('%d/%m/%Y %H:%M')})")
+        cleaned = item.clean_domain()
+
+        if HiddenDomain.objects.filter(domain=cleaned).exists():
+            return JsonResponse({'success': False, 'error': f"O domínio '{cleaned}' já está cadastrado no banco de domínios ocultos."})
+
+        item.domain = cleaned
+        item.save()
+
+        return JsonResponse({
+            'success': True,
+            'domain': cleaned,
+            'id': item.id,
+            'message': f"Domínio '{cleaned}' silenciado com sucesso do Live Stream!"
+        })
+
+    return JsonResponse({'success': False, 'error': 'Método inválido.'}, status=405)
+
+
+@login_required
+def hidden_domain_delete_view(request, hidden_id):
+    """
+    Endpoint AJAX para remover um domínio da base de domínios ocultos.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado'}, status=403)
+
+    item = get_object_or_404(HiddenDomain, id=hidden_id)
+    dom_name = item.domain
+    item.delete()
+
+    return JsonResponse({
+        'success': True,
+        'message': f"Domínio '{dom_name}' removido da base de domínios ocultos."
+    })
+
+
+@login_required
+def hidden_domain_list_json_view(request):
+    """
+    Retorna a lista de domínios ocultos para o modal de gerenciamento.
+    """
+    items = list(HiddenDomain.objects.all().values('id', 'domain', 'description', 'created_at'))
+    for i in items:
+        i['created_at'] = timezone.localtime(i['created_at']).strftime('%d/%m/%Y %H:%M')
+    return JsonResponse({'success': True, 'domains': items, 'total': len(items)})
+
+
+@login_required
+def proxy_tester_view(request):
+    """
+    Simulador e Testador de Políticas de Navegação.
+    Permite digitar qualquer domínio ou URL, selecionar uma porta (ou todas) e descobrir
+    em tempo real se o Squid vai permitir ou bloquear o acesso, explicando a regra exata e permitindo ações.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    input_domain = request.GET.get('domain', '').strip()
+    selected_port_id = request.GET.get('port_id', '').strip()
+
+    all_ports = list(ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number'))
+    all_groups = list(ProxyGroup.objects.filter(is_active=True).order_by('name'))
+    all_whitelists = list(ProxyList.objects.filter(list_type='WHITELIST', is_active=True).order_by('name'))
+    all_blacklists = list(ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).order_by('name'))
+
+    result = None
+
+    if input_domain:
+        cleaned_domain = input_domain.lower()
+        if '://' in cleaned_domain:
+            from urllib.parse import urlparse
+            cleaned_domain = urlparse(cleaned_domain).hostname or cleaned_domain
+        else:
+            cleaned_domain = cleaned_domain.split(':')[0].split('/')[0]
+        cleaned_domain = cleaned_domain.lstrip('.')
+
+        target_port = None
+        if selected_port_id and selected_port_id.isdigit():
+            target_port = ProxyPort.objects.select_related('group').filter(id=int(selected_port_id), is_active=True).first()
+
+        def domain_matches(test_d, list_pattern):
+            lp = list_pattern.lower().strip()
+            td = test_d.lower().strip()
+            if lp.startswith('.'):
+                root = lp.lstrip('.')
+                return td == root or td.endswith('.' + root)
+            elif lp.startswith('*.'):
+                root = lp[2:]
+                return td == root or td.endswith('.' + root)
+            else:
+                return td == lp or td.endswith('.' + lp)
+
+        # 1. Busca em TODAS as Whitelists ativas do sistema
+        matched_whitelists = []
+        all_wl = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).prefetch_related('domains')
+        for wl in all_wl:
+            for item in wl.domains.filter(is_active=True):
+                if domain_matches(cleaned_domain, item.domain):
+                    matched_whitelists.append({
+                        'list': wl,
+                        'matched_pattern': item.domain,
+                        'is_mandatory': wl.is_mandatory,
+                        'groups': list(wl.groups.filter(is_active=True)) if hasattr(wl, 'groups') else []
+                    })
+                    break
+
+        # 2. Busca em TODAS as Blacklists ativas do sistema
+        matched_blacklists = []
+        all_bl = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).prefetch_related('domains')
+        for bl in all_bl:
+            for item in bl.domains.filter(is_active=True):
+                if domain_matches(cleaned_domain, item.domain):
+                    matched_blacklists.append({
+                        'list': bl,
+                        'matched_pattern': item.domain,
+                        'groups': list(bl.groups.filter(is_active=True)) if hasattr(bl, 'groups') else []
+                    })
+                    break
+
+        # 3. Avaliação por Porta
+        port_evaluations = []
+        ports_to_test = [target_port] if target_port else all_ports
+
+        for p in ports_to_test:
+            g = p.group
+            mode = p.current_status
+
+            in_mandatory_wl = any(m['is_mandatory'] for m in matched_whitelists)
+            mandatory_item = next((m for m in matched_whitelists if m['is_mandatory']), None)
+
+            in_group_wl = any(g in m['groups'] for m in matched_whitelists)
+            group_wl_item = next((m for m in matched_whitelists if g in m['groups']), None)
+
+            in_group_bl = any(g in m['groups'] for m in matched_blacklists)
+            group_bl_item = next((m for m in matched_blacklists if g in m['groups']), None)
+
+            status = 'BLOCKED'
+            reason = ''
+            badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+
+            if mode == 'ALLOWED':
+                status = 'ALLOWED'
+                reason = 'Porta 100% Livre (Modo Aberto)'
+                badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+            elif mode == 'BLACKLIST':
+                if in_mandatory_wl:
+                    status = 'ALLOWED'
+                    reason = f"Liberado pela Whitelist Obrigatória: '{mandatory_item['list'].name}' (Precedência máxima)"
+                    badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                elif in_group_wl:
+                    status = 'ALLOWED'
+                    reason = f"Liberado pela Whitelist do Grupo: '{group_wl_item['list'].name}' (Precedência sobre Blacklist)"
+                    badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                elif in_group_bl:
+                    status = 'BLOCKED'
+                    reason = f"Bloqueado pela Blacklist do Grupo: '{group_bl_item['list'].name}'"
+                    badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                else:
+                    status = 'ALLOWED'
+                    reason = "Liberado (Não está em nenhuma Blacklist ativa deste Grupo)"
+                    badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+            else:  # Modo WHITELIST
+                if in_mandatory_wl:
+                    status = 'ALLOWED'
+                    reason = f"Liberado pela Whitelist Obrigatória: '{mandatory_item['list'].name}'"
+                    badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                elif in_group_wl:
+                    status = 'ALLOWED'
+                    reason = f"Liberado pela Whitelist do Grupo: '{group_wl_item['list'].name}'"
+                    badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                else:
+                    status = 'BLOCKED'
+                    reason = "Bloqueado (Modo Whitelist Restritivo: domínio não cadastrado em nenhuma Whitelist do Grupo)"
+                    badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+
+            port_evaluations.append({
+                'port': p,
+                'group': g,
+                'mode': mode,
+                'status': status,
+                'is_allowed': status == 'ALLOWED',
+                'reason': reason,
+                'badge_class': badge_class,
+                'in_mandatory_wl': in_mandatory_wl,
+                'in_group_wl': in_group_wl,
+                'in_group_bl': in_group_bl
+            })
+
+        result = {
+            'cleaned_domain': cleaned_domain,
+            'input_domain': input_domain,
+            'target_port': target_port,
+            'matched_whitelists': matched_whitelists,
+            'matched_blacklists': matched_blacklists,
+            'port_evaluations': port_evaluations,
+            'has_mandatory': any(m['is_mandatory'] for m in matched_whitelists),
+        }
+
+    return render(request, 'squid/tester.html', {
+        'profile': profile,
+        'all_ports': all_ports,
+        'all_groups': all_groups,
+        'all_whitelists': all_whitelists,
+        'all_blacklists': all_blacklists,
+        'input_domain': input_domain,
+        'selected_port_id': selected_port_id,
+        'result': result,
+        'active_menu': 'tester'
+    })
 
 
 @login_required
@@ -1162,6 +1481,292 @@ def pac_global_view(request):
     fallback_direct = request.GET.get('strict') != '1'
     from .pac_service import pac_response
     return pac_response(port_number=port_number, fallback_direct=fallback_direct, filename="proxy.pac")
+
+
+# ==========================================
+# 10. PORTAL EDUCACIONAL & PÁGINA DE BLOQUEIO PERSONALIZADA
+# ==========================================
+
+def portal_view(request, port_number):
+    """
+    Página pública de Portal Educacional / Bloqueio Amigável com catálogo de links autorizados.
+    Exibida quando um usuário tenta acessar uma URL não permitida na porta configurada (ex: 9030).
+    """
+    port = ProxyPort.objects.filter(port_number=port_number, is_active=True).first()
+    blocked_url = request.GET.get('blocked', '').strip()
+    
+    # Se blocked_url veio como parâmetro do Squid (%u), limpa para exibição
+    clean_blocked_host = ''
+    if blocked_url:
+        try:
+            from urllib.parse import urlparse
+            if '://' in blocked_url:
+                clean_blocked_host = urlparse(blocked_url).netloc
+            else:
+                clean_blocked_host = blocked_url.split('/')[0].split(':')[0]
+        except Exception:
+            clean_blocked_host = blocked_url
+
+    # Busca links aplicáveis a esta porta ou globais (port=None)
+    links_qs = PortalLink.objects.filter(is_active=True).filter(
+        models.Q(port=port) | models.Q(port__isnull=True)
+    ).order_by('display_order', 'title')
+
+    # Se a base estiver vazia, popula links iniciais padrão recomendados
+    if not PortalLink.objects.exists():
+        _seed_default_portal_links()
+        links_qs = PortalLink.objects.filter(is_active=True).filter(
+            models.Q(port=port) | models.Q(port__isnull=True)
+        ).order_by('display_order', 'title')
+
+    # Agrupa por categorias
+    categories = [
+        {
+            'code': 'FACULDADES',
+            'name': 'Faculdades & Portais Acadêmicos',
+            'icon': 'fa-graduation-cap',
+            'badge_color': 'from-indigo-500 to-cyan-500',
+            'links': [l for l in links_qs if l.category == 'FACULDADES']
+        },
+        {
+            'code': 'PESQUISA',
+            'name': 'Pesquisa & Bibliotecas Virtuais',
+            'icon': 'fa-book-bookmark',
+            'badge_color': 'from-emerald-500 to-teal-500',
+            'links': [l for l in links_qs if l.category == 'PESQUISA']
+        },
+        {
+            'code': 'DICIONARIOS',
+            'name': 'Dicionários & Enciclopédias',
+            'icon': 'fa-spell-check',
+            'badge_color': 'from-amber-500 to-orange-500',
+            'links': [l for l in links_qs if l.category == 'DICIONARIOS']
+        },
+        {
+            'code': 'FERRAMENTAS',
+            'name': 'Ferramentas & Recursos Educacionais',
+            'icon': 'fa-toolbox',
+            'badge_color': 'from-purple-500 to-pink-500',
+            'links': [l for l in links_qs if l.category == 'FERRAMENTAS']
+        },
+        {
+            'code': 'OUTROS',
+            'name': 'Outros Links Autorizados',
+            'icon': 'fa-globe',
+            'badge_color': 'from-slate-500 to-slate-400',
+            'links': [l for l in links_qs if l.category == 'OUTROS']
+        },
+    ]
+    # Remove categorias vazias
+    active_categories = [c for c in categories if len(c['links']) > 0]
+
+    return render(request, 'squid/portal.html', {
+        'port': port,
+        'port_number': port_number,
+        'blocked_url': blocked_url,
+        'clean_blocked_host': clean_blocked_host,
+        'categories': active_categories,
+        'total_links_count': links_qs.count()
+    })
+
+
+def _seed_default_portal_links():
+    """Popula links educativos padrão na primeira execução."""
+    defaults = [
+        ('Portal EAD UNIFACVEST', 'https://ead.unifacvest.edu.br', 'FACULDADES', 'Ambiente Virtual de Aprendizagem e Aulas Online', 'fa-graduation-cap', 1),
+        ('Portal Institucional UNIFACVEST', 'https://www.unifacvest.edu.br', 'FACULDADES', 'Site oficial do Centro Universitário FACVEST', 'fa-university', 2),
+        ('Google Acadêmico (Scholar)', 'https://scholar.google.com.br', 'PESQUISA', 'Pesquisa de artigos científicos, teses e livros acadêmicos', 'fa-magnifying-glass', 3),
+        ('SciELO Brasil', 'https://www.scielo.br', 'PESQUISA', 'Biblioteca científica eletrônica online com artigos indexados', 'fa-book-open', 4),
+        ('Periódicos CAPES', 'https://www.periodicos.capes.gov.br', 'PESQUISA', 'Acesso à produção científica nacional e internacional', 'fa-scroll', 5),
+        ('Wikipédia em Português', 'https://pt.wikipedia.org', 'PESQUISA', 'Enciclopédia livre multilíngue e colaborativa', 'fa-earth-americas', 6),
+        ('Dicio - Dicionário de Português', 'https://www.dicio.com.br', 'DICIONARIOS', 'Definições, sinônimos, antônimos e gramática da língua portuguesa', 'fa-spell-check', 7),
+        ('Michaelis Online', 'https://michaelis.uol.com.br', 'DICIONARIOS', 'Dicionários de português, inglês e outros idiomas', 'fa-book', 8),
+    ]
+    for title, url, cat, desc, icon, order in defaults:
+        PortalLink.objects.create(
+            title=title,
+            url=url,
+            category=cat,
+            description=desc,
+            icon=icon,
+            display_order=order,
+            is_active=True
+        )
+
+
+@login_required
+def portal_links_admin_view(request):
+    """
+    Interface administrativa para gerenciar os links do portal e quais portas têm portal personalizado ativo.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    links = PortalLink.objects.select_related('port').all().order_by('category', 'display_order', 'title')
+    ports = ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number')
+    
+    category_filter = request.GET.get('category', '').strip()
+    port_filter = request.GET.get('port', '').strip()
+    query = request.GET.get('q', '').strip()
+
+    if category_filter:
+        links = links.filter(category=category_filter)
+    if port_filter and port_filter.isdigit():
+        links = links.filter(port_id=int(port_filter))
+    if query:
+        links = links.filter(
+            models.Q(title__icontains=query) |
+            models.Q(url__icontains=query) |
+            models.Q(description__icontains=query)
+        )
+
+    categories_choices = PortalLink.CATEGORY_CHOICES
+
+    return render(request, 'squid/portal_links.html', {
+        'profile': profile,
+        'links': links,
+        'ports': ports,
+        'categories_choices': categories_choices,
+        'category_filter': category_filter,
+        'port_filter': port_filter,
+        'query': query,
+        'active_menu': 'portal_links'
+    })
+
+
+@login_required
+def portal_link_create_view(request):
+    """
+    Criação de um novo link autorizado no Portal.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        url = request.POST.get('url', '').strip()
+        category = request.POST.get('category', 'FACULDADES').strip()
+        description = request.POST.get('description', '').strip()
+        icon = request.POST.get('icon', 'fa-graduation-cap').strip()
+        port_id = request.POST.get('port_id', '').strip()
+        display_order = request.POST.get('display_order', '0').strip()
+
+        if not title or not url:
+            messages.error(request, 'Título e URL são obrigatórios.')
+            return redirect('portal_links_admin')
+
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = f"https://{url}"
+
+        port = ProxyPort.objects.filter(id=int(port_id)).first() if port_id and port_id.isdigit() else None
+        order = int(display_order) if display_order.isdigit() else 0
+
+        PortalLink.objects.create(
+            title=title,
+            url=url,
+            category=category,
+            description=description,
+            icon=icon or 'fa-globe',
+            port=port,
+            display_order=order,
+            is_active=True
+        )
+
+        messages.success(request, f"Link '{title}' adicionado ao Portal com sucesso!")
+        return redirect('portal_links_admin')
+
+    return redirect('portal_links_admin')
+
+
+@login_required
+def portal_link_edit_view(request, link_id):
+    """
+    Edição de um link do Portal.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    link = get_object_or_404(PortalLink, id=link_id)
+
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        url = request.POST.get('url', '').strip()
+        category = request.POST.get('category', 'FACULDADES').strip()
+        description = request.POST.get('description', '').strip()
+        icon = request.POST.get('icon', 'fa-graduation-cap').strip()
+        port_id = request.POST.get('port_id', '').strip()
+        display_order = request.POST.get('display_order', '0').strip()
+        is_active = request.POST.get('is_active') == 'on'
+
+        if not title or not url:
+            messages.error(request, 'Título e URL são obrigatórios.')
+            return redirect('portal_links_admin')
+
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = f"https://{url}"
+
+        port = ProxyPort.objects.filter(id=int(port_id)).first() if port_id and port_id.isdigit() else None
+        order = int(display_order) if display_order.isdigit() else 0
+
+        link.title = title
+        link.url = url
+        link.category = category
+        link.description = description
+        link.icon = icon or 'fa-globe'
+        link.port = port
+        link.display_order = order
+        link.is_active = is_active
+        link.save()
+
+        messages.success(request, f"Link '{title}' atualizado com sucesso!")
+        return redirect('portal_links_admin')
+
+    return redirect('portal_links_admin')
+
+
+@login_required
+def portal_link_delete_view(request, link_id):
+    """
+    Exclusão de um link do Portal.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    link = get_object_or_404(PortalLink, id=link_id)
+    title = link.title
+    link.delete()
+
+    messages.success(request, f"Link '{title}' removido do Portal.")
+    return redirect('portal_links_admin')
+
+
+@login_required
+def portal_toggle_port_view(request, port_id):
+    """
+    Ativa/Desativa o uso de Portal Personalizado de Bloqueio em uma porta/sala.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    port = get_object_or_404(ProxyPort, id=port_id)
+    port.use_custom_portal = not port.use_custom_portal
+    port.save()
+
+    mark_squid_sync_needed()
+
+    status_txt = "ATIVADO (Redirecionará para Portal com Links)" if port.use_custom_portal else "DESATIVADO (Erro padrão do Squid)"
+    messages.success(request, f"Portal personalizado da Porta {port.port_number} ({port.name}): {status_txt}. Clique em 'Aplicar no Squid' para sincronizar.")
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'use_custom_portal': port.use_custom_portal, 'port_number': port.port_number})
+
+    return redirect('portal_links_admin')
+
 
 
 

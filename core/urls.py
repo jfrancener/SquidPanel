@@ -17,6 +17,9 @@ urlpatterns = [
     # Download Direto do Certificado SSL Raiz
     path('certificate/download/', squid_views.download_certificate_view, name='root_download_certificate'),
 
+    # Portal Educacional / Página de Bloqueio Personalizada
+    path('portal/<int:port_number>/', squid_views.portal_view, name='root_portal'),
+
     # Scripts PAC / WPAD Globais e por Porta (Padrão de Mercado)
     path('proxy.pac', squid_views.pac_global_view, name='root_proxy_pac'),
     path('wpad.dat', squid_views.pac_global_view, name='root_wpad_dat'),

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Acesso Educacional | {% if port %}{{ port.name }} (Porta {{ port.port_number }}){% else %}Porta {{ port_number }}{% endif %}</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome 6 CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card:hover {
+            border-color: rgba(99, 102, 241, 0.35);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="min-h-full bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
+
+    <!-- Efeito de Luz de Fundo -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-indigo-600/15 via-cyan-500/5 to-transparent blur-3xl pointer-events-none -z-10"></div>
+
+    <!-- Header Principal -->
+    <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            <div class="flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                    <i class="fa-solid fa-graduation-cap text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-extrabold tracking-tight text-white">
+                            Portal Educacional de Acesso
+                        </h1>
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Navegação Segura
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        {% if port %}
+                            Sala conectada: <span class="text-indigo-300 font-semibold">{{ port.name }}</span> (Porta <span class="font-mono text-cyan-400">{{ port.port_number }}</span>)
+                        {% else %}
+                            Porta de Proxy: <span class="font-mono text-cyan-400">{{ port_number }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Identificador de Status e Relógio -->
+            <div class="flex items-center gap-3">
+                <div class="px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="font-medium text-slate-300">Ambiente de Aprendizagem</span>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+        <!-- Banner Informativo quando um site for bloqueado -->
+        {% if clean_blocked_host %}
+        <div class="p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-amber-500/5 border border-amber-500/30 shadow-lg relative overflow-hidden animate-fadeIn">
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 text-lg border border-amber-500/30">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-sm font-bold text-amber-300">
+                        Acesso restrito ao endereço requisitado
+                    </h2>
+                    <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                        O site <span class="font-mono font-semibold px-2 py-0.5 bg-slate-900/80 text-amber-200 rounded border border-amber-500/20 text-[11px] break-all">{{ clean_blocked_host }}</span> não está habilitado para esta sala de aula.
+                    </p>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Utilize os portais, ferramentas de pesquisa e dicionários autorizados listados abaixo para suas atividades acadêmicas.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Banner de Boas-Vindas Padrão -->
+        <div class="p-6 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900/80 to-slate-900/60 border border-indigo-500/20 shadow-xl">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="space-y-2 text-center md:text-left">
+                    <h2 class="text-xl font-bold text-white tracking-tight">
+                        Seja bem-vindo ao Portal de Estudos & Pesquisa
+                    </h2>
+                    <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                        Aqui você encontra acesso direto aos portais acadêmicos, ambientes virtuais (AVA/EAD), ferramentas de busca científica e dicionários recomendados para sua aula.
+                    </p>
+                </div>
+                <div class="flex items-center gap-3 text-xs text-slate-400">
+                    <div class="px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700/60 text-center">
+                        <div class="font-bold text-indigo-400 text-sm">{{ total_links_count }}</div>
+                        <div class="text-[10px] text-slate-400">Links Autorizados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Barra de Busca Rápida de Links -->
+        <div class="relative">
+            <div class="relative flex items-center">
+                <i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
+                <input 
+                    type="text" 
+                    id="search-portal-links" 
+                    placeholder="Pesquisar entre os sites autorizados (ex: Unifacvest, Scholar, Dicionário, SciELO)..." 
+                    class="w-full pl-11 pr-12 py-3.5 bg-slate-900/90 border border-slate-700/80 rounded-2xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
+                    oninput="filterPortalCards(this.value)"
+                    autofocus
+                >
+                <button 
+                    id="clear-search-btn" 
+                    onclick="clearSearch()" 
+                    class="hidden absolute right-3.5 w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all"
+                    title="Limpar busca"
+                >
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Seções por Categoria -->
+        <div id="categories-container" class="space-y-10">
+            {% for cat in categories %}
+            <section class="category-section space-y-4" data-category="{{ cat.code }}">
+                
+                <!-- Cabeçalho da Categoria -->
+                <div class="flex items-center gap-2.5 pb-2 border-b border-slate-800/60">
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr {{ cat.badge_color }} flex items-center justify-center text-white text-xs shadow-md">
+                        <i class="fa-solid {{ cat.icon }}"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white tracking-tight">
+                        {{ cat.name }}
+                    </h3>
+                    <span class="ml-auto text-[11px] font-semibold text-slate-500 px-2 py-0.5 bg-slate-900 rounded-md border border-slate-800">
+                        {{ cat.links|length }} {{ cat.links|length|pluralize:"item,itens" }}
+                    </span>
+                </div>
+
+                <!-- Grade de Cards de Links -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for link in cat.links %}
+                    <a 
+                        href="{{ link.url }}" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        class="portal-card glass-card p-5 rounded-2xl flex flex-col justify-between transition-all duration-200 group shadow-lg"
+                        data-title="{{ link.title|lower }}"
+                        data-desc="{{ link.description|lower }}"
+                        data-url="{{ link.url|lower }}"
+                    >
+                        <div class="space-y-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-slate-800/90 text-indigo-400 flex items-center justify-center text-base border border-slate-700/60 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-500 transition-all shadow-sm">
+                                    <i class="fa-solid {{ link.icon|default:'fa-globe' }}"></i>
+                                </div>
+                                <span class="p-1.5 rounded-lg bg-slate-800/50 text-slate-400 group-hover:text-indigo-300 transition-all text-xs">
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
+                                </span>
+                            </div>
+
+                            <div>
+                                <h4 class="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-1">
+                                    {{ link.title }}
+                                </h4>
+                                {% if link.description %}
+                                <p class="text-xs text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                                    {{ link.description }}
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
+                            <span class="font-mono text-slate-400 truncate max-w-[200px]" title="{{ link.url }}">
+                                {{ link.url|cut:"https://"|cut:"http://"|cut:"www."|slice:":28" }}
+                            </span>
+                            <span class="text-indigo-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                                Acessar <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+
+            </section>
+            {% empty %}
+            <div class="text-center py-16 bg-slate-900/40 rounded-3xl border border-slate-800/60">
+                <i class="fa-solid fa-circle-info text-3xl text-slate-500 mb-3"></i>
+                <h4 class="text-base font-bold text-slate-300">Nenhum link cadastrado no momento</h4>
+                <p class="text-xs text-slate-500 mt-1">O administrador do sistema pode cadastrar novos links no painel administrativo.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Mensagem de Nada Encontrado na Busca -->
+        <div id="no-search-results" class="hidden text-center py-16 bg-slate-900/40 rounded-3xl border border-slate-800/60">
+            <div class="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto text-lg mb-3">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </div>
+            <h4 class="text-base font-bold text-slate-300">Nenhum site encontrado para a busca</h4>
+            <p class="text-xs text-slate-500 mt-1">Verifique a ortografia ou tente pesquisar por outro termo.</p>
+            <button onclick="clearSearch()" class="mt-4 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all">
+                Limpar Busca
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Rodapé -->
+    <footer class="border-t border-slate-800/80 bg-slate-950/80 py-6 mt-12 text-center text-xs text-slate-500">
+        <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <span class="font-bold text-slate-400">SquidPanel</span> &bull; <span class="text-slate-500">Ambiente Seguro de Acesso à Internet</span>
+            </div>
+            <p class="text-[11px] text-slate-600">
+                &copy; 2026 &bull; Desenvolvido por Juliano Francener
+            </p>
+        </div>
+    </footer>
+
+    <!-- Script de Busca Rápida em Tempo Real -->
+    <script>
+        function filterPortalCards(term) {
+            const cleanTerm = term.trim().toLowerCase();
+            const clearBtn = document.getElementById('clear-search-btn');
+            const noResults = document.getElementById('no-search-results');
+            const sections = document.querySelectorAll('.category-section');
+            
+            if (cleanTerm.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+
+            let totalVisibleCards = 0;
+
+            sections.forEach(section => {
+                const cards = section.querySelectorAll('.portal-card');
+                let visibleCardsInSection = 0;
+
+                cards.forEach(card => {
+                    const title = card.getAttribute('data-title') || '';
+                    const desc = card.getAttribute('data-desc') || '';
+                    const url = card.getAttribute('data-url') || '';
+
+                    if (cleanTerm === '' || title.includes(cleanTerm) || desc.includes(cleanTerm) || url.includes(cleanTerm)) {
+                        card.style.display = 'flex';
+                        visibleCardsInSection++;
+                        totalVisibleCards++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                if (visibleCardsInSection === 0) {
+                    section.style.display = 'none';
+                } else {
+                    section.style.display = 'block';
+                }
+            });
+
+            if (totalVisibleCards === 0 && cleanTerm !== '') {
+                noResults.classList.remove('hidden');
+            } else {
+                noResults.classList.add('hidden');
+            }
+        }
+
+        function clearSearch() {
+            const input = document.getElementById('search-portal-links');
+            input.value = '';
+            filterPortalCards('');
+            input.focus();
+        }
+    </script>
+</body>
+</html>

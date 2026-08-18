@@ -108,8 +108,8 @@ def settings_general_view(request):
         SystemSetting.set_value('admin_email', admin_email, 'E-mail do Administrador de TI')
 
         # Sincroniza regras do Squid caso necessário
-        from squid.squid_sync import sync_squid_rules
-        sync_squid_rules()
+        from squid.squid_sync import apply_squid_changes
+        apply_squid_changes()
 
         messages.success(request, 'Parâmetros gerais de rede e servidor atualizados com sucesso!')
         return redirect('settings_general')

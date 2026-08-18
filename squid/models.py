@@ -193,3 +193,70 @@ class DeviceHost(models.Model):
         return f"{self.hostname} ({self.ip_address})"
 
 
+class HiddenDomain(models.Model):
+    """
+    Domínios que devem ser ocultados do Monitor em Tempo Real (Live Stream).
+    Permite silenciar ruídos, telemetrias, CDNs e domínios frequentes cadastrados pelo usuário.
+    """
+    domain = models.CharField(max_length=255, unique=True, db_index=True, verbose_name="Domínio a Ocultar")
+    description = models.CharField(max_length=255, blank=True, verbose_name="Motivo / Descrição")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Criado em")
+
+    class Meta:
+        verbose_name = "Domínio Oculto no Live"
+        verbose_name_plural = "Domínios Ocultos no Live"
+        ordering = ['domain']
+
+    def __str__(self):
+        return self.domain
+
+    def clean_domain(self):
+        d = self.domain.strip().lower()
+        if '://' in d:
+            from urllib.parse import urlparse
+            d = urlparse(d).hostname or d
+        else:
+            d = d.split(':')[0].split('/')[0]
+        return d.lstrip('.')
+
+class PortalLink(models.Model):
+    """
+    Links e atalhos permitidos exibidos na página de bloqueio/portal educacional (ex: Portal EAD, Google Scholar, Dicionários).
+    """
+    CATEGORY_CHOICES = [
+        ('FACULDADES', 'Faculdades & Portais Acadêmicos'),
+        ('PESQUISA', 'Pesquisa & Bibliotecas Virtuais'),
+        ('DICIONARIOS', 'Dicionários & Enciclopédias'),
+        ('FERRAMENTAS', 'Ferramentas & Recursos Educacionais'),
+        ('OUTROS', 'Outros Links Autorizados'),
+    ]
+
+    title = models.CharField(max_length=150, verbose_name="Título / Nome do Site")
+    url = models.URLField(max_length=500, verbose_name="Endereço URL (ex: https://...)")
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default='FACULDADES', verbose_name="Categoria")
+    description = models.CharField(max_length=255, blank=True, verbose_name="Descrição Curta")
+    icon = models.CharField(max_length=50, default='fa-graduation-cap', verbose_name="Ícone FontAwesome")
+    port = models.ForeignKey(
+        'dashboard.ProxyPort',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='portal_links',
+        verbose_name="Porta / Sala Específica",
+        help_text="Selecione uma porta específica ou deixe em branco para todas as salas com portal ativo"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    display_order = models.IntegerField(default=0, verbose_name="Ordem de Exibição")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Criado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        verbose_name = "Link do Portal"
+        verbose_name_plural = "Links do Portal"
+        ordering = ['display_order', 'title']
+
+    def __str__(self):
+        return f"{self.title} ({self.get_category_display()})"
+
+
+
