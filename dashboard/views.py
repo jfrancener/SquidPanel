@@ -15,9 +15,12 @@ from .models import (
 from .system_metrics import get_full_system_telemetry
 from django.http import JsonResponse
 
-# ==========================================
-# 1. DASHBOARD PRINCIPAL
-# ==========================================
+def generic_home_view(request):
+    """
+    Página inicial pública minimalista com identificador discreto do SquidPanel.
+    """
+    return render(request, 'generic_home.html')
+
 
 @login_required
 def dashboard_view(request):

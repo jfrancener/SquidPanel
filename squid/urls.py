@@ -54,7 +54,8 @@ urlpatterns = [
     path('certificate/download/', views.download_certificate_view, name='download_certificate'),
 
     # Portal Educacional / Página de Bloqueio Personalizada
-    path('portal/<int:port_number>/', views.portal_view, name='portal'),
+    path('portal/', views.portal_view, {'port_identifier': '9030'}, name='portal_default'),
+    path('portal/<str:port_identifier>/', views.portal_view, name='portal'),
     path('portal-links/', views.portal_links_admin_view, name='portal_links_admin'),
     path('portal-links/create/', views.portal_link_create_view, name='portal_link_create'),
     path('portal-links/<int:link_id>/edit/', views.portal_link_edit_view, name='portal_link_edit'),

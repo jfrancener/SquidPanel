@@ -1487,17 +1487,32 @@ def pac_global_view(request):
 # 10. PORTAL EDUCACIONAL & PÁGINA DE BLOQUEIO PERSONALIZADA
 # ==========================================
 
-def portal_view(request, port_number):
+def portal_view(request, port_identifier='9030'):
     """
     Página pública de Portal Educacional / Bloqueio Amigável com catálogo de links autorizados.
-    Exibida quando um usuário tenta acessar uma URL não permitida na porta configurada (ex: 9030).
+    Aceita tanto número de porta (9030) quanto slug/nome da sala (ead, sala-ead, etc.).
     """
-    port = ProxyPort.objects.filter(port_number=port_number, is_active=True).first()
+    port_str = str(port_identifier).strip().lower()
+    port = None
+    if port_str.isdigit():
+        port = ProxyPort.objects.filter(port_number=int(port_str), is_active=True).first()
+    
+    if not port:
+        port = ProxyPort.objects.filter(
+            models.Q(slug=port_str) | 
+            models.Q(slug__istartswith=port_str) | 
+            models.Q(name__icontains=port_str),
+            is_active=True
+        ).first()
+        
+    if not port and port_str == 'ead':
+        port = ProxyPort.objects.filter(port_number=9030, is_active=True).first()
+
     blocked_url = request.GET.get('blocked', '').strip()
     
     # Se blocked_url veio como parâmetro do Squid (%u), limpa para exibição
     clean_blocked_host = ''
-    if blocked_url:
+    if blocked_url and blocked_url not in ['%u', 'http://%u', 'https://%u']:
         try:
             from urllib.parse import urlparse
             if '://' in blocked_url:
@@ -1508,16 +1523,18 @@ def portal_view(request, port_number):
             clean_blocked_host = blocked_url
 
     # Busca links aplicáveis a esta porta ou globais (port=None)
-    links_qs = PortalLink.objects.filter(is_active=True).filter(
-        models.Q(port=port) | models.Q(port__isnull=True)
-    ).order_by('display_order', 'title')
+    links_qs = PortalLink.objects.filter(is_active=True)
+    if port:
+        links_qs = links_qs.filter(models.Q(port=port) | models.Q(port__isnull=True))
+    links_qs = links_qs.order_by('display_order', 'title')
 
     # Se a base estiver vazia, popula links iniciais padrão recomendados
     if not PortalLink.objects.exists():
         _seed_default_portal_links()
-        links_qs = PortalLink.objects.filter(is_active=True).filter(
-            models.Q(port=port) | models.Q(port__isnull=True)
-        ).order_by('display_order', 'title')
+        links_qs = PortalLink.objects.filter(is_active=True)
+        if port:
+            links_qs = links_qs.filter(models.Q(port=port) | models.Q(port__isnull=True))
+        links_qs = links_qs.order_by('display_order', 'title')
 
     # Agrupa por categorias
     categories = [
@@ -1562,7 +1579,7 @@ def portal_view(request, port_number):
 
     return render(request, 'squid/portal.html', {
         'port': port,
-        'port_number': port_number,
+        'port_identifier': port_identifier,
         'blocked_url': blocked_url,
         'clean_blocked_host': clean_blocked_host,
         'categories': active_categories,

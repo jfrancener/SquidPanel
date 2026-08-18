@@ -362,7 +362,8 @@ def generate_squid_config_and_lists():
     if portal_ports:
         conf_lines.append("# --- Paginas de Bloqueio / Portal Educacional Personalizado (deny_info) ---")
         for p in portal_ports:
-            conf_lines.append(f"deny_info http://{server_ip}:8000/portal/{p.port_number}/?blocked=%u myport_{p.port_number}")
+            target_slug = 'ead' if (p.port_number == 9030 or 'ead' in p.name.lower()) else (p.slug or str(p.port_number))
+            conf_lines.append(f"deny_info http://{server_ip}/portal/{target_slug}/?blocked=%u myport_{p.port_number}")
         conf_lines.append("")
 
     # Regras de Acesso por Porta e Status

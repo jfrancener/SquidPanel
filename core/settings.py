@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'squidpanel-insecure-key-7f9e8a1c2d3b4f5a6b7c8d9e0f1a2b3c4d5e'
 
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
@@ -87,9 +87,9 @@ STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication & Session Settings
-LOGIN_URL = 'login'
+LOGIN_URL = '/adminsp/login/'
 LOGIN_REDIRECT_URL = 'dashboard'
-LOGOUT_REDIRECT_URL = 'login'
+LOGOUT_REDIRECT_URL = '/adminsp/login/'
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_SAVE_EVERY_REQUEST = False
