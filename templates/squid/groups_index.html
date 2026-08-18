@@ -211,19 +211,19 @@
                             <td class="p-3.5 text-center" id="port-status-badge-{{ port.id }}">
                                 {% if port.current_status == 'ALLOWED' %}
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberada Total (100% Livre)
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Livre
                                 </span>
                                 {% elif port.current_status == 'BLACKLIST' %}
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Liberada com Blacklist
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Navegação Segura
                                 </span>
-                                {% elif port.current_status == 'BLOCKED' %}
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Bloqueio Total (Sem Acesso)
+                                {% elif port.current_status == 'WHITELIST' %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Navegação Restrita
                                 </span>
                                 {% else %}
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Apenas Whitelist
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Bloqueado
                                 </span>
                                 {% endif %}
 
@@ -765,16 +765,16 @@ async function togglePortStatusAjax(event, portId, status) {
                 let statusHtml = '';
                 if (data.new_status === 'ALLOWED') {
                     statusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberada Total (100% Livre)</span>`;
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Livre</span>`;
                 } else if (data.new_status === 'BLACKLIST') {
                     statusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Liberada com Blacklist</span>`;
-                } else if (data.new_status === 'BLOCKED') {
-                    statusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
-                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Bloqueio Total (Sem Acesso)</span>`;
-                } else {
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Navegação Segura</span>`;
+                } else if (data.new_status === 'WHITELIST') {
                     statusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Apenas Whitelist</span>`;
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Navegação Restrita</span>`;
+                } else {
+                    statusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Bloqueado</span>`;
                 }
                 badgeTd.innerHTML = statusHtml + listsBadgeHtml;
             }

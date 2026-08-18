@@ -97,9 +97,9 @@ def gestor_set_port_mode_api(request, port_id):
 
     mode_labels = {
         'ALLOWED': 'Livre',
-        'BLACKLIST': 'Livre',
-        'WHITELIST': 'Somente Liberados',
-        'BLOCKED': 'Bloqueio Total',
+        'BLACKLIST': 'Navegação Segura',
+        'WHITELIST': 'Navegação Restrita',
+        'BLOCKED': 'Bloqueado',
     }
 
     return JsonResponse({

@@ -136,12 +136,14 @@
                 <div class="flex items-center justify-between text-slate-300">
                     <span class="text-slate-400">Modo no Horário:</span>
                     <span>
-                        {% if s.action == 'ALLOWED' or s.action == 'BLACKLIST' %}
+                        {% if s.action == 'ALLOWED' %}
                         <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-globe text-[10px] mr-1"></i>Livre</span>
+                        {% elif s.action == 'BLACKLIST' %}
+                        <span class="text-amber-400 font-semibold"><i class="fa-solid fa-shield-halved text-[10px] mr-1"></i>Navegação Segura</span>
                         {% elif s.action == 'WHITELIST' %}
-                        <span class="text-indigo-400 font-semibold"><i class="fa-solid fa-shield-halved text-[10px] mr-1"></i>Somente Liberados</span>
+                        <span class="text-indigo-400 font-semibold"><i class="fa-solid fa-filter text-[10px] mr-1"></i>Navegação Restrita</span>
                         {% else %}
-                        <span class="text-rose-400 font-semibold"><i class="fa-solid fa-lock text-[10px] mr-1"></i>Bloqueio Total</span>
+                        <span class="text-rose-400 font-semibold"><i class="fa-solid fa-lock text-[10px] mr-1"></i>Bloqueado</span>
                         {% endif %}
                     </span>
                 </div>
@@ -151,9 +153,11 @@
                     <span class="text-slate-400">Após Término:</span>
                     <span>
                         {% if s.revert_action == 'BLOCKED' %}
-                        <span class="text-rose-400 font-medium">Bloqueio Total</span>
+                        <span class="text-rose-400 font-medium">Bloqueado</span>
+                        {% elif s.revert_action == 'BLACKLIST' %}
+                        <span class="text-amber-400 font-medium">Navegação Segura</span>
                         {% elif s.revert_action == 'WHITELIST' %}
-                        <span class="text-indigo-400 font-medium">Somente Liberados</span>
+                        <span class="text-indigo-400 font-medium">Navegação Restrita</span>
                         {% else %}
                         <span class="text-emerald-400 font-medium">Livre</span>
                         {% endif %}
@@ -353,9 +357,10 @@
                         Modo no Horário
                     </label>
                     <select id="sched-action" name="action" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold">
-                        <option value="BLACKLIST" class="text-emerald-400">🟢 Livre</option>
-                        <option value="WHITELIST" class="text-indigo-400">🔵 Somente Liberados</option>
-                        <option value="BLOCKED" class="text-rose-400">🔴 Bloqueio Total</option>
+                        <option value="BLACKLIST" class="text-amber-400" selected>🟡 Navegação Segura</option>
+                        <option value="WHITELIST" class="text-indigo-400">🔵 Navegação Restrita</option>
+                        <option value="ALLOWED" class="text-emerald-400">🟢 Livre</option>
+                        <option value="BLOCKED" class="text-rose-400">🔴 Bloqueado</option>
                     </select>
                 </div>
                 <div>
@@ -363,9 +368,10 @@
                         Após Término
                     </label>
                     <select id="sched-revert" name="revert_action" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold">
-                        <option value="BLOCKED" class="text-rose-400">🔴 Bloqueio Total</option>
-                        <option value="WHITELIST" class="text-indigo-400">🔵 Somente Liberados</option>
-                        <option value="BLACKLIST" class="text-emerald-400">🟢 Livre</option>
+                        <option value="BLOCKED" class="text-rose-400" selected>🔴 Bloqueado</option>
+                        <option value="BLACKLIST" class="text-amber-400">🟡 Navegação Segura</option>
+                        <option value="WHITELIST" class="text-indigo-400">🔵 Navegação Restrita</option>
+                        <option value="ALLOWED" class="text-emerald-400">🟢 Livre</option>
                     </select>
                 </div>
             </div>

@@ -44,7 +44,7 @@
     <div id="room-card-{{ p.id }}" class="glass-panel rounded-2xl p-5 border border-slate-800/80 shadow-lg hover:border-slate-700/80 transition-all flex flex-col justify-between relative overflow-hidden">
         
         <!-- Faixa lateral de status colorida -->
-        <div id="room-accent-{{ p.id }}" class="absolute top-0 left-0 bottom-0 w-1.5 {% if p.current_status == 'ALLOWED' or p.current_status == 'BLACKLIST' %}bg-emerald-500{% elif p.current_status == 'WHITELIST' %}bg-indigo-500{% else %}bg-rose-500{% endif %}"></div>
+        <div id="room-accent-{{ p.id }}" class="absolute top-0 left-0 bottom-0 w-1.5 {% if p.current_status == 'ALLOWED' %}bg-emerald-500{% elif p.current_status == 'BLACKLIST' %}bg-amber-500{% elif p.current_status == 'WHITELIST' %}bg-indigo-500{% else %}bg-rose-500{% endif %}"></div>
 
         <div>
             <!-- Topo do Card: Nome da Sala e Status -->
@@ -58,20 +58,25 @@
 
                 <!-- Badge do Status Atual -->
                 <div id="room-badge-{{ p.id }}">
-                    {% if p.current_status == 'ALLOWED' or p.current_status == 'BLACKLIST' %}
+                    {% if p.current_status == 'ALLOWED' %}
                     <span class="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                         Livre
                     </span>
+                    {% elif p.current_status == 'BLACKLIST' %}
+                    <span class="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        Navegação Segura
+                    </span>
                     {% elif p.current_status == 'WHITELIST' %}
                     <span class="px-2.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center gap-1.5">
                         <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-                        Somente Liberados
+                        Navegação Restrita
                     </span>
                     {% else %}
                     <span class="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-1.5">
                         <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                        Bloqueio Total
+                        Bloqueado
                     </span>
                     {% endif %}
                 </div>
@@ -131,37 +136,47 @@
             {% endif %}
         </div>
 
-        <!-- Botões Seletores de Modo (3 Modos Intuitivos) -->
+        <!-- Botões Seletores de Modo (4 Modos de Navegação) -->
         <div class="mt-4 pt-3 border-t border-slate-800/80 pl-2">
-            <div class="grid grid-cols-3 gap-2">
-                <!-- Modo Livre (Blacklist de Segurança) -->
+            <div class="grid grid-cols-2 gap-2">
+                <!-- Modo Livre -->
                 <button 
-                    onclick="setRoomMode({{ p.id }}, 'BLACKLIST')" 
-                    id="btn-mode-{{ p.id }}-BLACKLIST"
-                    class="room-mode-btn py-2 px-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'BLACKLIST' or p.current_status == 'ALLOWED' %}bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
-                    title="Acesso à internet liberado para navegação">
+                    onclick="setRoomMode({{ p.id }}, 'ALLOWED')" 
+                    id="btn-mode-{{ p.id }}-ALLOWED"
+                    class="room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'ALLOWED' %}bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    title="Acesso totalmente livre à internet">
                     <i class="fa-solid fa-globe text-[11px]"></i>
                     <span>Livre</span>
                 </button>
 
-                <!-- Modo Somente Liberados (Whitelist) -->
+                <!-- Modo Navegação Segura (Blacklist) -->
+                <button 
+                    onclick="setRoomMode({{ p.id }}, 'BLACKLIST')" 
+                    id="btn-mode-{{ p.id }}-BLACKLIST"
+                    class="room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'BLACKLIST' %}bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    title="Navegação livre bloqueando sites impróprios da blacklist">
+                    <i class="fa-solid fa-shield-halved text-[11px]"></i>
+                    <span class="truncate">Navegação Segura</span>
+                </button>
+
+                <!-- Modo Navegação Restrita (Whitelist) -->
                 <button 
                     onclick="setRoomMode({{ p.id }}, 'WHITELIST')" 
                     id="btn-mode-{{ p.id }}-WHITELIST"
-                    class="room-mode-btn py-2 px-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'WHITELIST' %}bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
-                    title="Permite apenas os sites autorizados e o portal educacional">
-                    <i class="fa-solid fa-shield-halved text-[11px]"></i>
-                    <span class="truncate">Somente Liberados</span>
+                    class="room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'WHITELIST' %}bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    title="Permite apenas os sites autorizados da whitelist e o portal">
+                    <i class="fa-solid fa-filter text-[11px]"></i>
+                    <span class="truncate">Navegação Restrita</span>
                 </button>
 
-                <!-- Modo Bloqueio Total -->
+                <!-- Modo Bloqueado -->
                 <button 
                     onclick="setRoomMode({{ p.id }}, 'BLOCKED')" 
                     id="btn-mode-{{ p.id }}-BLOCKED"
-                    class="room-mode-btn py-2 px-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'BLOCKED' %}bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    class="room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'BLOCKED' %}bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
                     title="Bloqueio total de navegação na internet para esta sala">
                     <i class="fa-solid fa-lock text-[11px]"></i>
-                    <span class="truncate">Bloqueio Total</span>
+                    <span>Bloqueado</span>
                 </button>
             </div>
         </div>
@@ -300,18 +315,22 @@ async function setRoomMode(portId, newMode) {
 
             const activeBtn = document.getElementById(`btn-mode-${portId}-${newMode}`);
             if (activeBtn) {
-                if (newMode === 'BLACKLIST' || newMode === 'ALLOWED') {
-                    activeBtn.className = "room-mode-btn py-2 px-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30";
+                if (newMode === 'ALLOWED') {
+                    activeBtn.className = "room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30";
                     accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-emerald-500";
                     badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Livre</span>`;
+                } else if (newMode === 'BLACKLIST') {
+                    activeBtn.className = "room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/30";
+                    accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-amber-500";
+                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Navegação Segura</span>`;
                 } else if (newMode === 'WHITELIST') {
-                    activeBtn.className = "room-mode-btn py-2 px-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30";
+                    activeBtn.className = "room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30";
                     accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-indigo-500";
-                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>Somente Liberados</span>`;
+                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>Navegação Restrita</span>`;
                 } else {
-                    activeBtn.className = "room-mode-btn py-2 px-1.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30";
+                    activeBtn.className = "room-mode-btn py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30";
                     accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-rose-500";
-                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Bloqueio Total</span>`;
+                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Bloqueado</span>`;
                 }
             }
 

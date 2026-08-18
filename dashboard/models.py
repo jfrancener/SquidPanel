@@ -114,46 +114,58 @@ class ProxyPort(models.Model):
         # 1. Se estiver sob efeito de um agendamento ativo
         if self.last_status_source == 'SCHEDULE' and self.active_schedule and self.active_schedule.is_in_effect_now(now):
             end_t = self.active_schedule.end_time.strftime('%H:%M')
-            if self.current_status in ['ALLOWED', 'BLACKLIST']:
+            if self.current_status == 'ALLOWED':
                 return {
                     'type': 'SCHEDULE',
-                    'title': 'Liberado por agendamento',
+                    'title': 'Livre por agendamento',
                     'detail': f"Agendamento '{self.active_schedule.name}' (bloqueia às {end_t})",
                     'short': f"Agendamento (até {end_t})",
-                    'badge_class': 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30',
-                    'icon': 'fa-solid fa-calendar-check text-cyan-400',
+                    'badge_class': 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+                    'icon': 'fa-solid fa-globe text-emerald-400',
                     'end_time': end_t
                 }
-            elif self.current_status == 'BLOCKED':
+            elif self.current_status == 'BLACKLIST':
                 return {
                     'type': 'SCHEDULE',
-                    'title': 'Bloqueio Total por agendamento',
+                    'title': 'Navegação Segura por agendamento',
+                    'detail': f"Agendamento '{self.active_schedule.name}' (bloqueia às {end_t})",
+                    'short': f"Agendamento (até {end_t})",
+                    'badge_class': 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+                    'icon': 'fa-solid fa-shield-halved text-amber-400',
+                    'end_time': end_t
+                }
+            elif self.current_status == 'WHITELIST':
+                return {
+                    'type': 'SCHEDULE',
+                    'title': 'Navegação Restrita por agendamento',
+                    'detail': f"Agendamento '{self.active_schedule.name}' (até às {end_t})",
+                    'short': f"Agendamento (até {end_t})",
+                    'badge_class': 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
+                    'icon': 'fa-solid fa-filter text-indigo-400',
+                    'end_time': end_t
+                }
+            else:
+                return {
+                    'type': 'SCHEDULE',
+                    'title': 'Bloqueado por agendamento',
                     'detail': f"Agendamento '{self.active_schedule.name}' (até às {end_t})",
                     'short': f"Agendamento (até {end_t})",
                     'badge_class': 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
                     'icon': 'fa-solid fa-calendar-xmark text-rose-400',
                     'end_time': end_t
                 }
-            else:
-                return {
-                    'type': 'SCHEDULE',
-                    'title': 'Somente Liberados por agendamento',
-                    'detail': f"Agendamento '{self.active_schedule.name}' (até às {end_t})",
-                    'short': f"Agendamento (até {end_t})",
-                    'badge_class': 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
-                    'icon': 'fa-solid fa-calendar-days text-indigo-400',
-                    'end_time': end_t
-                }
 
         # 2. Se foi alterado por usuário manualmente
         if self.last_modified_by:
             user_name = self.last_modified_by.first_name or self.last_modified_by.username
-            if self.current_status in ['ALLOWED', 'BLACKLIST']:
-                action_word = "Liberado"
-            elif self.current_status == 'BLOCKED':
-                action_word = "Bloqueio Total"
+            if self.current_status == 'ALLOWED':
+                action_word = "Livre"
+            elif self.current_status == 'BLACKLIST':
+                action_word = "Navegação Segura"
+            elif self.current_status == 'WHITELIST':
+                action_word = "Navegação Restrita"
             else:
-                action_word = "Somente Liberados"
+                action_word = "Bloqueado"
 
             return {
                 'type': 'MANUAL',
@@ -207,12 +219,12 @@ class ProxyPort(models.Model):
 
         action_map = {
             'ALLOWED': 'Livre',
-            'BLACKLIST': 'Livre',
-            'WHITELIST': 'Somente Liberados',
-            'BLOCKED': 'Bloqueio Total'
+            'BLACKLIST': 'Navegação Segura',
+            'WHITELIST': 'Navegação Restrita',
+            'BLOCKED': 'Bloqueado'
         }
         act_label = action_map.get(target.action, target.action)
-        rev_label = action_map.get(target.revert_action, 'Bloqueio Total')
+        rev_label = action_map.get(target.revert_action, 'Bloqueado')
 
         return {
             'has_schedule': True,
@@ -234,7 +246,6 @@ class ProxyPort(models.Model):
         super().save(*args, **kwargs)
 
 
-
 class RoomSchedule(models.Model):
     """
     Agendamentos de horários para liberação/bloqueio automático das salas.
@@ -245,9 +256,9 @@ class RoomSchedule(models.Model):
         ('ONETIME', 'Pontual (Data Específica)'),
     ]
     ACTION_CHOICES = [
+        ('BLACKLIST', 'Navegação Segura (Blacklist)'),
+        ('WHITELIST', 'Navegação Restrita (Whitelist)'),
         ('ALLOWED', 'Livre (Acesso Total)'),
-        ('WHITELIST', 'Whitelist (Apenas Permitidos)'),
-        ('BLACKLIST', 'Blacklist (Livre com Restrições)'),
         ('BLOCKED', 'Bloqueado'),
     ]
 
