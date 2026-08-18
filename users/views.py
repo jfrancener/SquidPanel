@@ -55,9 +55,12 @@ def login_view(request):
             else:
                 request.session['remember_me'] = False
                 request.session.set_expiry(0)
-                request.session['last_activity'] = time.time()
-
-            return redirect(next_url if next_url and next_url != '/' else 'dashboard')
+            if next_url and next_url not in ['/', 'dashboard', '/adminsp/']:
+                return redirect(next_url)
+            
+            if profile.is_admin:
+                return redirect('dashboard')
+            return redirect('gestor_dashboard')
         else:
             messages.error(request, 'Usuário ou senha incorretos. Verifique suas credenciais.')
 

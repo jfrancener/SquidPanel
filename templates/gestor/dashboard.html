@@ -1,0 +1,460 @@
+{% extends 'gestor/base_gestor.html' %}
+
+{% block title %}Painel de Controle das Salas{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho e Estatísticas Rápidas -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+        <h1 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
+            <i class="fa-solid fa-chalkboard-user text-indigo-400"></i>
+            Salas de Aula & Laboratórios
+        </h1>
+        <p class="text-xs text-slate-400 mt-1">
+            Gerencie o modo de navegação da internet em tempo real e acompanhe os acessos dos alunos.
+        </p>
+    </div>
+
+    <!-- Indicador de Status dos Modos das Salas -->
+    <div class="flex items-center gap-2 flex-wrap">
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="text-slate-300 font-medium">Livre: <strong id="stat-allowed" class="text-white">{{ allowed_count }}</strong></span>
+        </div>
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+            <span class="text-slate-300 font-medium">Whitelist: <strong id="stat-whitelist" class="text-white">{{ whitelist_count }}</strong></span>
+        </div>
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span class="text-slate-300 font-medium">Blacklist: <strong id="stat-blacklist" class="text-white">{{ blacklist_count }}</strong></span>
+        </div>
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+            <span class="text-slate-300 font-medium">Bloqueado: <strong id="stat-blocked" class="text-white">{{ blocked_count }}</strong></span>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- 1. CARDS DE CONTROLE DAS SALAS -->
+<!-- ========================================== -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for p in ports %}
+    <div id="room-card-{{ p.id }}" class="glass-panel rounded-2xl p-5 border border-slate-800/80 shadow-lg hover:border-slate-700/80 transition-all flex flex-col justify-between relative overflow-hidden">
+        
+        <!-- Faixa lateral de status colorida -->
+        <div id="room-accent-{{ p.id }}" class="absolute top-0 left-0 bottom-0 w-1.5 {% if p.current_status == 'ALLOWED' %}bg-emerald-500{% elif p.current_status == 'WHITELIST' %}bg-indigo-500{% elif p.current_status == 'BLACKLIST' %}bg-amber-500{% else %}bg-rose-500{% endif %}"></div>
+
+        <div>
+            <!-- Topo do Card: Nome e Porta -->
+            <div class="flex items-start justify-between gap-3 pl-2">
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                        <i class="fa-solid fa-door-open text-indigo-400 text-sm"></i>
+                        {{ p.name }}
+                    </h3>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60 font-mono text-[11px] font-semibold text-slate-300">
+                            Porta {{ p.port_number }}
+                        </span>
+                        {% if p.group %}
+                        <span class="text-[11px] text-slate-400 flex items-center gap-1">
+                            <i class="fa-solid fa-layer-group text-[10px] text-slate-500"></i>
+                            {{ p.group.name }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Badge do Status Atual -->
+                <div id="room-badge-{{ p.id }}">
+                    {% if p.current_status == 'ALLOWED' %}
+                    <span class="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Livre
+                    </span>
+                    {% elif p.current_status == 'WHITELIST' %}
+                    <span class="px-2.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                        Whitelist
+                    </span>
+                    {% elif p.current_status == 'BLACKLIST' %}
+                    <span class="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        Blacklist
+                    </span>
+                    {% else %}
+                    <span class="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        Bloqueado
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informações / Links -->
+            <div class="mt-4 pt-3 border-t border-slate-800/60 pl-2 text-xs text-slate-400 flex items-center justify-between">
+                <span class="text-[11px]">Tipo de Acesso da Sala:</span>
+                {% if p.use_custom_portal %}
+                <a href="{% url 'portal' port_identifier=p.slug|default:p.port_number %}" target="_blank" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                    <i class="fa-solid fa-graduation-cap text-[10px]"></i>
+                    Portal Educacional
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Botões Seletores de Modo (4 Modos de Navegação) -->
+        <div class="mt-4 pt-3 border-t border-slate-800/80 pl-2">
+            <div class="grid grid-cols-2 gap-2">
+                <!-- Modo Livre -->
+                <button 
+                    onclick="setRoomMode({{ p.id }}, 'ALLOWED')" 
+                    id="btn-mode-{{ p.id }}-ALLOWED"
+                    class="room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'ALLOWED' %}bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    title="Libera acesso irrestrito à internet para esta sala">
+                    <i class="fa-solid fa-globe text-[11px]"></i>
+                    <span>Livre</span>
+                </button>
+
+                <!-- Modo Whitelist -->
+                <button 
+                    onclick="setRoomMode({{ p.id }}, 'WHITELIST')" 
+                    id="btn-mode-{{ p.id }}-WHITELIST"
+                    class="room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'WHITELIST' %}bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    title="Permite apenas sites educacionais e whitelists autorizadas">
+                    <i class="fa-solid fa-shield-halved text-[11px]"></i>
+                    <span>Whitelist</span>
+                </button>
+
+                <!-- Modo Blacklist -->
+                <button 
+                    onclick="setRoomMode({{ p.id }}, 'BLACKLIST')" 
+                    id="btn-mode-{{ p.id }}-BLACKLIST"
+                    class="room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'BLACKLIST' %}bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    title="Navegação livre bloqueando apenas sites listados na blacklist">
+                    <i class="fa-solid fa-ban text-[11px]"></i>
+                    <span>Blacklist</span>
+                </button>
+
+                <!-- Modo Bloqueado -->
+                <button 
+                    onclick="setRoomMode({{ p.id }}, 'BLOCKED')" 
+                    id="btn-mode-{{ p.id }}-BLOCKED"
+                    class="room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all {% if p.current_status == 'BLOCKED' %}bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30{% else %}bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white{% endif %}"
+                    title="Bloqueia totalmente a navegação na internet para esta sala">
+                    <i class="fa-solid fa-lock text-[11px]"></i>
+                    <span>Bloqueado</span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+    {% empty %}
+    <div class="col-span-full py-12 text-center glass-panel rounded-2xl border border-slate-800">
+        <i class="fa-solid fa-chalkboard text-3xl text-slate-600 mb-3"></i>
+        <h3 class="text-base font-bold text-slate-300">Nenhuma sala atribuída</h3>
+        <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">
+            Seu usuário ainda não possui salas ou grupos atribuídos. Solicite ao Administrador de TI para autorizar o acesso às suas salas de aula.
+        </p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ========================================== -->
+<!-- 2. MONITOR DE ACESSOS EM TEMPO REAL (LIVE STREAM) -->
+<!-- ========================================== -->
+<div class="glass-panel rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xl space-y-4">
+    
+    <!-- Barra Superior do Monitor Live Stream -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+            <span class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+            <div>
+                <h2 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                    <i class="fa-solid fa-satellite-dish text-indigo-400"></i>
+                    Monitor de Acessos em Tempo Real
+                </h2>
+                <p class="text-xs text-slate-400">Transmissão contínua das requisições geradas pelos computadores das suas salas</p>
+            </div>
+        </div>
+
+        <!-- Controles de Filtragem e Pausa -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- Filtro por Sala -->
+            <select id="filter-room" onchange="resetLiveStream()" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500">
+                <option value="">Todas as minhas salas</option>
+                {% for p in ports %}
+                <option value="{{ p.id }}">{{ p.name }} (Porta {{ p.port_number }})</option>
+                {% endfor %}
+            </select>
+
+            <!-- Filtro por Status -->
+            <select id="filter-action" onchange="resetLiveStream()" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500">
+                <option value="">Todos os status</option>
+                <option value="ALLOWED">Apenas Permitidos</option>
+                <option value="BLOCKED">Apenas Bloqueados</option>
+            </select>
+
+            <!-- Botão Pausar / Retomar -->
+            <button id="btn-toggle-pause" onclick="toggleStreamPause()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-all" title="Pausar ou Retomar fluxo">
+                <i id="icon-pause" class="fa-solid fa-pause text-xs text-amber-400"></i>
+                <span id="label-pause">Pausar</span>
+            </button>
+
+            <!-- Botão Limpar Tela -->
+            <button onclick="clearStreamLog()" class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-300 flex items-center gap-1.5 transition-all" title="Limpar visualização da tabela">
+                <i class="fa-solid fa-trash-can text-xs text-slate-400"></i>
+                <span class="hidden sm:inline">Limpar</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabela do Live Stream -->
+    <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-[460px] overflow-y-auto">
+        <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/90 sticky top-0 z-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                    <th class="py-3 px-3.5">Horário</th>
+                    <th class="py-3 px-3.5">Sala</th>
+                    <th class="py-3 px-3.5">Computador / IP</th>
+                    <th class="py-3 px-3.5">Domínio Requisitado</th>
+                    <th class="py-3 px-3.5 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody id="gestor-stream-body" class="divide-y divide-slate-800/60 font-mono">
+                <tr id="row-loading-initial">
+                    <td colspan="5" class="py-8 text-center text-slate-500 font-sans">
+                        <i class="fa-solid fa-spinner fa-spin text-indigo-400 text-lg mb-2"></i>
+                        <p class="text-xs">Conectando ao fluxo de acessos das salas...</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Rodapé do Live Stream -->
+    <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+        <div class="flex items-center gap-2">
+            <span id="stream-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="stream-status-text">Fluxo ativo • Atualizando a cada 2.5s</span>
+        </div>
+        <div>
+            Total de eventos recebidos: <strong id="total-stream-events" class="text-slate-300 font-mono font-bold">0</strong>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ==========================================
+// 1. ALTERAÇÃO DE MODO DA SALA EM TEMPO REAL
+// ==========================================
+async function setRoomMode(portId, newMode) {
+    const card = document.getElementById(`room-card-${portId}`);
+    const badge = document.getElementById(`room-badge-${portId}`);
+    const accent = document.getElementById(`room-accent-${portId}`);
+
+    // Desativa botões momentaneamente e adiciona estado de loading
+    const buttons = card.querySelectorAll('.room-mode-btn');
+    buttons.forEach(b => b.classList.add('opacity-60', 'pointer-events-none'));
+
+    try {
+        const formData = new FormData();
+        formData.append('mode', newMode);
+
+        const res = await fetch(`/gestor/api/ports/${portId}/set-mode/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            // Atualiza botões ativos
+            buttons.forEach(b => {
+                b.className = "room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800 hover:text-white";
+            });
+
+            const activeBtn = document.getElementById(`btn-mode-${portId}-${newMode}`);
+            if (activeBtn) {
+                if (newMode === 'ALLOWED') {
+                    activeBtn.className = "room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30";
+                    accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-emerald-500";
+                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Livre</span>`;
+                } else if (newMode === 'WHITELIST') {
+                    activeBtn.className = "room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30";
+                    accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-indigo-500";
+                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>Whitelist</span>`;
+                } else if (newMode === 'BLACKLIST') {
+                    activeBtn.className = "room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/30";
+                    accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-amber-500";
+                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Blacklist</span>`;
+                } else {
+                    activeBtn.className = "room-mode-btn py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30";
+                    accent.className = "absolute top-0 left-0 bottom-0 w-1.5 bg-rose-500";
+                    badge.innerHTML = `<span class="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Bloqueado</span>`;
+                }
+            }
+
+            showToast(data.message, 'success');
+        } else {
+            showToast(data.error || 'Erro ao alterar modo da sala.', 'error');
+        }
+    } catch (e) {
+        showToast('Erro de conexão ao aplicar novo modo.', 'error');
+    } finally {
+        buttons.forEach(b => b.classList.remove('opacity-60', 'pointer-events-none'));
+    }
+}
+
+
+// ==========================================
+// 2. MONITOR LIVE STREAM EM TEMPO REAL
+// ==========================================
+let lastLogId = 0;
+let isStreamPaused = false;
+let streamTimer = null;
+let totalEventsCount = 0;
+const MAX_TABLE_ROWS = 70;
+
+async function fetchLiveStreamLogs() {
+    if (isStreamPaused) return;
+
+    const roomSelect = document.getElementById('filter-room');
+    const actionSelect = document.getElementById('filter-action');
+    const portId = roomSelect ? roomSelect.value : '';
+    const action = actionSelect ? actionSelect.value : '';
+
+    const url = `/gestor/api/logs/live-stream/?port_id=${portId}&action=${action}&last_id=${lastLogId}&hide_cdns=true`;
+
+    try {
+        const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const data = await res.json();
+
+        if (data.success && data.logs) {
+            const tbody = document.getElementById('gestor-stream-body');
+            const initialRow = document.getElementById('row-loading-initial');
+            if (initialRow) initialRow.remove();
+
+            if (data.logs.length > 0) {
+                // Atualiza o maior ID recebido
+                data.logs.forEach(log => {
+                    if (log.id > lastLogId) {
+                        lastLogId = log.id;
+                    }
+                    totalEventsCount++;
+                    renderLogRow(log, tbody);
+                });
+
+                document.getElementById('total-stream-events').textContent = totalEventsCount;
+
+                // Limita a quantidade de linhas na tabela para alta performance
+                while (tbody.children.length > MAX_TABLE_ROWS) {
+                    tbody.removeChild(tbody.lastChild);
+                }
+            }
+        }
+    } catch (e) {
+        // Erro silencioso de timeout
+    }
+}
+
+function renderLogRow(log, tbody) {
+    const tr = document.createElement('tr');
+    tr.className = `hover:bg-slate-800/40 transition-colors animate-fadeIn ${log.is_proxy_blocked ? 'bg-rose-950/20' : ''}`;
+
+    const statusBadge = log.is_proxy_blocked ? `
+        <span class="px-2 py-0.5 rounded-md bg-rose-500/20 border border-rose-500/30 text-rose-300 text-[10px] font-bold inline-flex items-center gap-1">
+            <i class="fa-solid fa-ban text-[9px]"></i> Bloqueado
+        </span>
+    ` : log.is_dest_blocked ? `
+        <span class="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-bold inline-flex items-center gap-1">
+            <i class="fa-solid fa-triangle-exclamation text-[9px]"></i> Destino 403
+        </span>
+    ` : `
+        <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold inline-flex items-center gap-1">
+            <i class="fa-solid fa-check text-[9px]"></i> Permitido
+        </span>
+    `;
+
+    const computerLabel = log.hostname ? 
+        `<span class="text-white font-semibold">${log.hostname}</span> <span class="text-slate-500 text-[10px]">(${log.client_ip})</span>` :
+        `<span class="text-slate-300">${log.client_ip}</span>`;
+
+    tr.innerHTML = `
+        <td class="py-2.5 px-3.5 text-slate-400 text-[11px] whitespace-nowrap">${log.timestamp}</td>
+        <td class="py-2.5 px-3.5 font-sans font-semibold text-indigo-300 whitespace-nowrap text-xs">
+            <i class="fa-solid fa-door-closed text-slate-500 text-[10px] mr-1"></i>${log.port_name}
+        </td>
+        <td class="py-2.5 px-3.5 text-xs whitespace-nowrap">${computerLabel}</td>
+        <td class="py-2.5 px-3.5 text-xs font-mono font-medium text-slate-100 max-w-xs truncate" title="${log.domain}">
+            ${log.domain}
+        </td>
+        <td class="py-2.5 px-3.5 text-center whitespace-nowrap">${statusBadge}</td>
+    `;
+
+    // Insere no início da tabela
+    tbody.insertBefore(tr, tbody.firstChild);
+}
+
+function resetLiveStream() {
+    lastLogId = 0;
+    const tbody = document.getElementById('gestor-stream-body');
+    tbody.innerHTML = `
+        <tr id="row-loading-initial">
+            <td colspan="5" class="py-8 text-center text-slate-500 font-sans">
+                <i class="fa-solid fa-spinner fa-spin text-indigo-400 text-lg mb-2"></i>
+                <p class="text-xs">Atualizando filtro do monitor...</p>
+            </td>
+        </tr>
+    `;
+    fetchLiveStreamLogs();
+}
+
+function toggleStreamPause() {
+    isStreamPaused = !isStreamPaused;
+    const btn = document.getElementById('btn-toggle-pause');
+    const icon = document.getElementById('icon-pause');
+    const label = document.getElementById('label-pause');
+    const dot = document.getElementById('stream-status-dot');
+    const statusText = document.getElementById('stream-status-text');
+
+    if (isStreamPaused) {
+        icon.className = "fa-solid fa-play text-xs text-emerald-400";
+        label.textContent = "Retomar";
+        dot.className = "w-2 h-2 rounded-full bg-amber-400";
+        statusText.textContent = "Fluxo pausado";
+    } else {
+        icon.className = "fa-solid fa-pause text-xs text-amber-400";
+        label.textContent = "Pausar";
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+        statusText.textContent = "Fluxo ativo • Atualizando a cada 2.5s";
+        fetchLiveStreamLogs();
+    }
+}
+
+function clearStreamLog() {
+    const tbody = document.getElementById('gestor-stream-body');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" class="py-6 text-center text-slate-500 font-sans text-xs">
+                Visualização limpa. Aguardando novos acessos...
+            </td>
+        </tr>
+    `;
+}
+
+// Inicia o polling automático
+(function initStream() {
+    fetchLiveStreamLogs();
+    streamTimer = setInterval(fetchLiveStreamLogs, 2500);
+})();
+</script>
+{% endblock %}

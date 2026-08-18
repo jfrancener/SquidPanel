@@ -29,24 +29,12 @@ def dashboard_view(request):
     """
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
 
-    # Filtra grupos e portas conforme o perfil do usuário (RBAC)
-    if profile.is_admin:
-        groups = ProxyGroup.objects.prefetch_related('ports').filter(is_active=True)
-        ports = ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number')
-    else:
-        # Usuário comum (Professor / Coordenador) visualiza apenas os grupos/portas atribuídos
-        user_groups = profile.allowed_groups.filter(is_active=True)
-        user_ports = profile.allowed_ports.filter(is_active=True)
-        
-        ports = ProxyPort.objects.filter(
-            models.Q(id__in=user_ports.values_list('id', flat=True)) |
-            models.Q(group__in=user_groups)
-        ).distinct().select_related('group').order_by('port_number')
-        
-        groups = ProxyGroup.objects.filter(
-            models.Q(id__in=user_groups.values_list('id', flat=True)) |
-            models.Q(ports__in=ports)
-        ).distinct().prefetch_related('ports')
+    # Se não for Administrador Geral de TI, redireciona para a Dashboard do Gestor
+    if not profile.is_admin:
+        return redirect('gestor_dashboard')
+
+    groups = ProxyGroup.objects.prefetch_related('ports').filter(is_active=True)
+    ports = ProxyPort.objects.select_related('group').filter(is_active=True).order_by('port_number')
 
     # Métricas para os cards estatísticos
     total_ports = ports.count()

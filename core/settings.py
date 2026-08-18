@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'dashboard',
     'users',
     'squid',
+    'gestor',
 ]
 
 MIDDLEWARE = [

@@ -20,6 +20,9 @@ urlpatterns = [
     path('adminsp/', dashboard_views.dashboard_view, name='dashboard'),
     path('adminsp/', include('users.urls')),
 
+    # Painel do Coordenador / Gestor (/gestor/)
+    path('gestor/', include('gestor.urls')),
+
     # Configurações do Sistema no /adminsp/
     path('adminsp/settings/general/', dashboard_views.settings_general_view, name='settings_general'),
     path('adminsp/settings/session/', dashboard_views.settings_session_view, name='settings_session'),
