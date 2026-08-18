@@ -60,6 +60,7 @@ urlpatterns = [
     path('portal-links/create/', views.portal_link_create_view, name='portal_link_create'),
     path('portal-links/<int:link_id>/edit/', views.portal_link_edit_view, name='portal_link_edit'),
     path('portal-links/<int:link_id>/delete/', views.portal_link_delete_view, name='portal_link_delete'),
+    path('portal-links/toggle-port/<int:port_id>/', views.portal_toggle_port_view, name='portal_toggle_port'),
     # Agendamentos de Horários de Salas (Scheduler)
     path('schedules/', views.admin_schedules_view, name='admin_schedules'),
     path('schedules/create/', views.admin_schedule_create_view, name='admin_schedule_create'),
