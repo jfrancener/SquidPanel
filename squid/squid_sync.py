@@ -291,10 +291,18 @@ def generate_squid_config_and_lists():
     conf_lines.append("# --- Servidores DNS ---")
     conf_lines.append(f"dns_nameservers {dns_servers}\n")
 
-    # Portas de Escuta Dinâmicas
-    conf_lines.append("# --- Portas de Escuta das Salas e Grupos ---")
-    for p in active_ports:
-        conf_lines.append(f"http_port {p.port_number} name=port_{p.port_number}")
+    # Portas de Escuta Dinâmicas com Suporte a SSL-Bump
+    conf_lines.append("# --- Portas de Escuta das Salas e Grupos (com SSL-Bump para Bloqueio Visual HTTPS) ---")
+    if paths['is_linux']:
+        ca_pem_path = "/etc/squid/certs/squidpanel_ca.pem"
+        certgen_path = "/usr/lib/squid/security_file_certgen"
+        conf_lines.append(f'sslcrtd_program {certgen_path} -s /var/lib/squid/ssl_db -M 4MB')
+        conf_lines.append('sslcrtd_children 5 startup=1 idle=1\n')
+        for p in active_ports:
+            conf_lines.append(f"http_port {p.port_number} ssl-bump cert={ca_pem_path} generate-host-certificates=on dynamic_cert_mem_cache_size=4MB name=port_{p.port_number}")
+    else:
+        for p in active_ports:
+            conf_lines.append(f"http_port {p.port_number} name=port_{p.port_number}")
     conf_lines.append("")
 
     # ACLs Básicas de Rede e Segurança (Suporte permanente a HTTPS padrão e portas customizadas como CIASC/Governo/APIs)
@@ -349,6 +357,22 @@ def generate_squid_config_and_lists():
                 conf_lines.append(f'acl port_{p.id}_bl dstdomain "{pf["bl_path"]}"')
     if has_any_port_lists:
         conf_lines.append("")
+
+    # Regras de SSL-Bump Seletivo (Peek and Splice nos permitidos, Bump nos bloqueados)
+    if paths['is_linux']:
+        conf_lines.append("# --- Regras de SSL-Bump Inteligente (Peek & Splice) ---")
+        conf_lines.append("acl step1 at_step SslBump1")
+        conf_lines.append("ssl_bump peek step1")
+        conf_lines.append("ssl_bump splice mandatory_whitelist")
+        for g in groups:
+            files = group_list_files[g.id]
+            if files['has_wl']:
+                conf_lines.append(f"ssl_bump splice group_{g.id}_wl")
+        for p in active_ports:
+            pf = port_list_files[p.id]
+            if pf['has_wl']:
+                conf_lines.append(f"ssl_bump splice port_{p.id}_wl")
+        conf_lines.append("ssl_bump bump all\n")
 
     # Regras de Segurança Padrão
     conf_lines.append("# --- Regras de Seguranca Basicas ---")
