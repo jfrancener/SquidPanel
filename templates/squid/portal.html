@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Acesso Educacional | {% if port %}{{ port.name }} (Porta {{ port.port_number }}){% else %}Porta {{ port_number }}{% endif %}</title>
+    <title>Portal Educacional</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -76,29 +76,17 @@
         <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             
             <div class="flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
-                    <i class="fa-solid fa-graduation-cap text-xl"></i>
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
                 </div>
                 <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="text-lg font-extrabold tracking-tight text-white">
-                            Portal Educacional de Acesso
-                        </h1>
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                            Navegação Segura
-                        </span>
-                    </div>
-                    <p class="text-xs text-slate-400">
-                        {% if port %}
-                            Sala conectada: <span class="text-indigo-300 font-semibold">{{ port.name }}</span> (Porta <span class="font-mono text-cyan-400">{{ port.port_number }}</span>)
-                        {% else %}
-                            Porta de Proxy: <span class="font-mono text-cyan-400">{{ port_number }}</span>
-                        {% endif %}
-                    </p>
+                    <h1 class="text-lg font-extrabold tracking-tight text-white">
+                        Portal Educacional
+                    </h1>
                 </div>
             </div>
 
-            <!-- Identificador de Status e Relógio -->
+            <!-- Identificador de Status -->
             <div class="flex items-center gap-3">
                 <div class="px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -154,33 +142,10 @@
         </div>
         {% endif %}
 
-        <!-- Barra de Busca Rápida de Links -->
-        <div class="relative">
-            <div class="relative flex items-center">
-                <i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
-                <input 
-                    type="text" 
-                    id="search-portal-links" 
-                    placeholder="Pesquisar entre os sites autorizados (ex: Unifacvest, Scholar, Dicionário, SciELO)..." 
-                    class="w-full pl-11 pr-12 py-3.5 bg-slate-900/90 border border-slate-700/80 rounded-2xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
-                    oninput="filterPortalCards(this.value)"
-                    autofocus
-                >
-                <button 
-                    id="clear-search-btn" 
-                    onclick="clearSearch()" 
-                    class="hidden absolute right-3.5 w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all"
-                    title="Limpar busca"
-                >
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-        </div>
-
         <!-- Seções por Categoria -->
         <div id="categories-container" class="space-y-10">
             {% for cat in categories %}
-            <section class="category-section space-y-4" data-category="{{ cat.code }}">
+            <section class="category-section space-y-4">
                 
                 <!-- Cabeçalho da Categoria -->
                 <div class="flex items-center gap-2.5 pb-2 border-b border-slate-800/60">
@@ -203,9 +168,6 @@
                         target="_blank" 
                         rel="noopener noreferrer"
                         class="portal-card glass-card p-5 rounded-2xl flex flex-col justify-between transition-all duration-200 group shadow-lg"
-                        data-title="{{ link.title|lower }}"
-                        data-desc="{{ link.description|lower }}"
-                        data-url="{{ link.url|lower }}"
                     >
                         <div class="space-y-3">
                             <div class="flex items-start justify-between gap-3">
@@ -251,89 +213,15 @@
             {% endfor %}
         </div>
 
-        <!-- Mensagem de Nada Encontrado na Busca -->
-        <div id="no-search-results" class="hidden text-center py-16 bg-slate-900/40 rounded-3xl border border-slate-800/60">
-            <div class="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto text-lg mb-3">
-                <i class="fa-solid fa-magnifying-glass"></i>
-            </div>
-            <h4 class="text-base font-bold text-slate-300">Nenhum site encontrado para a busca</h4>
-            <p class="text-xs text-slate-500 mt-1">Verifique a ortografia ou tente pesquisar por outro termo.</p>
-            <button onclick="clearSearch()" class="mt-4 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all">
-                Limpar Busca
-            </button>
-        </div>
-
     </main>
 
     <!-- Rodapé -->
-    <footer class="border-t border-slate-800/80 bg-slate-950/80 py-6 mt-12 text-center text-xs text-slate-500">
-        <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">
-                    <i class="fa-solid fa-shield-halved"></i>
-                </div>
-                <span class="font-bold text-slate-400">SquidPanel</span> &bull; <span class="text-slate-500">Ambiente Seguro de Acesso à Internet</span>
-            </div>
-            <p class="text-[11px] text-slate-600">
-                &copy; 2026 &bull; Desenvolvido por Juliano Francener
-            </p>
+    <footer class="border-t border-slate-800/80 bg-slate-950/80 py-6 mt-12 text-center text-xs text-slate-400">
+        <div class="max-w-6xl mx-auto px-4 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-shield-halved text-indigo-400 text-sm"></i>
+            <span class="font-medium text-slate-400">Ambiente Seguro de Acesso à Internet</span>
         </div>
     </footer>
 
-    <!-- Script de Busca Rápida em Tempo Real -->
-    <script>
-        function filterPortalCards(term) {
-            const cleanTerm = term.trim().toLowerCase();
-            const clearBtn = document.getElementById('clear-search-btn');
-            const noResults = document.getElementById('no-search-results');
-            const sections = document.querySelectorAll('.category-section');
-            
-            if (cleanTerm.length > 0) {
-                clearBtn.classList.remove('hidden');
-            } else {
-                clearBtn.classList.add('hidden');
-            }
-
-            let totalVisibleCards = 0;
-
-            sections.forEach(section => {
-                const cards = section.querySelectorAll('.portal-card');
-                let visibleCardsInSection = 0;
-
-                cards.forEach(card => {
-                    const title = card.getAttribute('data-title') || '';
-                    const desc = card.getAttribute('data-desc') || '';
-                    const url = card.getAttribute('data-url') || '';
-
-                    if (cleanTerm === '' || title.includes(cleanTerm) || desc.includes(cleanTerm) || url.includes(cleanTerm)) {
-                        card.style.display = 'flex';
-                        visibleCardsInSection++;
-                        totalVisibleCards++;
-                    } else {
-                        card.style.display = 'none';
-                    }
-                });
-
-                if (visibleCardsInSection === 0) {
-                    section.style.display = 'none';
-                } else {
-                    section.style.display = 'block';
-                }
-            });
-
-            if (totalVisibleCards === 0 && cleanTerm !== '') {
-                noResults.classList.remove('hidden');
-            } else {
-                noResults.classList.add('hidden');
-            }
-        }
-
-        function clearSearch() {
-            const input = document.getElementById('search-portal-links');
-            input.value = '';
-            filterPortalCards('');
-            input.focus();
-        }
-    </script>
 </body>
 </html>
