@@ -181,7 +181,9 @@
                     <select name="action" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-2.5 focus:border-indigo-500 outline-none">
                         <option value="ALL" {% if action_filter == 'ALL' %}selected{% endif %}>Todos os Status</option>
                         <option value="ALLOWED" {% if action_filter == 'ALLOWED' %}selected{% endif %}>Liberados (200 OK)</option>
-                        <option value="BLOCKED" {% if action_filter == 'BLOCKED' %}selected{% endif %}>Bloqueados (403 Denied)</option>
+                        <option value="BLOCKED_PROXY" {% if action_filter == 'BLOCKED_PROXY' %}selected{% endif %}>Bloqueados no Proxy (Squid)</option>
+                        <option value="BLOCKED_DEST" {% if action_filter == 'BLOCKED_DEST' %}selected{% endif %}>Bloqueados no Destino (403/401)</option>
+                        <option value="BLOCKED" {% if action_filter == 'BLOCKED' %}selected{% endif %}>Todos os Bloqueados</option>
                     </select>
                 </div>
 
@@ -315,13 +317,17 @@
 
                             <!-- Status / Ação -->
                             <td class="p-3.5 text-center whitespace-nowrap">
-                                {% if log.is_blocked %}
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Bloqueado (403)
+                                {% if log.is_proxy_blocked %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30" title="Bloqueado pelo Proxy Squid (Regras)">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Bloqueado Proxy ({{ log.status_code }})
+                                </span>
+                                {% elif log.is_dest_blocked %}
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30" title="Bloqueado no Servidor de Destino">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Bloqueado Destino ({{ log.status_code }})
                                 </span>
                                 {% else %}
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberado (200)
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" title="Liberado pelo Proxy">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberado ({{ log.status_code }})
                                 </span>
                                 {% endif %}
                             </td>
@@ -686,11 +692,11 @@ async function fetchNewTableLogs() {
                 // Verifica se já existe na tabela
                 if (document.getElementById(`row-log-${l.id}`)) return;
 
-                const isBlocked = l.action === 'BLOCKED' || l.http_status.includes('DENIED') || l.http_status.includes('403');
+                const statusInfo = getLogVisualStatus(l);
                 
                 // Atualiza contadores
                 totalFilteredCount++;
-                if (isBlocked) blockedCount++;
+                if (statusInfo.category === 'proxy_blocked' || statusInfo.category === 'dest_blocked') blockedCount++;
                 else allowedCount++;
 
                 const tr = document.createElement('tr');
@@ -716,13 +722,7 @@ async function fetchNewTableLogs() {
                         </button>
                        </div>`;
 
-                const statusBadge = isBlocked 
-                    ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Bloqueado (403)
-                       </span>`
-                    : `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberado (200)
-                       </span>`;
+                const statusBadge = statusInfo.tableBadge;
 
                 tr.innerHTML = `
                     <td class="p-3.5 pl-6 font-mono text-slate-300 text-[11px] whitespace-nowrap">
@@ -971,6 +971,67 @@ async function submitAddDomainToList(e) {
 }
 
 // ==========================================
+// FUNÇÃO AUXILIAR DE STATUS E CORES DOS LOGS
+// ==========================================
+function getLogVisualStatus(l) {
+    const rawStatus = (l.http_status || '').toUpperCase();
+    const action = (l.action || '').toUpperCase();
+    
+    // Extrai o código numérico HTTP (ex: 200, 307, 403, 401, 502)
+    let statusCode = l.status_code || '';
+    if (!statusCode) {
+        if (rawStatus.includes('/')) {
+            statusCode = rawStatus.split('/')[1];
+        } else {
+            const match = rawStatus.match(/\d{3}/);
+            if (match) statusCode = match[0];
+        }
+    }
+    if (!statusCode || !/^\d+$/.test(statusCode)) {
+        statusCode = action === 'BLOCKED' ? '403' : '200';
+    }
+
+    // 1. Bloqueado no Proxy (Squid ACL / Whitelist / Blacklist / DENIED) -> VERMELHO
+    const isProxyBlocked = l.is_proxy_blocked || action === 'BLOCKED' || rawStatus.includes('DENIED') || rawStatus.includes('ERR_ACCESS_DENIED') || rawStatus.startsWith('TCP_DENIED') || rawStatus.startsWith('UDP_DENIED') || rawStatus.startsWith('NONE/403');
+
+    // 2. Bloqueado no Destino (o proxy permitiu a conexão, mas o servidor web remoto retornou 403, 401, 407, 429, etc) -> AMARELO
+    const isDestBlocked = !isProxyBlocked && (l.is_dest_blocked || ['401', '403', '407', '429'].includes(statusCode));
+
+    if (isProxyBlocked) {
+        return {
+            category: 'proxy_blocked',
+            statusCode: statusCode,
+            label: 'Bloqueado no Proxy',
+            liveBadgeClass: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+            liveRowClass: 'bg-rose-950/20 border-rose-500/25 hover:border-rose-500/40',
+            livePortClass: 'bg-rose-500/15 text-rose-300',
+            tableBadge: `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30" title="Bloqueado pelo Proxy Squid (Regras)"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Bloqueado Proxy (${statusCode})</span>`
+        };
+    } else if (isDestBlocked) {
+        return {
+            category: 'dest_blocked',
+            statusCode: statusCode,
+            label: 'Bloqueado no Destino',
+            liveBadgeClass: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+            liveRowClass: 'bg-amber-950/15 border-amber-500/25 hover:border-amber-500/40',
+            livePortClass: 'bg-amber-500/15 text-amber-300',
+            tableBadge: `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30" title="Bloqueado no Servidor de Destino"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Bloqueado Destino (${statusCode})</span>`
+        };
+    } else {
+        // 3. Liberado / Sucesso -> VERDE
+        return {
+            category: 'allowed',
+            statusCode: statusCode,
+            label: 'Liberado',
+            liveBadgeClass: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+            liveRowClass: 'bg-slate-900/60 border-slate-800/80 hover:border-emerald-500/30',
+            livePortClass: 'bg-indigo-500/15 text-indigo-300',
+            tableBadge: `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" title="Liberado pelo Proxy"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Liberado (${statusCode})</span>`
+        };
+    }
+}
+
+// ==========================================
 // MONITOR AO VIVO (LIVE STREAM POLLING)
 // ==========================================
 let liveTimer = null;
@@ -1089,13 +1150,9 @@ async function fetchLiveLogs() {
                     lastLogId = l.id;
                 }
 
-                const isBlocked = l.action === 'BLOCKED' || l.http_status.includes('DENIED') || l.http_status.includes('403');
+                const statusInfo = getLogVisualStatus(l);
                 const row = document.createElement('div');
-                row.className = `p-2.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 transition-all animate-fade-in ${
-                    isBlocked 
-                    ? 'bg-rose-950/20 border-rose-500/25 hover:border-rose-500/40' 
-                    : 'bg-slate-900/60 border-slate-800/80 hover:border-emerald-500/30'
-                }`;
+                row.className = `p-2.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 transition-all animate-fade-in ${statusInfo.liveRowClass}`;
 
                 const deviceDisplay = l.hostname 
                     ? `<span onclick="setLiveHostnameFilter('${l.hostname.replace(/'/g, "\\'")}')" class="px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 hover:text-white font-bold border border-cyan-500/25 hover:border-cyan-400 text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-all shadow-sm group" title="Filtrar Live Stream por ${l.hostname}"><i class="fa-solid fa-desktop text-[10px] text-cyan-400 group-hover:scale-110 transition-transform"></i>${l.hostname}</span> <span onclick="setLiveHostnameFilter('${l.client_ip}')" class="text-slate-500 hover:text-cyan-300 font-mono text-[10px] cursor-pointer hover:underline transition-colors" title="Filtrar Live Stream por IP ${l.client_ip}">(${l.client_ip})</span>`
@@ -1104,16 +1161,16 @@ async function fetchLiveLogs() {
                 row.innerHTML = `
                     <div class="flex flex-wrap items-center gap-2.5">
                         <span class="text-slate-500 font-mono text-[11px]">${l.timestamp}</span>
-                        <span onclick="setLivePortFilter('${l.port_number}')" class="px-2 py-0.5 rounded text-[10px] font-bold font-mono cursor-pointer hover:brightness-125 transition-all ${isBlocked ? 'bg-rose-500/15 text-rose-300' : 'bg-indigo-500/15 text-indigo-300'}" title="Filtrar por Porta ${l.port_number}">
+                        <span onclick="setLivePortFilter('${l.port_number}')" class="px-2 py-0.5 rounded text-[10px] font-bold font-mono cursor-pointer hover:brightness-125 transition-all ${statusInfo.livePortClass}" title="Filtrar por Porta ${l.port_number}">
                             ${l.port_number} • ${l.port_name}
                         </span>
                         ${deviceDisplay}
-                        <span class="text-white font-bold font-mono tracking-wide text-xs">${l.domain}</span>
+                        <span class="text-white font-bold font-mono tracking-wide text-xs truncate max-w-lg" title="${l.full_url || l.domain}">${l.domain}</span>
                     </div>
 
                     <div class="flex items-center gap-2 self-end sm:self-center">
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isBlocked ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
-                            ${isBlocked ? '403 BLOQUEADO' : '200 OK'}
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono ${statusInfo.liveBadgeClass}" title="${statusInfo.label} (${statusInfo.statusCode})">
+                            ${statusInfo.statusCode}
                         </span>
                         <span class="text-[10px] text-slate-500 font-mono">${l.bytes}</span>
                         

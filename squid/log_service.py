@@ -96,9 +96,11 @@ def parse_squid_log_line(line, port_map, device_map=None):
             first_port = next(iter(port_map.values()), None)
             port_number = first_port.port_number if first_port else 9020
 
-        # Ação (ALLOWED / BLOCKED)
-        is_blocked = 'DENIED' in http_status or '403' in http_status or 'ERR' in http_status
-        action = 'BLOCKED' if is_blocked else 'ALLOWED'
+        # Ação (ALLOWED / BLOCKED pelo Proxy Squid)
+        # O Squid marca bloqueios por ACL com TCP_DENIED, UDP_DENIED, NONE/403 ou ERR_ACCESS_DENIED
+        status_upper = http_status.upper()
+        is_proxy_blocked = 'DENIED' in status_upper or 'ERR_ACCESS_DENIED' in status_upper or status_upper.startswith('NONE/403')
+        action = 'BLOCKED' if is_proxy_blocked else 'ALLOWED'
 
         proxy_port = port_map.get(port_number)
         proxy_group = proxy_port.group if proxy_port else None

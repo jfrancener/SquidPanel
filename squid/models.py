@@ -129,8 +129,40 @@ class AccessLog(models.Model):
         return f"[{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {self.client_ip} -> {self.domain} ({self.action})"
 
     @property
+    def status_code(self):
+        if not self.http_status:
+            return '200'
+        if '/' in self.http_status:
+            code = self.http_status.split('/')[1]
+            return code if code.isdigit() else '200'
+        parts = self.http_status.split()
+        for p in parts:
+            if p.isdigit() and len(p) == 3:
+                return p
+        return '200'
+
+    @property
+    def is_proxy_blocked(self):
+        status_upper = (self.http_status or '').upper()
+        return self.action == 'BLOCKED' or 'DENIED' in status_upper or 'ERR_ACCESS_DENIED' in status_upper or status_upper.startswith('TCP_DENIED') or status_upper.startswith('UDP_DENIED') or status_upper.startswith('NONE/403')
+
+    @property
+    def is_dest_blocked(self):
+        if self.is_proxy_blocked:
+            return False
+        return self.status_code in ['401', '403', '407', '429']
+
+    @property
+    def status_category(self):
+        if self.is_proxy_blocked:
+            return 'proxy_blocked'
+        if self.is_dest_blocked:
+            return 'dest_blocked'
+        return 'allowed'
+
+    @property
     def is_blocked(self):
-        return self.action == 'BLOCKED' or 'DENIED' in self.http_status or '403' in self.http_status
+        return self.is_proxy_blocked or self.is_dest_blocked
 
     @property
     def formatted_bytes(self):

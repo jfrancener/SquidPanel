@@ -1,0 +1,585 @@
+{% extends 'base.html' %}
+
+{% block title %}Testador de Navegação & Regras - SquidPanel{% endblock %}
+{% block page_title %}Testador de Navegação{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Topo / Cabeçalho -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-vial-circle-check text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span>Testador de Navegação & Políticas</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Simulador Squid
+                        </span>
+                    </h1>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Verifique se um domínio navega em uma porta/sala e adicione ou remova das Whitelists e Blacklists com 1 clique.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <a href="{% url 'whitelists' %}" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700">
+                <i class="fa-solid fa-shield-halved text-emerald-400 text-xs"></i>
+                <span>Ver Whitelists</span>
+            </a>
+            <a href="{% url 'blacklists' %}" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700">
+                <i class="fa-solid fa-ban text-rose-400 text-xs"></i>
+                <span>Ver Blacklists</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Formulário do Testador -->
+    <div class="glass-panel p-6 rounded-2xl border border-slate-800 shadow-xl bg-[#0f121e]">
+        <form method="GET" action="{% url 'proxy_tester' %}" class="space-y-4">
+            
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                
+                <!-- Domínio ou URL -->
+                <div class="md:col-span-6">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                        <i class="fa-solid fa-globe text-cyan-400 mr-1.5"></i> Domínio ou URL de Teste:
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="main-domain-input" name="domain" value="{{ input_domain }}" required autofocus placeholder="ex: apim.ciasc.sc.gov.br, youtube.com, whatsapp.com..." class="w-full bg-[#161a2b] border border-slate-700 focus:border-emerald-500 text-white rounded-xl px-4 py-3 text-sm font-mono outline-none shadow-inner transition-all placeholder-slate-500">
+                        <i class="fa-solid fa-magnifying-glass absolute right-4 top-3.5 text-slate-500"></i>
+                    </div>
+                </div>
+
+                <!-- Seleção de Sala / Porta (Opcional) -->
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                        <i class="fa-solid fa-network-wired text-indigo-400 mr-1.5"></i> Selecionar Sala / Porta:
+                    </label>
+                    <select name="port_id" class="w-full bg-[#161a2b] border border-slate-700 focus:border-emerald-500 text-white rounded-xl px-3 py-3 text-sm outline-none transition-all">
+                        <option value="">🎯 Testar em TODAS as Portas (Matriz Geral)</option>
+                        {% for p in all_ports %}
+                        <option value="{{ p.id }}" {% if selected_port_id == p.id|stringformat:"s" %}selected{% endif %}>
+                            Porta {{ p.port_number }} — {{ p.name }} (Grupo: {{ p.group.name }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Botão de Ação -->
+                <div class="md:col-span-2 flex gap-2">
+                    <button type="submit" class="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                        <i class="fa-solid fa-play text-xs"></i>
+                        <span>Testar</span>
+                    </button>
+                    {% if input_domain %}
+                    <a href="{% url 'proxy_tester' %}" class="p-3 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition-all border border-slate-700 flex items-center justify-center" title="Limpar Teste">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </a>
+                    {% endif %}
+                </div>
+
+            </div>
+
+        </form>
+    </div>
+
+    <!-- RESULTADOS DO TESTE -->
+    {% if result %}
+    <div class="space-y-6 animate-fade-in">
+
+        <!-- Banner de Resumo do Domínio Testado + Botões de Ação Rápida -->
+        <div class="glass-card p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111424]">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-xl font-mono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Diagnóstico para o Domínio:</span>
+                    <h2 class="text-lg font-bold text-cyan-300 font-mono flex items-center gap-2">
+                        <span id="tested-domain-display">{{ result.cleaned_domain }}</span>
+                        {% if result.has_mandatory %}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-sans">
+                            <i class="fa-solid fa-lock text-[9px] mr-1"></i> Whitelist Obrigatória
+                        </span>
+                        {% endif %}
+                    </h2>
+                </div>
+            </div>
+
+            <!-- Botões de Ação Rápida no Topo -->
+            <div class="flex flex-wrap items-center gap-2.5">
+                <button type="button" onclick="openAddToListModal('{{ result.cleaned_domain|escapejs }}', 'WHITELIST')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 active:scale-95">
+                    <i class="fa-solid fa-plus-circle"></i>
+                    <span>Adicionar a uma Whitelist</span>
+                </button>
+
+                <button type="button" onclick="openAddToListModal('{{ result.cleaned_domain|escapejs }}', 'BLACKLIST')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 transition-all flex items-center gap-1.5 active:scale-95">
+                    <i class="fa-solid fa-ban"></i>
+                    <span>Adicionar a uma Blacklist</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Seção 1: Listas Onde o Domínio Está Cadastrado -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Whitelists Encontradas -->
+            <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-shield-check text-sm"></i>
+                        <span>Presente nas Whitelists ({{ result.matched_whitelists|length }})</span>
+                    </h3>
+
+                    <button type="button" onclick="openAddToListModal('{{ result.cleaned_domain|escapejs }}', 'WHITELIST')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> Adicionar Whitelist
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    {% for item in result.matched_whitelists %}
+                    <div class="p-3.5 rounded-xl bg-[#0e111d] border border-emerald-500/20 hover:border-emerald-500/40 transition-all space-y-2.5">
+                        <div class="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <a href="{% url 'list_detail' item.list.id %}" class="text-xs font-bold text-white hover:text-emerald-300 transition-colors">
+                                        {{ item.list.name }}
+                                    </a>
+                                    {% if item.is_mandatory %}
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        Obrigatória
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-[10px] text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                                    <span>Grupos:</span>
+                                    {% for g in item.groups %}
+                                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800 text-slate-300 border border-slate-700">
+                                        {{ g.name }}
+                                    </span>
+                                    {% empty %}
+                                    <span class="italic">Nenhum</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lista de Padrões / Subdomínios Encontrados Nesta Lista -->
+                        <div class="space-y-1.5">
+                            {% for m in item.matches %}
+                            <div class="flex items-center justify-between p-2 rounded-lg bg-[#141726] border border-slate-800 text-xs">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <code class="px-2 py-0.5 rounded bg-slate-900 font-mono text-emerald-300 text-[11px] font-bold border border-slate-700">
+                                        {{ m.matched_pattern }}
+                                    </code>
+                                    {% if m.relation_type == 'EXACT' %}
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                                        Exato
+                                    </span>
+                                    {% elif m.relation_type == 'COVERS_TARGET' %}
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+                                        Domínio Pai (Cobre todos)
+                                    </span>
+                                    {% elif m.relation_type == 'IS_SUBDOMAIN' %}
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/25">
+                                        Subdomínio Específico
+                                    </span>
+                                    {% endif %}
+                                </div>
+
+                                <button type="button" onclick="confirmRemoveDomain('{{ item.list.id }}', '{{ m.domain_item_id }}', '{{ item.list.name|escapejs }}', '{{ m.matched_pattern|escapejs }}')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all flex items-center gap-1" title="Remover '{{ m.matched_pattern }}' da lista {{ item.list.name }}">
+                                    <i class="fa-solid fa-trash-can text-[9px]"></i>
+                                    <span>Remover</span>
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="p-4 text-center text-slate-500 text-xs italic bg-slate-900/40 rounded-xl border border-dashed border-slate-800">
+                        <i class="fa-solid fa-circle-info text-slate-600 block mb-1"></i>
+                        Este domínio não está presente em nenhuma Whitelist do sistema.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Blacklists Encontradas -->
+            <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <h3 class="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-ban text-sm"></i>
+                        <span>Presente nas Blacklists ({{ result.matched_blacklists|length }})</span>
+                    </h3>
+
+                    <button type="button" onclick="openAddToListModal('{{ result.cleaned_domain|escapejs }}', 'BLACKLIST')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> Adicionar Blacklist
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    {% for item in result.matched_blacklists %}
+                    <div class="p-3.5 rounded-xl bg-[#0e111d] border border-rose-500/20 hover:border-rose-500/40 transition-all space-y-2.5">
+                        <div class="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <a href="{% url 'list_detail' item.list.id %}" class="text-xs font-bold text-white hover:text-rose-300 transition-colors">
+                                        {{ item.list.name }}
+                                    </a>
+                                </div>
+                                <div class="text-[10px] text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                                    <span>Grupos:</span>
+                                    {% for g in item.groups %}
+                                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800 text-slate-300 border border-slate-700">
+                                        {{ g.name }}
+                                    </span>
+                                    {% empty %}
+                                    <span class="italic">Nenhum</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lista de Padrões / Subdomínios Encontrados Nesta Lista -->
+                        <div class="space-y-1.5">
+                            {% for m in item.matches %}
+                            <div class="flex items-center justify-between p-2 rounded-lg bg-[#141726] border border-slate-800 text-xs">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <code class="px-2 py-0.5 rounded bg-slate-900 font-mono text-rose-300 text-[11px] font-bold border border-slate-700">
+                                        {{ m.matched_pattern }}
+                                    </code>
+                                    {% if m.relation_type == 'EXACT' %}
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/25">
+                                        Exato
+                                    </span>
+                                    {% elif m.relation_type == 'COVERS_TARGET' %}
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+                                        Domínio Pai (Cobre todos)
+                                    </span>
+                                    {% elif m.relation_type == 'IS_SUBDOMAIN' %}
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/25">
+                                        Subdomínio Específico
+                                    </span>
+                                    {% endif %}
+                                </div>
+
+                                <button type="button" onclick="confirmRemoveDomain('{{ item.list.id }}', '{{ m.domain_item_id }}', '{{ item.list.name|escapejs }}', '{{ m.matched_pattern|escapejs }}')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all flex items-center gap-1" title="Remover '{{ m.matched_pattern }}' da lista {{ item.list.name }}">
+                                    <i class="fa-solid fa-trash-can text-[9px]"></i>
+                                    <span>Remover</span>
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="p-4 text-center text-slate-500 text-xs italic bg-slate-900/40 rounded-xl border border-dashed border-slate-800">
+                        <i class="fa-solid fa-circle-check text-emerald-500/40 block mb-1"></i>
+                        Este domínio não está presente em nenhuma Blacklist do sistema.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Seção 2: Resultado da Avaliação por Sala / Porta -->
+        <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+            <div class="p-4 bg-[#111422] border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-indigo-400"></i>
+                    <span>Resultado da Navegação por Sala / Porta</span>
+                </h3>
+                <span class="text-[11px] text-slate-400 font-mono">{{ result.port_evaluations|length }} portas avaliadas</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-[#0f121e] text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800">
+                            <th class="p-3.5 pl-6">Porta / Sala</th>
+                            <th class="p-3.5">Grupo</th>
+                            <th class="p-3.5 text-center">Modo da Porta</th>
+                            <th class="p-3.5 text-center">Navegação (Status)</th>
+                            <th class="p-3.5 pr-6">Motivo da Decisão / ACL</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 font-mono">
+                        {% for eval in result.port_evaluations %}
+                        <tr class="hover:bg-slate-800/30 transition-colors {% if eval.is_allowed %}bg-emerald-500/[0.02]{% else %}bg-rose-500/[0.02]{% endif %}">
+                            
+                            <!-- Porta / Sala -->
+                            <td class="p-3.5 pl-6 whitespace-nowrap">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded font-bold text-[11px] bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+                                        {{ eval.port.port_number }}
+                                    </span>
+                                    <span class="text-white font-semibold font-sans">
+                                        {{ eval.port.name }}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- Grupo -->
+                            <td class="p-3.5 font-sans text-slate-300 whitespace-nowrap">
+                                {{ eval.group.name }}
+                            </td>
+
+                            <!-- Modo da Porta -->
+                            <td class="p-3.5 text-center whitespace-nowrap">
+                                {% if eval.mode == 'ALLOWED' %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-sans">
+                                    Totalmente Livre
+                                </span>
+                                {% elif eval.mode == 'BLACKLIST' %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-sans">
+                                    Livre c/ Blacklist
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-sans">
+                                    Whitelist Restrita
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Status de Navegação -->
+                            <td class="p-3.5 text-center whitespace-nowrap">
+                                {% if eval.is_allowed %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 font-sans shadow-sm shadow-emerald-500/10">
+                                    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+                                    <span>NAVEGA (LIBERADO)</span>
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/35 font-sans shadow-sm shadow-rose-500/10">
+                                    <i class="fa-solid fa-ban text-rose-400"></i>
+                                    <span>BLOQUEADO (403)</span>
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Motivo / Explicação -->
+                            <td class="p-3.5 pr-6 font-sans text-slate-300 text-xs">
+                                <span class="{% if eval.is_allowed %}text-emerald-300{% else %}text-rose-300{% endif %} font-medium">
+                                    {{ eval.reason }}
+                                </span>
+                            </td>
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADICIONAR DOMÍNIO À LISTA -->
+<!-- ========================================== -->
+<div id="modal-add-to-list" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2" id="modal-add-title">
+                <i class="fa-solid fa-shield-plus text-emerald-400"></i>
+                <span>Adicionar à Lista</span>
+            </h3>
+            <button type="button" onclick="closeAddToListModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-add-to-list" onsubmit="submitAddToList(event)" class="p-6 space-y-4 text-xs">
+            {% csrf_token %}
+            
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Domínio a Adicionar:</label>
+                <input type="text" id="target-domain-input" name="domain" required class="w-full bg-[#0d101a] border border-slate-700/80 text-cyan-300 font-mono text-xs rounded-xl p-3 outline-none font-bold">
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Selecione a Lista de Destino <span class="text-red-400">*</span></label>
+                <select id="target-list-select" name="list_id" required class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none font-medium">
+                    <!-- Preenchido via JS -->
+                </select>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Observação (Opcional):</label>
+                <input type="text" id="target-desc-input" name="description" placeholder="ex: Adicionado via Testador de Navegação" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+            </div>
+
+            <div id="modal-add-feedback" class="text-xs min-h-[16px]"></div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="closeAddToListModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-submit-add-list" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20">
+                    Confirmar e Adicionar
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- FORM OCULTO DE EXCLUSÃO DE DOMÍNIO -->
+<!-- ========================================== -->
+<form id="form-delete-domain" method="POST" style="display:none;">
+    {% csrf_token %}
+</form>
+
+<script>
+const allWhitelists = [
+    {% for wl in all_whitelists %}
+    { id: {{ wl.id }}, name: "{{ wl.name|escapejs }}", is_mandatory: {{ wl.is_mandatory|lower }} },
+    {% endfor %}
+];
+
+const allBlacklists = [
+    {% for bl in all_blacklists %}
+    { id: {{ bl.id }}, name: "{{ bl.name|escapejs }}" },
+    {% endfor %}
+];
+
+function openAddToListModal(domain, listType) {
+    document.getElementById('target-domain-input').value = domain;
+    document.getElementById('target-desc-input').value = `Adicionado via Testador de Políticas (${new Date().toLocaleDateString('pt-BR')})`;
+    document.getElementById('modal-add-feedback').innerHTML = '';
+
+    const select = document.getElementById('target-list-select');
+    select.innerHTML = '';
+
+    const titleEl = document.getElementById('modal-add-title');
+    const submitBtn = document.getElementById('btn-submit-add-list');
+
+    if (listType === 'WHITELIST') {
+        titleEl.innerHTML = '<i class="fa-solid fa-shield-check text-emerald-400"></i><span>Adicionar à Whitelist (Permitir)</span>';
+        submitBtn.className = 'px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20';
+        
+        allWhitelists.forEach(wl => {
+            const opt = document.createElement('option');
+            opt.value = wl.id;
+            opt.textContent = `🛡️ ${wl.name}${wl.is_mandatory ? ' (Obrigatória)' : ''}`;
+            select.appendChild(opt);
+        });
+    } else {
+        titleEl.innerHTML = '<i class="fa-solid fa-ban text-rose-400"></i><span>Adicionar à Blacklist (Bloquear)</span>';
+        submitBtn.className = 'px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20';
+        
+        allBlacklists.forEach(bl => {
+            const opt = document.createElement('option');
+            opt.value = bl.id;
+            opt.textContent = `🚫 ${bl.name}`;
+            select.appendChild(opt);
+        });
+    }
+
+    document.getElementById('modal-add-to-list').classList.remove('hidden');
+}
+
+function closeAddToListModal() {
+    document.getElementById('modal-add-to-list').classList.add('hidden');
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Submissão do Modal de Adicionar
+async function submitAddToList(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-add-list');
+    const feedback = document.getElementById('modal-add-feedback');
+    const domain = document.getElementById('target-domain-input').value;
+    const listId = document.getElementById('target-list-select').value;
+    const desc = document.getElementById('target-desc-input').value;
+
+    btn.disabled = true;
+    feedback.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Gravando e aplicando...</span>';
+
+    const formData = new URLSearchParams();
+    formData.append('domain', domain);
+    formData.append('list_id', listId);
+    formData.append('description', desc);
+
+    try {
+        const res = await fetch('/proxy/logs/add-to-list/', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            feedback.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check"></i> ${data.message}</span>`;
+            setTimeout(() => {
+                closeAddToListModal();
+                btn.disabled = false;
+                // Recarrega a página de teste com os novos resultados
+                window.location.reload();
+            }, 1000);
+        } else {
+            feedback.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-circle-xmark"></i> ${data.error}</span>`;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        feedback.innerHTML = `<span class="text-rose-400">Erro na requisição.</span>`;
+        btn.disabled = false;
+    }
+}
+
+// Remoção de Domínio com Confirmação
+function confirmRemoveDomain(listId, domainItemId, listName, domainPattern) {
+    if (!domainItemId || domainItemId === 'undefined') {
+        alert('Não foi possível identificar o ID deste domínio na lista.');
+        return;
+    }
+    
+    if (confirm(`Deseja realmente remover o padrão '${domainPattern}' da lista '${listName}'?`)) {
+        const form = document.getElementById('form-delete-domain');
+        form.action = `/proxy/lists/${listId}/domains/${domainItemId}/delete/`;
+        
+        // Dispara via fetch para recarregar o testador suavemente
+        const formData = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}'
+            }
+        }).then(() => {
+            window.location.reload();
+        }).catch(() => {
+            form.submit();
+        });
+    }
+}
+</script>
+{% endblock %}

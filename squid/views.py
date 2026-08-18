@@ -764,11 +764,25 @@ def logs_view(request):
     if port_id:
         logs_qs = logs_qs.filter(port_id=port_id)
 
-    # Filtro por Ação (Permitido / Bloqueado)
+    # Filtro por Ação (Permitido / Bloqueado no Proxy / Bloqueado no Destino)
     if action_filter == 'ALLOWED':
-        logs_qs = logs_qs.filter(action='ALLOWED')
+        logs_qs = logs_qs.filter(action='ALLOWED').exclude(http_status__contains='/403').exclude(http_status__contains='/401')
+    elif action_filter == 'BLOCKED_PROXY':
+        logs_qs = logs_qs.filter(models.Q(action='BLOCKED') | models.Q(http_status__icontains='DENIED'))
+    elif action_filter == 'BLOCKED_DEST':
+        logs_qs = logs_qs.filter(action='ALLOWED').filter(
+            models.Q(http_status__contains='/403') |
+            models.Q(http_status__contains='/401') |
+            models.Q(http_status__contains='/429') |
+            models.Q(http_status__contains='/407')
+        )
     elif action_filter == 'BLOCKED':
-        logs_qs = logs_qs.filter(action='BLOCKED')
+        logs_qs = logs_qs.filter(
+            models.Q(action='BLOCKED') |
+            models.Q(http_status__icontains='DENIED') |
+            models.Q(http_status__contains='/403') |
+            models.Q(http_status__contains='/401')
+        )
 
     # Filtro por Tempo Rápido
     now = timezone.now()
@@ -913,6 +927,10 @@ def logs_live_stream_view(request):
             'method': l.method,
             'action': l.action,
             'http_status': l.http_status,
+            'status_code': l.status_code,
+            'status_category': l.status_category,
+            'is_proxy_blocked': l.is_proxy_blocked,
+            'is_dest_blocked': l.is_dest_blocked,
             'bytes': l.formatted_bytes,
             'latency': f"{l.response_time_ms}ms"
         })
