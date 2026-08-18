@@ -4,6 +4,7 @@ db.sqlite3
 __pycache__/
 venv/
 .env
+.deploy_config.json
 .vscode/
 *.log
 
