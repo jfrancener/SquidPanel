@@ -72,6 +72,10 @@ def parse_squid_log_line(line, port_map, device_map=None):
         raw_url = parts[6]
         full_url = raw_url
 
+        # Descarta linhas de erros internos sintéticos do próprio Squid (ex: error:invalid-request, error:transaction-end)
+        if raw_url.startswith('error:') or raw_url.startswith('-') or raw_url.lower() == 'error':
+            return None
+
         # Extrai o domínio limpo
         if '://' in raw_url:
             parsed = urlparse(raw_url)
@@ -80,6 +84,8 @@ def parse_squid_log_line(line, port_map, device_map=None):
             domain = raw_url.split(':')[0]
 
         domain = domain.lstrip('.').lower()
+        if not domain or domain == 'error':
+            return None
 
         # 9. Mime Type
         mime_type = parts[9] if len(parts) > 9 else '-'
@@ -91,10 +97,9 @@ def parse_squid_log_line(line, port_map, device_map=None):
         elif len(parts) >= 10 and parts[-1].isdigit():
             port_number = int(parts[-1])
 
-        # Se não vier a porta na linha, tenta associar pela primeira porta cadastrada ou 9020
-        if not port_number:
-            first_port = next(iter(port_map.values()), None)
-            port_number = first_port.port_number if first_port else 9020
+        # Se a requisição não tiver porta de escuta válida (ex: erro abortado antes do handshake), ignora para não poluir salas aleatórias
+        if not port_number or port_number not in port_map:
+            return None
 
         # Ação (ALLOWED / BLOCKED pelo Proxy Squid)
         # O Squid marca bloqueios por ACL com TCP_DENIED, UDP_DENIED, NONE/403 ou ERR_ACCESS_DENIED
