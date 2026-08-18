@@ -176,6 +176,57 @@ class ProxyPort(models.Model):
             'end_time': ''
         }
 
+    @property
+    def active_schedules_list(self):
+        """
+        Retorna a lista de agendamentos habilitados para esta sala.
+        """
+        now = timezone.localtime(timezone.now())
+        schedules = list(self.schedules.filter(is_enabled=True).order_by('start_time'))
+        for s in schedules:
+            s.is_active_now = s.is_in_effect_now(now)
+        return schedules
+
+    @property
+    def schedule_summary(self):
+        """
+        Retorna um resumo conciso do agendamento configurado para a sala:
+        Dias/Data, Horário de Liberação e Horário de Bloqueio.
+        """
+        schedules = self.active_schedules_list
+        if not schedules:
+            return None
+
+        # Prioriza o agendamento que está em vigor agora
+        active = next((s for s in schedules if getattr(s, 'is_active_now', False)), None)
+        target = active or schedules[0]
+
+        start_h = target.start_time.strftime('%H:%M')
+        end_h = target.end_time.strftime('%H:%M')
+        days = target.days_display
+
+        action_map = {
+            'ALLOWED': 'Livre',
+            'WHITELIST': 'Whitelist',
+            'BLACKLIST': 'Blacklist',
+            'BLOCKED': 'Bloqueado'
+        }
+        act_label = action_map.get(target.action, target.action)
+        rev_label = action_map.get(target.revert_action, 'Bloqueado')
+
+        return {
+            'has_schedule': True,
+            'is_active_now': getattr(target, 'is_active_now', False),
+            'name': target.name,
+            'days': days,
+            'start_time': start_h,
+            'end_time': end_h,
+            'action_label': act_label,
+            'revert_label': rev_label,
+            'count': len(schedules),
+            'text': f"{days}: Libera {start_h} • Bloqueia {end_h}",
+        }
+
     def save(self, *args, **kwargs):
         if not self.slug:
             from django.utils.text import slugify

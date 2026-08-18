@@ -107,7 +107,7 @@
                 {% else %}
                 <div id="room-schedule-detail-{{ p.id }}" class="text-[10px] text-slate-500 hidden"></div>
                 {% if p.use_custom_portal %}
-                <div class="flex justify-end">
+                <div class="flex justify-end pt-1">
                     <a href="{% url 'portal' port_identifier=p.slug|default:p.port_number %}" target="_blank" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
                         <i class="fa-solid fa-graduation-cap text-[9px]"></i> Portal Educacional
                     </a>
@@ -115,6 +115,25 @@
                 {% endif %}
                 {% endif %}
             </div>
+
+            <!-- Resumo do Agendamento Programado (Data, Horário de Liberação e Bloqueio) -->
+            {% if p.schedule_summary %}
+            <div class="mt-2.5 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-[11px] text-slate-300 shadow-inner">
+                <div class="flex items-center gap-2">
+                    <i class="fa-regular fa-calendar-clock text-cyan-400 text-xs"></i>
+                    <span>
+                        <strong class="text-white">{{ p.schedule_summary.days }}:</strong>
+                        Libera às <strong class="text-emerald-400 font-mono">{{ p.schedule_summary.start_time }}</strong>
+                        • Bloqueia às <strong class="text-rose-400 font-mono">{{ p.schedule_summary.end_time }}</strong>
+                    </span>
+                </div>
+                {% if p.schedule_summary.is_active_now %}
+                <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[9px] uppercase tracking-wider border border-emerald-500/30 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ativo
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
 
         <!-- Botões Seletores de Modo (4 Modos de Navegação) -->
