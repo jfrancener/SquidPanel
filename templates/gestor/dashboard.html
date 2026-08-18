@@ -47,24 +47,13 @@
         <div id="room-accent-{{ p.id }}" class="absolute top-0 left-0 bottom-0 w-1.5 {% if p.current_status == 'ALLOWED' %}bg-emerald-500{% elif p.current_status == 'WHITELIST' %}bg-indigo-500{% elif p.current_status == 'BLACKLIST' %}bg-amber-500{% else %}bg-rose-500{% endif %}"></div>
 
         <div>
-            <!-- Topo do Card: Nome e Porta -->
-            <div class="flex items-start justify-between gap-3 pl-2">
+            <!-- Topo do Card: Nome da Sala e Status -->
+            <div class="flex items-center justify-between gap-3 pl-2">
                 <div>
                     <h3 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
                         <i class="fa-solid fa-door-open text-indigo-400 text-sm"></i>
                         {{ p.name }}
                     </h3>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60 font-mono text-[11px] font-semibold text-slate-300">
-                            Porta {{ p.port_number }}
-                        </span>
-                        {% if p.group %}
-                        <span class="text-[11px] text-slate-400 flex items-center gap-1">
-                            <i class="fa-solid fa-layer-group text-[10px] text-slate-500"></i>
-                            {{ p.group.name }}
-                        </span>
-                        {% endif %}
-                    </div>
                 </div>
 
                 <!-- Badge do Status Atual -->
@@ -186,7 +175,7 @@
             <select id="filter-room" onchange="resetLiveStream()" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500">
                 <option value="">Todas as minhas salas</option>
                 {% for p in ports %}
-                <option value="{{ p.id }}">{{ p.name }} (Porta {{ p.port_number }})</option>
+                <option value="{{ p.id }}">{{ p.name }}</option>
                 {% endfor %}
             </select>
 
