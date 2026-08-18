@@ -331,6 +331,7 @@ def auto_deploy_api_view(request):
     if request.method not in ['POST', 'GET']:
         return JsonResponse({'success': False, 'error': 'Método inválido.'}, status=405)
 
+    is_authenticated_admin = request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.is_admin
     expected_token = SystemSetting.get_value('deploy_token', 'squidpanel-deploy-secret-2026')
 
     # Obtém token dos headers, query params ou body
@@ -348,8 +349,9 @@ def auto_deploy_api_view(request):
         except Exception:
             pass
 
-    if not token or token != expected_token:
-        return JsonResponse({'success': False, 'error': 'Token de deploy inválido ou não fornecido.'}, status=403)
+    # Valida permissão: ou Admin logado no painel, ou Token válido
+    if not is_authenticated_admin and (not token or token != expected_token):
+        return JsonResponse({'success': False, 'error': 'Acesso negado: Token de deploy inválido ou permissão insuficiente.'}, status=403)
 
     log_results = []
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -393,8 +395,8 @@ def auto_deploy_api_view(request):
         
         if sys.platform != 'win32':
             prefix = ['sudo'] if hasattr(os, 'geteuid') and os.geteuid() != 0 else []
-            subprocess.run(prefix + ['systemctl', 'restart', 'gunicorn'], capture_output=True, timeout=10)
             subprocess.run(prefix + ['systemctl', 'restart', 'squidpanel'], capture_output=True, timeout=10)
+            subprocess.run(prefix + ['systemctl', 'restart', 'gunicorn'], capture_output=True, timeout=10)
         log_results.append("Serviço WSGI: Recarregado com sucesso")
     except Exception as e:
         log_results.append(f"WSGI Reload Erro: {str(e)}")
@@ -404,6 +406,72 @@ def auto_deploy_api_view(request):
         'message': 'Deploy e sincronização executados com sucesso no servidor de produção!',
         'logs': log_results
     })
+
+
+@login_required
+def check_system_update_api_view(request):
+    """
+    Verifica de forma assíncrona se existem novos commits no repositório remoto (Git).
+    Retorna se há atualização pendente e a quantidade de commits a aplicar.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_admin:
+        return JsonResponse({'success': False, 'error': 'Acesso restrito.'}, status=403)
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    try:
+        # Busca referências remotas sem alterar arquivos locais
+        subprocess.run(
+            ['git', 'fetch', 'origin', 'main'],
+            cwd=base_dir,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        # Hash local e remoto
+        local_hash = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'],
+            cwd=base_dir,
+            text=True,
+            timeout=5
+        ).strip()
+
+        remote_hash = subprocess.check_output(
+            ['git', 'rev-parse', 'origin/main'],
+            cwd=base_dir,
+            text=True,
+            timeout=5
+        ).strip()
+
+        # Contagem de commits atrás
+        count_out = subprocess.check_output(
+            ['git', 'rev-list', 'HEAD..origin/main', '--count'],
+            cwd=base_dir,
+            text=True,
+            timeout=5
+        ).strip()
+
+        commits_behind = int(count_out) if count_out.isdigit() else 0
+        has_update = commits_behind > 0 or (local_hash != remote_hash and local_hash and remote_hash)
+
+        return JsonResponse({
+            'success': True,
+            'has_update': has_update,
+            'commits_behind': commits_behind,
+            'local_hash': local_hash[:7] if local_hash else '',
+            'remote_hash': remote_hash[:7] if remote_hash else '',
+            'message': f"{commits_behind} nova(s) atualização(ões) disponível(is)" if has_update else "Sistema atualizado."
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'has_update': False,
+            'error': str(e),
+            'message': 'Não foi possível verificar atualizações no momento.'
+        })
 
 
 

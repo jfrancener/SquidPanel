@@ -215,8 +215,15 @@
                 </div>
 
                 {% if request.user.profile.is_admin %}
-                <!-- Botões de Controle do Squid -->
+                <!-- Botões de Controle do Squid e Sistema -->
                 <div class="flex items-center gap-2">
+                    <!-- Botão Inteligente de Atualização Git (Aparece apenas se houver novidade no repositório) -->
+                    <button onclick="executeSystemUpdate()" id="btn-system-update" class="hidden px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white rounded-xl text-xs font-bold items-center gap-1.5 shadow-lg shadow-amber-500/20 transition-all animate-pulse" title="Nova versão detectada no repositório Git. Clique para atualizar o SquidPanel!">
+                        <i class="fa-solid fa-cloud-arrow-down text-yellow-200 text-[11px]"></i>
+                        <span>Atualizar</span>
+                        <span id="badge-update-count" class="bg-black/40 px-1.5 py-0.2 rounded-full text-[10px] font-mono">1</span>
+                    </button>
+
                     <button onclick="executeSquidAction('apply')" id="btn-squid-apply" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition-all" title="Aplica as configurações e recarrega as ACLs no Squid imediatamente">
                         <i class="fa-solid fa-bolt text-yellow-300 text-[11px]"></i>
                         <span>Aplicar no Squid</span>
@@ -280,6 +287,21 @@
     </div>
 
     <script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
     async function executeSquidAction(action) {
         const isApply = action === 'apply';
         const btn = document.getElementById(isApply ? 'btn-squid-apply' : 'btn-squid-restart');
@@ -319,6 +341,74 @@
         }
     }
 
+    // ==========================================
+    // VERIFICAÇÃO AUTOMÁTICA DE ATUALIZAÇÕES GIT
+    // ==========================================
+    async function checkSystemUpdates() {
+        const updateBtn = document.getElementById('btn-system-update');
+        const badgeCount = document.getElementById('badge-update-count');
+        if (!updateBtn) return;
+
+        try {
+            const res = await fetch("{% url 'api_check_system_update' %}", {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            if (data.success && data.has_update) {
+                updateBtn.classList.remove('hidden');
+                updateBtn.classList.add('flex');
+                if (badgeCount && data.commits_behind) {
+                    badgeCount.textContent = data.commits_behind;
+                }
+            } else {
+                updateBtn.classList.add('hidden');
+                updateBtn.classList.remove('flex');
+            }
+        } catch (e) {
+            // Silencioso em caso de timeout
+        }
+    }
+
+    async function executeSystemUpdate() {
+        const btn = document.getElementById('btn-system-update');
+        if (!btn) return;
+
+        if (!confirm('Há novas atualizações no repositório Git.\n\nDeseja aplicar o deploy completo (git pull, migrações, recarga do Squid e restart do WSGI) agora?')) {
+            return;
+        }
+
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.remove('animate-pulse');
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Atualizando...</span>`;
+
+        try {
+            const res = await fetch("{% url 'api_auto_deploy' %}", {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}'
+                }
+            });
+            const data = await res.json();
+            if (data.success) {
+                btn.innerHTML = `<i class="fa-solid fa-check text-white text-xs"></i> <span>Atualizado!</span>`;
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                alert('Erro ao atualizar: ' + (data.error || data.message));
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        } catch (err) {
+            alert('Falha na comunicação durante a atualização: ' + err);
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }
+
     // Relógio em Tempo Real do Servidor (America/Sao_Paulo UTC-3)
     (function initServerClock() {
         const timeEl = document.getElementById('server-live-time');
@@ -340,6 +430,12 @@
         updateTime();
         setInterval(updateTime, 1000);
     })();
+
+    {% if request.user.profile.is_admin %}
+    // Executa verificação inicial e periódica a cada 60s
+    setTimeout(checkSystemUpdates, 1500);
+    setInterval(checkSystemUpdates, 60000);
+    {% endif %}
     </script>
 
     {% block extra_scripts %}{% endblock %}
