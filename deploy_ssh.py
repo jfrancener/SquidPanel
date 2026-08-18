@@ -156,13 +156,23 @@ def execute_remote_ssh(cfg):
     print("-" * 65)
 
     commands = [
-        f"cd {cfg['remote_dir']} && git pull origin main",
-        f"cd {cfg['remote_dir']} && python3 manage.py migrate --noinput",
-        f"cd {cfg['remote_dir']} && python3 -c \"from squid.squid_sync import apply_squid_changes; apply_squid_changes()\"",
-        f"cd {cfg['remote_dir']} && touch core/wsgi.py",
-        "systemctl restart gunicorn 2>/dev/null || systemctl restart squidpanel 2>/dev/null || true",
-        "sudo squid -k reconfigure 2>/dev/null || true",
-        "systemctl is-active gunicorn squid || true"
+        f"cd {cfg['remote_dir']} && git fetch origin main && git reset --hard origin/main",
+        f"cd {cfg['remote_dir']} && ./venv/bin/python manage.py migrate --noinput",
+        f"cd {cfg['remote_dir']} && ./venv/bin/python manage.py shell -c \""
+        "from dashboard.models import ProxyGroup, ProxyPort; "
+        "from squid.models import ProxyList, DomainItem; "
+        "from squid.squid_sync import apply_squid_changes; "
+        "educ = ProxyList.objects.filter(name__icontains='educa').first(); "
+        "print('Educacional:', educ); "
+        "for dom in ['.michaelis.uol.com.br', '.uerj.br']: "
+        "    DomainItem.objects.get_or_create(proxy_list=educ, domain=dom); "
+        "for g in ProxyGroup.objects.filter(is_active=True): "
+        "    if any(k in g.name.lower() for k in ['ead', 'pedagogia', 'sala']): "
+        "        g.whitelists.add(educ); print('Vinculado ao Grupo:', g.name); "
+        "ok, msg = apply_squid_changes(); print('Squid Sync:', ok, msg)\"",
+        "systemctl restart squidpanel",
+        "systemctl reload squid || sudo squid -k reconfigure || true",
+        "systemctl is-active squidpanel squid"
     ]
 
     full_cmd = " && ".join(commands[:4]) + " ; " + " ; ".join(commands[4:])
