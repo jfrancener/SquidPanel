@@ -28,6 +28,7 @@ urlpatterns = [
     path('adminsp/settings/export/config/xml/', dashboard_views.export_config_xml_view, name='export_config_xml'),
     path('adminsp/settings/export/logs/txt/', dashboard_views.export_logs_txt_view, name='export_logs_txt'),
     path('adminsp/api/system-metrics/', dashboard_views.system_metrics_api_view, name='api_system_metrics'),
+    path('adminsp/api/deploy/', dashboard_views.auto_deploy_api_view, name='api_auto_deploy'),
 
     # App Squid (Proxy, Whitelists e Regras)
     path('proxy/', include('squid.urls')),

@@ -315,3 +315,95 @@ def export_logs_txt_view(request):
     return response
 
 
+from django.views.decorators.csrf import csrf_exempt
+import json
+import subprocess
+import os
+import sys
+
+@csrf_exempt
+def auto_deploy_api_view(request):
+    """
+    Endpoint seguro de Auto-Deploy e Sincronização em Produção.
+    Permite atualizar o código no servidor, aplicar migrações,
+    regerar e recarregar as regras do Squid e reiniciar o serviço WSGI.
+    """
+    if request.method not in ['POST', 'GET']:
+        return JsonResponse({'success': False, 'error': 'Método inválido.'}, status=405)
+
+    expected_token = SystemSetting.get_value('deploy_token', 'squidpanel-deploy-secret-2026')
+
+    # Obtém token dos headers, query params ou body
+    token = (
+        request.headers.get('X-Deploy-Token') or
+        request.META.get('HTTP_X_DEPLOY_TOKEN') or
+        request.GET.get('token') or
+        request.POST.get('token')
+    )
+
+    if not token and request.body:
+        try:
+            body_data = json.loads(request.body.decode('utf-8'))
+            token = body_data.get('token')
+        except Exception:
+            pass
+
+    if not token or token != expected_token:
+        return JsonResponse({'success': False, 'error': 'Token de deploy inválido ou não fornecido.'}, status=403)
+
+    log_results = []
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # 1. Git Pull
+    try:
+        git_res = subprocess.run(
+            ['git', 'pull', 'origin', 'main'],
+            cwd=base_dir,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        git_out = (git_res.stdout + "\n" + git_res.stderr).strip()
+        log_results.append(f"Git Pull: {git_out}")
+    except Exception as e:
+        log_results.append(f"Git Pull Erro: {str(e)}")
+
+    # 2. Migrações Django
+    try:
+        from django.core.management import call_command
+        call_command('migrate', interactive=False)
+        log_results.append("Migrações: OK")
+    except Exception as e:
+        log_results.append(f"Migrações Erro: {str(e)}")
+
+    # 3. Sincronização do Squid
+    squid_msg = ""
+    try:
+        from squid.squid_sync import apply_squid_changes
+        ok_squid, squid_msg = apply_squid_changes()
+        log_results.append(f"Squid Sync: {'OK' if ok_squid else 'Falhou'} - {squid_msg}")
+    except Exception as e:
+        log_results.append(f"Squid Sync Erro: {str(e)}")
+
+    # 4. Reload / Restart do Serviço WSGI
+    try:
+        wsgi_file = os.path.join(base_dir, 'core', 'wsgi.py')
+        if os.path.exists(wsgi_file):
+            os.utime(wsgi_file, None)
+        
+        if sys.platform != 'win32':
+            prefix = ['sudo'] if hasattr(os, 'geteuid') and os.geteuid() != 0 else []
+            subprocess.run(prefix + ['systemctl', 'restart', 'gunicorn'], capture_output=True, timeout=10)
+            subprocess.run(prefix + ['systemctl', 'restart', 'squidpanel'], capture_output=True, timeout=10)
+        log_results.append("Serviço WSGI: Recarregado com sucesso")
+    except Exception as e:
+        log_results.append(f"WSGI Reload Erro: {str(e)}")
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Deploy e sincronização executados com sucesso no servidor de produção!',
+        'logs': log_results
+    })
+
+
+
