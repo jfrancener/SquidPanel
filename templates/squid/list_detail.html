@@ -362,7 +362,8 @@ function openMoveModal(domainId, domainName) {
     targetSelect.value = '';
 
     // Define action dinamicamente
-    form.action = `/adminsp/lists/{{ proxy_list.id }}/domains/${domainId}/move/`;
+    let baseUrl = "{% url 'domain_move' proxy_list.id 999999 %}";
+    form.action = baseUrl.replace('999999', domainId);
     domainNameSpan.innerText = domainName;
 
     modal.classList.remove('hidden');
