@@ -7,7 +7,7 @@ from django.http import HttpResponseForbidden, JsonResponse, HttpResponse, Http4
 from django.db import models
 from django.utils.text import slugify
 
-from .models import ProxyList, DomainItem, PortalLink
+from .models import ProxyList, DomainItem, PortalLink, AllowedRefererHub, DiscoveredSublink
 from .squid_sync import apply_squid_changes, restart_squid_service, mark_squid_sync_needed, is_squid_sync_needed
 from dashboard.models import ProxyGroup, ProxyPort, UserProfile
 
@@ -464,6 +464,9 @@ def whitelists_view(request):
     total_lists = lists.count()
     total_domains = DomainItem.objects.filter(proxy_list__list_type='WHITELIST', is_active=True).count()
     all_groups = ProxyGroup.objects.filter(is_active=True)
+    all_ports = ProxyPort.objects.filter(is_active=True).order_by('port_number')
+    referer_hubs = AllowedRefererHub.objects.all().prefetch_related('ports').order_by('name')
+    discovered_sublinks = DiscoveredSublink.objects.select_related('origin_hub').order_by('-hit_count', '-last_seen')[:100]
 
     return render(request, 'squid/lists_index.html', {
         'profile': profile,
@@ -476,6 +479,9 @@ def whitelists_view(request):
         'total_lists': total_lists,
         'total_domains': total_domains,
         'all_groups': all_groups,
+        'all_ports': all_ports,
+        'referer_hubs': referer_hubs,
+        'discovered_sublinks': discovered_sublinks,
         'active_menu': 'whitelists'
     })
 
@@ -829,7 +835,9 @@ def logs_view(request):
     if port_id:
         logs_qs = logs_qs.filter(port_id=port_id)
 
-    # Filtro por Ação (Permitido / Bloqueado no Proxy / Bloqueado no Destino)
+    # Filtro por Ação (Permitido / Bloqueado no Proxy / Bloqueado no Destino / Bloqueados Resumido)
+    is_summary_mode = (action_filter == 'BLOCKED_SUMMARY')
+
     if action_filter == 'ALLOWED':
         logs_qs = logs_qs.filter(action='ALLOWED').exclude(http_status__contains='/403').exclude(http_status__contains='/401')
     elif action_filter == 'BLOCKED_PROXY':
@@ -841,7 +849,7 @@ def logs_view(request):
             models.Q(http_status__contains='/429') |
             models.Q(http_status__contains='/407')
         )
-    elif action_filter == 'BLOCKED':
+    elif action_filter in ['BLOCKED', 'BLOCKED_SUMMARY']:
         logs_qs = logs_qs.filter(
             models.Q(action='BLOCKED') |
             models.Q(http_status__icontains='DENIED') |
@@ -893,15 +901,57 @@ def logs_view(request):
     allowed_count = logs_qs.filter(action='ALLOWED').count()
     blocked_count = logs_qs.filter(action='BLOCKED').count()
 
-    # Paginação
-    paginator = Paginator(logs_qs, 50)
-    page_number = request.GET.get('page', 1)
-    logs_page = paginator.get_page(page_number)
-
-    # Anexa DeviceHost aos logs da página atual
     device_map = {d.ip_address: d for d in DeviceHost.objects.all()}
-    for log in logs_page:
-        log.device = device_map.get(log.client_ip)
+
+    # MODO RESUMIDO (AGRUPADO POR DOMÍNIO)
+    if is_summary_mode:
+        summary_qs = logs_qs.values('domain').annotate(
+            block_count=models.Count('id'),
+            last_timestamp=models.Max('timestamp'),
+            last_log_id=models.Max('id')
+        ).order_by('-last_timestamp')
+
+        summary_count = summary_qs.count()
+        paginator = Paginator(summary_qs, 50)
+        page_number = request.GET.get('page', 1)
+        summary_page = paginator.get_page(page_number)
+
+        # Para cada domínio resumido na página atual, busca detalhes do último acesso
+        domain_last_ids = [item['last_log_id'] for item in summary_page if item.get('last_log_id')]
+        last_logs_dict = {l.id: l for l in AccessLog.objects.filter(id__in=domain_last_ids).select_related('port', 'group')}
+
+        summary_items = []
+        for item in summary_page:
+            last_log = last_logs_dict.get(item['last_log_id'])
+            dev = device_map.get(last_log.client_ip) if last_log else None
+            summary_items.append({
+                'domain': item['domain'],
+                'block_count': item['block_count'],
+                'last_timestamp': item['last_timestamp'],
+                'last_log': last_log,
+                'device': dev,
+                'port_number': last_log.port_number if last_log else '-',
+                'port_name': (last_log.port.name if last_log and last_log.port else (last_log.group.name if last_log and last_log.group else '-')),
+                'client_ip': last_log.client_ip if last_log else '-',
+                'hostname': (last_log.hostname if last_log and last_log.hostname else (dev.hostname if dev else None)),
+                'status_code': last_log.status_code if last_log else '403',
+                'is_proxy_blocked': last_log.is_proxy_blocked if last_log else True,
+                'is_dest_blocked': last_log.is_dest_blocked if last_log else False,
+                'formatted_bytes': last_log.formatted_bytes if last_log else '0 B',
+            })
+
+        logs_page = summary_page
+        summary_data = summary_items
+        total_filtered_count = summary_count
+    else:
+        summary_data = None
+        # Paginação normal
+        paginator = Paginator(logs_qs, 50)
+        page_number = request.GET.get('page', 1)
+        logs_page = paginator.get_page(page_number)
+
+        for log in logs_page:
+            log.device = device_map.get(log.client_ip)
 
     # Dados para os dropdowns de filtro
     all_groups = ProxyGroup.objects.filter(is_active=True).order_by('name')
@@ -916,6 +966,8 @@ def logs_view(request):
     return render(request, 'squid/logs_index.html', {
         'profile': profile,
         'logs': logs_page,
+        'is_summary_mode': is_summary_mode,
+        'summary_data': summary_data,
         'total_filtered_count': total_filtered_count,
         'allowed_count': allowed_count,
         'blocked_count': blocked_count,
@@ -2071,6 +2123,234 @@ def admin_schedule_delete_view(request, schedule_id):
 
     messages.success(request, f"Agendamento '{name}' excluído com sucesso!")
     return redirect('admin_schedules')
+
+
+# ==========================================
+# 12. SUBLINKS LIBERADOS POR ORIGEM (REFERER HUBS)
+# ==========================================
+
+@login_required
+def referer_hub_create_view(request):
+    """
+    Criação de um novo Portal/Buscador com Sublinks Liberados.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        domain_pattern = request.POST.get('domain_pattern', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_active = request.POST.get('is_active') == 'on'
+        port_ids = request.POST.getlist('ports')
+
+        if not name or not domain_pattern:
+            messages.error(request, "Nome e Domínio de Origem são obrigatórios.")
+            return redirect('whitelists')
+
+        hub = AllowedRefererHub.objects.create(
+            name=name,
+            domain_pattern=domain_pattern,
+            description=description,
+            is_active=is_active
+        )
+        if port_ids:
+            hub.ports.set(ProxyPort.objects.filter(id__in=port_ids, is_active=True))
+
+        apply_squid_changes()
+        messages.success(request, f"Buscador/Portal '{name}' cadastrado com sublinks liberados!")
+
+    return redirect('whitelists')
+
+
+@login_required
+def referer_hub_edit_view(request, hub_id):
+    """
+    Edição de um Buscador/Portal com Sublinks Liberados.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    hub = get_object_or_404(AllowedRefererHub, id=hub_id)
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        domain_pattern = request.POST.get('domain_pattern', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_active = request.POST.get('is_active') == 'on'
+        port_ids = request.POST.getlist('ports')
+
+        if not name or not domain_pattern:
+            messages.error(request, "Nome e Domínio de Origem são obrigatórios.")
+            return redirect('whitelists')
+
+        hub.name = name
+        hub.domain_pattern = domain_pattern
+        hub.description = description
+        hub.is_active = is_active
+        hub.save()
+
+        hub.ports.set(ProxyPort.objects.filter(id__in=port_ids, is_active=True))
+
+        apply_squid_changes()
+        messages.success(request, f"Buscador '{name}' atualizado com sucesso!")
+
+    return redirect('whitelists')
+
+
+@login_required
+def referer_hub_toggle_view(request, hub_id):
+    """
+    Ativa/Desativa o portal de sublinks liberados com 1 clique e aplica no Squid.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    hub = get_object_or_404(AllowedRefererHub, id=hub_id)
+    hub.is_active = not hub.is_active
+    hub.save()
+
+    apply_squid_changes()
+
+    status_str = "ativado" if hub.is_active else "desativado"
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'is_active': hub.is_active,
+            'message': f"Buscador '{hub.name}' {status_str} com sucesso!"
+        })
+
+    messages.success(request, f"Buscador '{hub.name}' {status_str} com sucesso!")
+    return redirect('whitelists')
+
+
+@login_required
+def referer_hub_delete_view(request, hub_id):
+    """
+    Exclusão de um portal de sublinks liberados.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    hub = get_object_or_404(AllowedRefererHub, id=hub_id)
+    name = hub.name
+    hub.delete()
+
+    apply_squid_changes()
+    messages.success(request, f"Buscador '{name}' excluído com sucesso!")
+    return redirect('whitelists')
+
+
+# ==========================================
+# GESTÃO DE SUBLINKS DESCOBERTOS (PROMOVER P/ WHITELIST)
+# ==========================================
+
+@login_required
+def promote_sublink_to_whitelist_view(request):
+    """
+    Promove um domínio descoberto através de sublink/pesquisa para uma Whitelist definitiva.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    if request.method == 'POST':
+        domain = request.POST.get('domain', '').strip()
+        whitelist_id = request.POST.get('whitelist_id')
+        description = request.POST.get('description', 'Promovido de Sublinks Descobertos').strip()
+
+        if not domain or not whitelist_id:
+            messages.error(request, 'Domínio e Whitelist de destino são obrigatórios.')
+            return redirect('whitelists')
+
+        target_wl = get_object_or_404(ProxyList, id=whitelist_id, list_type='WHITELIST')
+
+        item = DomainItem(proxy_list=target_wl, domain=domain, description=description)
+        cleaned = item.clean_domain()
+
+        if target_wl.domains.filter(domain=cleaned).exists():
+            messages.warning(request, f"O domínio '{cleaned}' já está cadastrado na Whitelist '{target_wl.name}'.")
+        else:
+            item.save()
+            apply_squid_changes()
+            messages.success(request, f"Domínio '{cleaned}' adicionado permanentemente à Whitelist '{target_wl.name}' e sincronizado no Squid!")
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'domain': cleaned, 'whitelist': target_wl.name})
+
+    return redirect('whitelists')
+
+
+@login_required
+def delete_discovered_sublink_view(request, sublink_id):
+    """
+    Remove um domínio do catálogo de sublinks descobertos.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    sublink = get_object_or_404(DiscoveredSublink, id=sublink_id)
+    sublink.delete()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True})
+
+    messages.success(request, "Item removido do histórico de sublinks descobertos.")
+    return redirect('whitelists')
+
+
+@login_required
+def discovered_sublinks_page_view(request):
+    """
+    Página completa dedicada à visualização e gestão dos Sublinks Descobertos por Pesquisa/Buscadores.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    query = request.GET.get('q', '').strip()
+    sublinks = DiscoveredSublink.objects.select_related('origin_hub').order_by('-hit_count', '-last_seen')
+
+    if query:
+        sublinks = sublinks.filter(
+            models.Q(domain__icontains=query) |
+            models.Q(last_requested_url__icontains=query) |
+            models.Q(origin_hub__name__icontains=query)
+        )
+
+    whitelists = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).order_by('-is_mandatory', 'name')
+    total_count = sublinks.count()
+
+    return render(request, 'squid/discovered_sublinks.html', {
+        'profile': profile,
+        'sublinks': sublinks,
+        'whitelists': whitelists,
+        'query': query,
+        'total_count': total_count,
+        'active_menu': 'discovered_sublinks'
+    })
+
+
+@login_required
+def clear_discovered_sublinks_view(request):
+    """
+    Limpa todo o catálogo de sublinks descobertos.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    if request.method == 'POST':
+        DiscoveredSublink.objects.all().delete()
+        messages.success(request, "Histórico de sublinks descobertos limpo com sucesso!")
+
+    return redirect('discovered_sublinks')
+
 
 
 

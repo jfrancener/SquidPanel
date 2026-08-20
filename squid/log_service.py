@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from django.utils import timezone
 from django.conf import settings
 
-from .models import AccessLog, ProxyList, DomainItem, DeviceHost
+from .models import AccessLog, ProxyList, DomainItem, DeviceHost, DiscoveredSublink, AllowedRefererHub
 from dashboard.models import ProxyGroup, ProxyPort, SystemSetting
 
 
@@ -183,6 +183,43 @@ def sync_logs_from_squid_file():
 
         if new_logs:
             AccessLog.objects.bulk_create(new_logs)
+
+            # Identifica e cataloga acessos permitidos em salas com Whitelist que não são domínios diretos do portal
+            try:
+                whitelist_ports = {p.port_number for p in port_map.values() if p.current_status == 'WHITELIST'}
+                allowed_hubs = list(AllowedRefererHub.objects.filter(is_active=True))
+                
+                for log in new_logs:
+                    if log.action == 'ALLOWED' and log.port_number in whitelist_ports:
+                        clean_d = log.domain.strip().lower().split(':')[0]
+                        # Ignora IPs locais, portas internas e o próprio servidor SquidPanel
+                        if not clean_d or clean_d.startswith('10.') or clean_d.startswith('192.168.') or clean_d.startswith('127.'):
+                            continue
+                        
+                        # Verifica se é um domínio de buscador ou sublink
+                        origin = None
+                        for hub in allowed_hubs:
+                            if hub.clean_pattern() in clean_d:
+                                origin = hub
+                                break
+                        
+                        # Atualiza ou cria o registro de sublink descoberto
+                        sublink, created = DiscoveredSublink.objects.get_or_create(
+                            domain=clean_d,
+                            defaults={
+                                'origin_hub': origin,
+                                'last_requested_url': log.full_url[:500] if log.full_url else f"https://{clean_d}",
+                                'hit_count': 1
+                            }
+                        )
+                        if not created:
+                            DiscoveredSublink.objects.filter(id=sublink.id).update(
+                                hit_count=models.F('hit_count') + 1,
+                                last_seen=timezone.now(),
+                                last_requested_url=log.full_url[:500] if log.full_url else sublink.last_requested_url
+                            )
+            except Exception as e_sub:
+                pass
 
         SystemSetting.set_value('squid_log_file_offset', str(valid_offset), 'Offset do arquivo access.log')
         return len(new_logs)

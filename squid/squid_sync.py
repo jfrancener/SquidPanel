@@ -4,7 +4,7 @@ import subprocess
 from django.conf import settings
 from django.utils import timezone
 from dashboard.models import ProxyGroup, ProxyPort, SystemSetting
-from squid.models import ProxyList, DomainItem
+from squid.models import ProxyList, DomainItem, AllowedRefererHub
 
 
 def get_squid_paths():
@@ -126,19 +126,28 @@ def _write_file_safely(filepath, content):
 
 def optimize_domain_set(domains):
     """
-    Remove subdomínios redundantes quando o domínio pai já estiver presente
-    (ex: se tiver '.cloudflare.com', remove '.cdnjs.cloudflare.com'),
-    pois o Squid não permite subdomínios repetidos no mesmo arquivo dstdomain.
+    Otimiza a lista de domínios para arquivos dstdomain do Squid, respeitando estritamente a intenção do usuário:
+    - Entradas com '.' inicial (ex: .sc.gov.br, .youtube.com) cobrem o domínio e todos os subdomínios.
+    - Entradas sem '.' inicial (ex: sc.gov.br, youtube.com) cobrem estritamente o domínio exato.
+    Se no mesmo conjunto houver '.dominio.com' e 'dominio.com', mantém a versão com wildcard para evitar aviso de redundância no Squid.
     """
     cleaned = set()
     for d in domains:
-        d = d.strip().lower()
+        d = str(d).strip().lower()
         if not d:
             continue
         cleaned.add(d)
 
-    # Ordena por número de pontos e comprimento (domínios pais antes)
-    sorted_domains = sorted(cleaned, key=lambda x: (x.count('.'), len(x)))
+    # Se existir '.dominio.com' e 'dominio.com', prefere a versão com wildcard para não duplicar no Squid
+    wildcards = {d.lstrip('.') for d in cleaned if d.startswith('.')}
+    processed = set()
+    for d in cleaned:
+        if not d.startswith('.') and d in wildcards:
+            continue
+        processed.add(d)
+
+    # Ordena domínios pais com wildcard primeiro (menos partes primeiro)
+    sorted_domains = sorted(processed, key=lambda x: (x.lstrip('.').count('.'), len(x.lstrip('.')), 0 if x.startswith('.') else 1))
     final_domains = []
 
     for candidate in sorted_domains:
@@ -146,9 +155,15 @@ def optimize_domain_set(domains):
         is_subdomain = False
         for parent in final_domains:
             parent_norm = parent.lstrip('.')
-            if cand_norm == parent_norm or cand_norm.endswith('.' + parent_norm):
-                is_subdomain = True
-                break
+            # Apenas se o pai for wildcard com ponto inicial ele engloba subdomínios
+            if parent.startswith('.'):
+                if cand_norm == parent_norm or cand_norm.endswith('.' + parent_norm):
+                    is_subdomain = True
+                    break
+            else:
+                if cand_norm == parent_norm:
+                    is_subdomain = True
+                    break
         
         if not is_subdomain:
             final_domains.append(candidate)
@@ -278,7 +293,23 @@ def generate_squid_config_and_lists():
             'has_bl': has_port_bl,
         }
 
-    # 4. Monta o conteúdo completo do squid.conf
+    # 4. Gera arquivo de Sublinks Liberados por Origem (Referer Hubs - Google Scholar, SciELO, etc.)
+    referer_hubs = AllowedRefererHub.objects.filter(is_active=True)
+    has_referer_hubs = referer_hubs.exists()
+    referer_file_path = os.path.join(lists_dir, 'allowed_referers.txt')
+    if has_referer_hubs:
+        ref_patterns = []
+        for rh in referer_hubs:
+            clean = rh.clean_pattern()
+            if clean:
+                # Escapa pontos para regex seguro
+                regex_esc = clean.replace('.', r'\.')
+                ref_patterns.append(regex_esc)
+        _write_file_safely(referer_file_path, "\n".join(ref_patterns) + "\n")
+    else:
+        _write_file_safely(referer_file_path, "# Nenhum referer hub ativo\n")
+
+    # 5. Monta o conteúdo completo do squid.conf
     dns_servers = SystemSetting.get_value('server_dns', '1.1.1.1 8.8.8.8').replace(',', ' ')
 
     conf_lines = []
@@ -387,7 +418,14 @@ def generate_squid_config_and_lists():
         conf_lines.append("# --- Paginas de Bloqueio / Portal Educacional Personalizado (deny_info) ---")
         for p in portal_ports:
             target_slug = 'ead' if (p.port_number == 9030 or 'ead' in p.name.lower()) else (p.slug or str(p.port_number))
-            conf_lines.append(f"deny_info http://{server_ip}/portal/{target_slug}/?blocked=%u myport_{p.port_number}")
+            conf_lines.append(f"acl deny_portal_{p.port_number} myport {p.port_number}")
+            conf_lines.append(f"deny_info 302:http://{server_ip}/portal/{target_slug}/?blocked=%u deny_portal_{p.port_number}")
+        conf_lines.append("")
+
+    # ACL de Sublinks Liberados por Origem (Referer Hubs)
+    if has_referer_hubs:
+        conf_lines.append("# --- ACL de Portais com Sublinks Liberados (Referer Hubs) ---")
+        conf_lines.append(f'acl allowed_referer_hubs referer_regex -i "{referer_file_path}"')
         conf_lines.append("")
 
     # Regras de Acesso por Porta e Status
@@ -421,13 +459,25 @@ def generate_squid_config_and_lists():
             conf_lines.append(f"http_access allow myport_{p.port_number}")
 
         else:
-            # Modo Whitelist (Padrão Seguro: apenas Whitelists permitidas)
-            # Hierarquia: Sistema > WL porta > WL grupo > Nega
+            # Modo Whitelist (Padrão Seguro: Blacklist tem precedência de negação > Whitelists > Sublinks acadêmicos autorizados > Negação padrão)
+            if pf['has_bl']:
+                conf_lines.append(f"http_access deny myport_{p.port_number} port_{p.id}_bl")
+            conf_lines.append(f"http_access deny myport_{p.port_number} group_{g.id}_bl")
+
             conf_lines.append(f"http_access allow myport_{p.port_number} mandatory_whitelist")
             if pf['has_wl']:
                 conf_lines.append(f"http_access allow myport_{p.port_number} port_{p.id}_wl")
             conf_lines.append(f"http_access allow myport_{p.port_number} group_{g.id}_wl")
-            conf_lines.append(f"http_access deny myport_{p.port_number}")
+
+            # Se a sala possui sublinks liberados (Referer Hubs como Google Scholar, SciELO, CAPES), permite os links originados nesses portais
+            if has_referer_hubs:
+                conf_lines.append(f"http_access allow myport_{p.port_number} allowed_referer_hubs")
+            
+            # Se a porta possui portal educacional ativo, nega usando a ACL do deny_info para disparar o redirecionamento
+            if getattr(p, 'use_custom_portal', False):
+                conf_lines.append(f"http_access deny deny_portal_{p.port_number}")
+            else:
+                conf_lines.append(f"http_access deny myport_{p.port_number}")
 
     # Bloqueio Geral no Final
     conf_lines.append("\n# --- Bloqueio Padrao no Final ---")
@@ -480,6 +530,12 @@ def apply_squid_changes():
         res_test = subprocess.run(prefix + ['squid', '-k', 'parse'], capture_output=True, text=True)
         if res_test.returncode != 0:
             return False, f"Erro de sintaxe no Squid: {res_test.stderr}"
+
+        # Garante liberação da porta no firewall UFW se estiver rodando
+        try:
+            subprocess.run(prefix + ['ufw', 'allow', '9010:9099/tcp'], capture_output=True)
+        except Exception:
+            pass
 
         # Recarrega configurações
         res_reconfig = subprocess.run(prefix + ['squid', '-k', 'reconfigure'], capture_output=True, text=True)

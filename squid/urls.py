@@ -68,6 +68,18 @@ urlpatterns = [
     path('schedules/<int:schedule_id>/toggle/', views.admin_schedule_toggle_view, name='admin_schedule_toggle'),
     path('schedules/<int:schedule_id>/delete/', views.admin_schedule_delete_view, name='admin_schedule_delete'),
 
+    # Sublinks Liberados por Origem (Referer Hubs)
+    path('referer-hubs/create/', views.referer_hub_create_view, name='referer_hub_create'),
+    path('referer-hubs/<int:hub_id>/edit/', views.referer_hub_edit_view, name='referer_hub_edit'),
+    path('referer-hubs/<int:hub_id>/toggle/', views.referer_hub_toggle_view, name='referer_hub_toggle'),
+    path('referer-hubs/<int:hub_id>/delete/', views.referer_hub_delete_view, name='referer_hub_delete'),
+
+    # Sublinks Descobertos / Histórico & Promoção para Whitelist
+    path('discovered-sublinks/', views.discovered_sublinks_page_view, name='discovered_sublinks'),
+    path('discovered-sublinks/promote/', views.promote_sublink_to_whitelist_view, name='promote_sublink_to_whitelist'),
+    path('discovered-sublinks/<int:sublink_id>/delete/', views.delete_discovered_sublink_view, name='delete_discovered_sublink'),
+    path('discovered-sublinks/clear/', views.clear_discovered_sublinks_view, name='clear_discovered_sublinks'),
+
     # Scripts PAC / WPAD (Proxy Auto-Configuration)
     path('pac/<int:port_number>.pac', views.pac_by_port_view, name='pac_by_port'),
     path('pac/<int:port_number>.dat', views.pac_by_port_view, name='pac_by_port_dat'),

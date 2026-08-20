@@ -77,7 +77,6 @@ class DomainItem(models.Model):
 
     def clean_domain(self):
         d = self.domain.strip().lower()
-        # Remove http://, https:// e barras
         if d.startswith('http://'):
             d = d[7:]
         elif d.startswith('https://'):
@@ -225,6 +224,7 @@ class HiddenDomain(models.Model):
             d = d.split(':')[0].split('/')[0]
         return d.lstrip('.')
 
+
 class PortalLink(models.Model):
     """
     Links e atalhos permitidos exibidos na página de bloqueio/portal educacional (ex: Portal EAD, Google Scholar, Dicionários).
@@ -265,4 +265,80 @@ class PortalLink(models.Model):
         return f"{self.title} ({self.get_category_display()})"
 
 
+class AllowedRefererHub(models.Model):
+    """
+    Portais e Buscadores com Sublinks Liberados (Referer Whitelist).
+    Permite abrir links externos e resultados derivados desde que o clique tenha se originado
+    de um dos domínios autorizados cadastrados nesta tabela (ex: scholar.google.com, scielo.br).
+    """
+    name = models.CharField(max_length=150, verbose_name="Nome do Portal / Buscador")
+    domain_pattern = models.CharField(
+        max_length=255, 
+        verbose_name="Domínio / Padrão de Origem (ex: scholar.google.com)",
+        help_text="Domínio ou regex do site de busca/portal que permite navegar nos resultados"
+    )
+    description = models.CharField(max_length=255, blank=True, verbose_name="Descrição / Finalidade")
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    ports = models.ManyToManyField(
+        'dashboard.ProxyPort',
+        blank=True,
+        related_name='allowed_referer_hubs',
+        verbose_name="Salas / Portas Aplicadas",
+        help_text="Deixe em branco para aplicar a todas as salas com Whitelist ativa"
+    )
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Criado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
 
+    class Meta:
+        verbose_name = "Sublinks Liberados (Referer Hub)"
+        verbose_name_plural = "Sublinks Liberados (Referer Hubs)"
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.domain_pattern})"
+
+    def clean_pattern(self):
+        d = self.domain_pattern.strip().lower()
+        if '://' in d:
+            from urllib.parse import urlparse
+            d = urlparse(d).hostname or d
+        return d.lstrip('.')
+
+
+class DiscoveredSublink(models.Model):
+    """
+    Domínios externos que foram acessados dinamicamente através de cliques em Sublinks/Buscadores (Referer Hubs).
+    Registra a frequência de acesso e permite ao administrador promover o domínio para uma Whitelist definitiva com 1 clique.
+    """
+    domain = models.CharField(max_length=255, unique=True, db_index=True, verbose_name="Domínio Acessado")
+    origin_hub = models.ForeignKey(
+        AllowedRefererHub, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='discovered_links',
+        verbose_name="Buscador de Origem"
+    )
+    last_requested_url = models.URLField(max_length=500, blank=True, verbose_name="Última URL Acessada")
+    hit_count = models.PositiveIntegerField(default=1, verbose_name="Vezes Acessado")
+    first_seen = models.DateTimeField(default=timezone.now, verbose_name="Primeiro Acesso")
+    last_seen = models.DateTimeField(auto_now=True, verbose_name="Último Acesso")
+
+    class Meta:
+        verbose_name = "Sublink Descoberto / Acessado"
+        verbose_name_plural = "Sublinks Descobertos / Acessados"
+        ordering = ['-last_seen']
+
+    def __str__(self):
+        return f"{self.domain} ({self.hit_count} acessos)"
+
+    @property
+    def is_in_whitelist(self):
+        """Verifica se este domínio já está cadastrado em alguma Whitelist ativa"""
+        clean = self.domain.lstrip('.')
+        return DomainItem.objects.filter(
+            proxy_list__list_type='WHITELIST',
+            proxy_list__is_active=True
+        ).filter(
+            models.Q(domain=clean) | models.Q(domain=f".{clean}")
+        ).exists()
