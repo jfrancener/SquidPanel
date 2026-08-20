@@ -1267,7 +1267,7 @@ def proxy_tester_view(request):
 
         # 1. Busca em TODAS as Whitelists ativas do sistema
         matched_whitelists = []
-        all_wl = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).prefetch_related('domains', 'applied_groups_whitelist')
+        all_wl = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).prefetch_related('domains', 'applied_groups_whitelist', 'applied_ports_whitelist')
         for wl in all_wl:
             for item in wl.domains.filter(is_active=True):
                 if domain_matches(cleaned_domain, item.domain):
@@ -1275,24 +1275,26 @@ def proxy_tester_view(request):
                         'list': wl,
                         'matched_pattern': item.domain,
                         'is_mandatory': wl.is_mandatory,
-                        'groups': list(wl.applied_groups_whitelist.filter(is_active=True))
+                        'groups': list(wl.applied_groups_whitelist.filter(is_active=True)),
+                        'ports': list(wl.applied_ports_whitelist.filter(is_active=True)),
                     })
                     break
 
         # 2. Busca em TODAS as Blacklists ativas do sistema
         matched_blacklists = []
-        all_bl = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).prefetch_related('domains', 'applied_groups_blacklist')
+        all_bl = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).prefetch_related('domains', 'applied_groups_blacklist', 'applied_ports_blacklist')
         for bl in all_bl:
             for item in bl.domains.filter(is_active=True):
                 if domain_matches(cleaned_domain, item.domain):
                     matched_blacklists.append({
                         'list': bl,
                         'matched_pattern': item.domain,
-                        'groups': list(bl.applied_groups_blacklist.filter(is_active=True))
+                        'groups': list(bl.applied_groups_blacklist.filter(is_active=True)),
+                        'ports': list(bl.applied_ports_blacklist.filter(is_active=True)),
                     })
                     break
 
-        # 3. Avaliação por Porta
+        # 3. Avaliação por Porta (Alinhada estritamente à hierarquia do squid.conf)
         port_evaluations = []
         ports_to_test = [target_port] if target_port else all_ports
 
@@ -1302,6 +1304,12 @@ def proxy_tester_view(request):
 
             in_mandatory_wl = any(m['is_mandatory'] for m in matched_whitelists)
             mandatory_item = next((m for m in matched_whitelists if m['is_mandatory']), None)
+
+            in_port_wl = any(p in m['ports'] for m in matched_whitelists)
+            port_wl_item = next((m for m in matched_whitelists if p in m['ports']), None)
+
+            in_port_bl = any(p in m['ports'] for m in matched_blacklists)
+            port_bl_item = next((m for m in matched_blacklists if p in m['ports']), None)
 
             in_group_wl = any(g in m['groups'] for m in matched_whitelists)
             group_wl_item = next((m for m in matched_whitelists if g in m['groups']), None)
@@ -1317,14 +1325,27 @@ def proxy_tester_view(request):
                 status = 'ALLOWED'
                 reason = 'Porta 100% Livre (Modo Aberto)'
                 badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+            elif mode == 'BLOCKED':
+                status = 'BLOCKED'
+                reason = 'Porta 100% Bloqueada (Acesso Totalmente Suspenso)'
+                badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
             elif mode == 'BLACKLIST':
+                # Hierarquia Squid: Mandatory WL > Port WL > Port BL > Group WL > Group BL > Libera
                 if in_mandatory_wl:
                     status = 'ALLOWED'
                     reason = f"Liberado pela Whitelist Obrigatória: '{mandatory_item['list'].name}' (Precedência máxima)"
                     badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                elif in_port_wl:
+                    status = 'ALLOWED'
+                    reason = f"Liberado pela Whitelist Exclusiva da Porta: '{port_wl_item['list'].name}'"
+                    badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                elif in_port_bl:
+                    status = 'BLOCKED'
+                    reason = f"Bloqueado pela Blacklist da Porta: '{port_bl_item['list'].name}'"
+                    badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                 elif in_group_wl:
                     status = 'ALLOWED'
-                    reason = f"Liberado pela Whitelist do Grupo: '{group_wl_item['list'].name}' (Precedência sobre Blacklist)"
+                    reason = f"Liberado pela Whitelist do Grupo: '{group_wl_item['list'].name}'"
                     badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                 elif in_group_bl:
                     status = 'BLOCKED'
@@ -1332,12 +1353,25 @@ def proxy_tester_view(request):
                     badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                 else:
                     status = 'ALLOWED'
-                    reason = "Liberado (Não está em nenhuma Blacklist ativa deste Grupo)"
+                    reason = "Liberado (Não está em nenhuma Blacklist ativa desta Porta ou Grupo)"
                     badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
             else:  # Modo WHITELIST
-                if in_mandatory_wl:
+                # Hierarquia Squid: Port BL nega > Group BL nega > Mandatory WL > Port WL > Group WL > Nega
+                if in_port_bl:
+                    status = 'BLOCKED'
+                    reason = f"Bloqueado pela Blacklist da Porta: '{port_bl_item['list'].name}'"
+                    badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                elif in_group_bl:
+                    status = 'BLOCKED'
+                    reason = f"Bloqueado pela Blacklist do Grupo: '{group_bl_item['list'].name}'"
+                    badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                elif in_mandatory_wl:
                     status = 'ALLOWED'
                     reason = f"Liberado pela Whitelist Obrigatória: '{mandatory_item['list'].name}'"
+                    badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                elif in_port_wl:
+                    status = 'ALLOWED'
+                    reason = f"Liberado pela Whitelist Exclusiva da Porta: '{port_wl_item['list'].name}'"
                     badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                 elif in_group_wl:
                     status = 'ALLOWED'
@@ -1345,7 +1379,7 @@ def proxy_tester_view(request):
                     badge_class = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                 else:
                     status = 'BLOCKED'
-                    reason = "Bloqueado (Modo Whitelist Restritivo: domínio não cadastrado em nenhuma Whitelist do Grupo)"
+                    reason = "Bloqueado (Modo Whitelist: domínio não cadastrado em nenhuma Whitelist do Grupo ou Porta)"
                     badge_class = 'bg-rose-500/15 text-rose-400 border-rose-500/30'
 
             port_evaluations.append({
@@ -1358,7 +1392,9 @@ def proxy_tester_view(request):
                 'badge_class': badge_class,
                 'in_mandatory_wl': in_mandatory_wl,
                 'in_group_wl': in_group_wl,
-                'in_group_bl': in_group_bl
+                'in_group_bl': in_group_bl,
+                'in_port_wl': in_port_wl,
+                'in_port_bl': in_port_bl
             })
 
         result = {

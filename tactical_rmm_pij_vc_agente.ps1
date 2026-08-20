@@ -1,9 +1,9 @@
 # ==============================================================================
-# TACTICAL RMM - CONFIGURAÇÃO SQUID PROXY (PAC 9011) + CERTIFICADO SSL
+# TACTICAL RMM - CONFIGURAÇÃO SQUID PROXY (PAC 9011) + CERTIFICADO SSL + BLOQUEIO
 # ==============================================================================
 $ErrorActionPreference = "SilentlyContinue"
 
-Write-Host ">>> [1/3] Baixando e instalando o Certificado Raiz Squid CA..." -ForegroundColor Cyan
+Write-Host ">>> [1/4] Baixando e instalando o Certificado Raiz Squid CA..." -ForegroundColor Cyan
 $certUrl = "http://10.40.88.5/proxy/certificate/download/"
 $certPath = "$env:TEMP\squid_ca.crt"
 
@@ -21,7 +21,7 @@ try {
     Write-Host "[ERRO] Falha ao baixar/instalar certificado: $_" -ForegroundColor Red
 }
 
-Write-Host "`n>>> [2/3] Aplicando Script PAC 9011 no Registro..." -ForegroundColor Cyan
+Write-Host "`n>>> [2/4] Aplicando Script PAC 9011 no Registro..." -ForegroundColor Cyan
 $pacUrl = "http://10.40.88.5/9011.pac"
 
 # 1. Configura em HKLM (Politica Global da Maquina)
@@ -72,9 +72,46 @@ if (Test-Path "Registry::HKEY_USERS\DefaultUser") {
 
 Write-Host "[OK] PAC 9011 configurado em todos os perfis de usuario." -ForegroundColor Green
 
-Write-Host "`n>>> [3/3] Reiniciando navegadores..." -ForegroundColor Cyan
+Write-Host "`n>>> [3/4] Aplicando Bloqueios de Diretiva (GPO Local e Navegadores)..." -ForegroundColor Cyan
+
+# A) Força proxy por máquina (ignora bypass por usuário)
+Set-ItemProperty -Path 'HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'ProxySettingsPerUser' -Value 0 -Type DWord -Force
+
+# B) Desabilita interface de configurações de Proxy no Painel de Controle e Configurações do Windows
+$controlPanelKey = 'HKLM:\Software\Policies\Microsoft\Internet Explorer\Control Panel'
+if (-not (Test-Path $controlPanelKey)) { New-Item -Path $controlPanelKey -Force | Out-Null }
+Set-ItemProperty -Path $controlPanelKey -Name 'Proxy' -Value 1 -Type DWord -Force
+Set-ItemProperty -Path $controlPanelKey -Name 'Connection Settings' -Value 1 -Type DWord -Force
+Set-ItemProperty -Path $controlPanelKey -Name 'Connwiz Admin' -Value 1 -Type DWord -Force
+
+# C) Força Script PAC via Políticas do Google Chrome
+$chromePol = 'HKLM:\Software\Policies\Google\Chrome'
+if (-not (Test-Path $chromePol)) { New-Item -Path $chromePol -Force | Out-Null }
+Set-ItemProperty -Path $chromePol -Name 'ProxyMode' -Value 'pac_script' -Type String -Force
+Set-ItemProperty -Path $chromePol -Name 'ProxyPacUrl' -Value $pacUrl -Type String -Force
+
+# D) Força Script PAC via Políticas do Microsoft Edge
+$edgePol = 'HKLM:\Software\Policies\Microsoft\Edge'
+if (-not (Test-Path $edgePol)) { New-Item -Path $edgePol -Force | Out-Null }
+Set-ItemProperty -Path $edgePol -Name 'ProxyMode' -Value 'pac_script' -Type String -Force
+Set-ItemProperty -Path $edgePol -Name 'ProxyPacUrl' -Value $pacUrl -Type String -Force
+
+# E) Bloqueia no HKEY_USERS das contas logadas
+Get-ChildItem Registry::HKEY_USERS | ForEach-Object {
+    $sub = $_.PSChildName
+    if ($sub -match '^S-1-5-21-' -and $sub -notmatch '_Classes$') {
+        $uCp = "Registry::HKEY_USERS\$sub\Software\Policies\Microsoft\Internet Explorer\Control Panel"
+        if (-not (Test-Path $uCp)) { New-Item -Path $uCp -Force -ErrorAction SilentlyContinue | Out-Null }
+        Set-ItemProperty -Path $uCp -Name 'Proxy' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $uCp -Name 'Connection Settings' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Write-Host "[OK] Diretivas de bloqueio aplicadas com sucesso (Windows, Chrome e Edge)." -ForegroundColor Green
+
+Write-Host "`n>>> [4/4] Reiniciando navegadores..." -ForegroundColor Cyan
 taskkill.exe /F /IM chrome.exe /IM msedge.exe /IM brave.exe /IM firefox.exe 2>$null | Out-Null
 
 Write-Host "`n==========================================================" -ForegroundColor Yellow
-Write-Host " SUCESSO: PIJ-VC-AGENTE configurado com PAC 9011 e Certificado!" -ForegroundColor Green
+Write-Host " SUCESSO: Proxy PAC 9011 configurado e BLOQUEADO para alteracoes!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Yellow
