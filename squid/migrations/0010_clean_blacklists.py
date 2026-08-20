@@ -117,7 +117,7 @@ def reorganize_blacklists(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('squid', '0007_portallink'),
+        ('squid', '0009_discoveredsublink'),
     ]
 
     operations = [
