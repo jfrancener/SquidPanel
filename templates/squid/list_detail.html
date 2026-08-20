@@ -153,7 +153,10 @@
                             <td class="p-3.5 text-slate-400">
                                 {{ item.description|default:"—" }}
                             </td>
-                            <td class="p-3.5 text-right pr-5">
+                            <td class="p-3.5 text-right pr-5 flex items-center justify-end gap-1.5 ml-auto">
+                                <button type="button" onclick="openMoveModal('{{ item.id }}', '{{ item.domain }}')" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-slate-800/80 hover:bg-indigo-600 text-slate-400 hover:text-white transition-all border border-slate-700/60" title="Mover categoria">
+                                    <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
+                                </button>
                                 <a href="{% url 'domain_delete' proxy_list.id item.id %}" onclick="return confirm('Remover {{ item.domain }} desta lista?')" class="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-slate-800/80 hover:bg-red-600 text-slate-400 hover:text-white transition-all border border-slate-700/60" title="Remover domínio">
                                     <i class="fa-solid fa-trash text-[10px]"></i>
                                 </a>
@@ -289,4 +292,127 @@
 
     </div>
 </div>
+
+<!-- ========================================== -->
+<!-- MODAL DE MOVER DOMÍNIO DE CATEGORIA -->
+<!-- ========================================== -->
+<div id="modal-move-domain" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+        
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-arrow-right-arrow-left text-indigo-400"></i>
+                <span>Mover <span id="move-domain-name" class="font-mono text-indigo-300"></span></span>
+            </h3>
+            <button onclick="closeMoveModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-move-domain" method="POST" action="" class="p-6 space-y-4">
+            {% csrf_token %}
+            <input type="hidden" id="move-confirm" name="confirm" value="false">
+
+            <div>
+                <label for="target_list_id" class="block text-xs font-semibold text-white mb-1.5">
+                    Selecione a Lista de Destino:
+                </label>
+                <select id="target_list_id" name="target_list_id" required class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-indigo-500 outline-none">
+                    <option value="" disabled selected>Escolha uma lista...</option>
+                    {% for ol in other_lists %}
+                    <option value="{{ ol.id }}">{{ ol.name }} ({% if ol.list_type == 'WHITELIST' %}Whitelist{% else %}Blacklist{% endif %})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="move-already-exists-warning" class="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 hidden">
+                <span class="text-xs font-bold text-amber-300 block">Domínio já existe no destino!</span>
+                <span class="text-[10px] text-slate-400 block mt-0.5">Deseja remover este domínio da lista atual e mantê-lo apenas no destino?</span>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="closeMoveModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-submit-move" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20">
+                    Mover Domínio
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<script>
+function openMoveModal(domainId, domainName) {
+    const modal = document.getElementById('modal-move-domain');
+    const form = document.getElementById('form-move-domain');
+    const domainNameSpan = document.getElementById('move-domain-name');
+    const warningDiv = document.getElementById('move-already-exists-warning');
+    const confirmInput = document.getElementById('move-confirm');
+    const btnSubmit = document.getElementById('btn-submit-move');
+    const targetSelect = document.getElementById('target_list_id');
+
+    // Reset estado
+    warningDiv.classList.add('hidden');
+    confirmInput.value = 'false';
+    btnSubmit.innerText = 'Mover Domínio';
+    btnSubmit.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+    btnSubmit.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
+    targetSelect.value = '';
+
+    // Define action dinamicamente
+    form.action = `/adminsp/lists/{{ proxy_list.id }}/domains/${domainId}/move/`;
+    domainNameSpan.innerText = domainName;
+
+    modal.classList.remove('hidden');
+}
+
+function closeMoveModal() {
+    document.getElementById('modal-move-domain').classList.add('hidden');
+}
+
+document.getElementById('form-move-domain').addEventListener('submit', function(e) {
+    const confirmInput = document.getElementById('move-confirm');
+    if (confirmInput.value === 'true') {
+        return; // Prossegue com o submit normal
+    }
+
+    const select = document.getElementById('target_list_id');
+    const warningDiv = document.getElementById('move-already-exists-warning');
+    const btnSubmit = document.getElementById('btn-submit-move');
+    const form = this;
+
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    formData.append('ajax', 'true');
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else if (data.already_exists) {
+            warningDiv.classList.remove('hidden');
+            confirmInput.value = 'true';
+            btnSubmit.innerText = 'Sim, remover da lista atual';
+            btnSubmit.classList.remove('bg-indigo-600', 'hover:bg-indigo-500');
+            btnSubmit.classList.add('bg-amber-600', 'hover:bg-amber-500');
+        } else {
+            alert(data.message || 'Erro ao mover domínio.');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Erro ao processar movimentação.');
+    });
+});
+</script>
 {% endblock %}

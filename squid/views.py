@@ -623,6 +623,8 @@ def list_detail_view(request, list_id):
 
         return redirect('list_detail', list_id=proxy_list.id)
 
+    other_lists = ProxyList.objects.filter(list_type=proxy_list.list_type, is_active=True).exclude(id=proxy_list.id).order_by('name')
+
     return render(request, 'squid/list_detail.html', {
         'profile': profile,
         'proxy_list': proxy_list,
@@ -630,8 +632,74 @@ def list_detail_view(request, list_id):
         'query': query,
         'all_groups': all_groups,
         'applied_groups': applied_groups,
+        'other_lists': other_lists,
         'active_menu': 'whitelists' if proxy_list.list_type == 'WHITELIST' else 'blacklists'
     })
+
+
+@login_required
+def domain_move_view(request, list_id, domain_id):
+    """
+    Move um domínio de uma lista de proxy para outra do mesmo tipo.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    proxy_list = get_object_or_404(ProxyList, id=list_id)
+    domain_item = get_object_or_404(DomainItem, id=domain_id, proxy_list=proxy_list)
+
+    if request.method == 'POST':
+        target_list_id = request.POST.get('target_list_id')
+        confirm = request.POST.get('confirm') == 'true'
+
+        if not target_list_id:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == 'true':
+                return JsonResponse({'success': False, 'message': 'Selecione uma lista de destino.'})
+            messages.error(request, "Selecione uma lista de destino.")
+            return redirect('list_detail', list_id=proxy_list.id)
+
+        target_list = get_object_or_404(ProxyList, id=target_list_id)
+
+        if target_list.id == proxy_list.id:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == 'true':
+                return JsonResponse({'success': False, 'message': 'A lista de destino é igual à de origem.'})
+            messages.warning(request, "A lista de destino é igual à de origem.")
+            return redirect('list_detail', list_id=proxy_list.id)
+
+        # Verificar se o domínio já existe na lista de destino
+        cleaned_domain = domain_item.domain
+        existing = target_list.domains.filter(domain=cleaned_domain).first()
+
+        if existing:
+            if confirm:
+                # O usuário confirmou a remoção do atual (mantendo no destino)
+                domain_item.delete()
+                msg = f"O domínio '{cleaned_domain}' já existia em '{target_list.name}' e foi removido de '{proxy_list.name}'."
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == 'true':
+                    return JsonResponse({'success': True, 'message': msg})
+                messages.success(request, msg)
+                return redirect('list_detail', list_id=proxy_list.id)
+            else:
+                # Retorna aviso para confirmação no frontend
+                return JsonResponse({
+                    'success': False,
+                    'already_exists': True,
+                    'message': f"O domínio '{cleaned_domain}' já está na lista '{target_list.name}'."
+                })
+
+        # Caso não exista na lista de destino, movemos normalmente
+        domain_item.proxy_list = target_list
+        domain_item.save()
+
+        msg = f"Domínio '{cleaned_domain}' movido para a lista '{target_list.name}' com sucesso!"
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('ajax') == 'true':
+            return JsonResponse({'success': True, 'message': msg})
+
+        messages.success(request, msg)
+        return redirect('list_detail', list_id=proxy_list.id)
+
+    return redirect('list_detail', list_id=proxy_list.id)
 
 
 @login_required
