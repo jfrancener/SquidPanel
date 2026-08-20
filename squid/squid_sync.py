@@ -339,6 +339,7 @@ def generate_squid_config_and_lists():
     # ACLs Básicas de Rede e Segurança (Suporte permanente a HTTPS padrão e portas customizadas como CIASC/Governo/APIs)
     conf_lines.append("# --- ACLs Padroes de Seguranca ---")
     conf_lines.append("acl SSL_ports port 443")
+    conf_lines.append("acl SSL_ports port 5222         # WhatsApp Web WebSockets / XMPP")
     conf_lines.append("acl SSL_ports port 8243         # CIASC / SC Gov WSO2 APIM HTTPS")
     conf_lines.append("acl SSL_ports port 8280         # CIASC / SC Gov WSO2 APIM HTTP")
     conf_lines.append("acl SSL_ports port 8443         # Alternate HTTPS / Tomcat")
@@ -348,6 +349,7 @@ def generate_squid_config_and_lists():
     conf_lines.append("acl Safe_ports port 80          # http")
     conf_lines.append("acl Safe_ports port 21          # ftp")
     conf_lines.append("acl Safe_ports port 443         # https")
+    conf_lines.append("acl Safe_ports port 5222        # WhatsApp Web")
     conf_lines.append("acl Safe_ports port 8243        # CIASC APIM")
     conf_lines.append("acl Safe_ports port 8280        # CIASC APIM HTTP")
     conf_lines.append("acl Safe_ports port 8443        # Alternate HTTPS")
@@ -364,7 +366,8 @@ def generate_squid_config_and_lists():
 
     # ACLs de Domínios Obrigatórios
     conf_lines.append("# --- ACL de Whitelist Obrigatoria do Sistema ---")
-    conf_lines.append(f'acl mandatory_whitelist dstdomain "{mandatory_file_path}"\n')
+    conf_lines.append(f'acl mandatory_whitelist dstdomain "{mandatory_file_path}"')
+    conf_lines.append('acl websocket_bypass_ssl dstdomain .whatsapp.com .whatsapp.net .web.whatsapp.com .wa.me .teams.microsoft.com\n')
 
     # ACLs de Domínios por Grupo
     conf_lines.append("# --- ACLs de Whitelists e Blacklists por Grupo ---")
@@ -395,6 +398,7 @@ def generate_squid_config_and_lists():
         conf_lines.append("acl step1 at_step SslBump1")
         conf_lines.append("ssl_bump peek step1")
         conf_lines.append("ssl_bump splice mandatory_whitelist")
+        conf_lines.append("ssl_bump splice websocket_bypass_ssl")
         for g in groups:
             files = group_list_files[g.id]
             if files['has_wl']:
