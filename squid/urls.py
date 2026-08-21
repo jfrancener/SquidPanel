@@ -80,6 +80,7 @@ urlpatterns = [
     path('discovered-sublinks/promote/', views.promote_sublink_to_whitelist_view, name='promote_sublink_to_whitelist'),
     path('discovered-sublinks/<int:sublink_id>/delete/', views.delete_discovered_sublink_view, name='delete_discovered_sublink'),
     path('discovered-sublinks/clear/', views.clear_discovered_sublinks_view, name='clear_discovered_sublinks'),
+    path('discovered-sublinks/<int:sublink_id>/analyze/', views.analyze_sublink_ia_view, name='analyze_sublink_ia'),
 
     # Scripts PAC / WPAD (Proxy Auto-Configuration)
     path('pac/<int:port_number>.pac', views.pac_by_port_view, name='pac_by_port'),

@@ -79,7 +79,7 @@
                 <thead>
                     <tr class="border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider bg-slate-900/40">
                         <th class="py-3 px-4">Domínio do Artigo / Faculdade</th>
-                        <th class="py-3 px-4">Buscador de Origem</th>
+                        <th class="py-3 px-4">Origem</th>
                         <th class="py-3 px-4 text-center">Frequência (Acessos)</th>
                         <th class="py-3 px-4">Primeiro Acesso</th>
                         <th class="py-3 px-4">Último Acesso</th>
@@ -95,8 +95,80 @@
                                 <div class="w-8 h-8 rounded-lg bg-indigo-950/80 text-cyan-400 border border-indigo-500/30 flex items-center justify-center text-xs">
                                     <i class="fa-solid fa-globe"></i>
                                 </div>
-                                <div>
-                                    <span class="font-mono font-bold text-white text-xs block">{{ item.domain }}</span>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono font-bold text-white text-xs block">{{ item.domain }}</span>
+                                        <!-- Botão / Badge de análise IA -->
+                                        {% if ai_enabled %}
+                                        <div class="ia-tooltip-wrapper relative flex-shrink-0"
+                                             data-sublink-id="{{ item.pk }}"
+                                             data-analyzed="{{ item.ai_analysis|yesno:'true,false' }}">
+                                            {% if item.ai_analysis %}
+                                                {% with rec=item.ai_analysis.recommendation %}
+                                                <button type="button"
+                                                    onclick="loadIaTooltip(this)"
+                                                    class="ia-badge px-1.5 py-0.5 rounded-md text-[9px] font-bold border flex items-center gap-1 cursor-pointer transition-all
+                                                    {% if rec == 'whitelist' %}bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25
+                                                    {% elif rec == 'block' %}bg-red-500/15 text-red-400 border-red-500/30 hover:bg-red-500/25
+                                                    {% else %}bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25{% endif %}"
+                                                    title="Ver análise da IA">
+                                                    <i class="fa-solid fa-robot"></i>
+                                                    {% if rec == 'whitelist' %}Liberar{% elif rec == 'block' %}Bloquear{% else %}Monitorar{% endif %}
+                                                </button>
+                                                {% endwith %}
+                                            {% else %}
+                                                <button type="button"
+                                                    onclick="loadIaTooltip(this)"
+                                                    class="ia-badge px-1.5 py-0.5 rounded-md text-[9px] font-bold border flex items-center gap-1 bg-slate-700/50 text-slate-400 border-slate-600 hover:bg-violet-500/15 hover:text-violet-400 hover:border-violet-500/30 transition-all cursor-pointer"
+                                                    title="Analisar com IA">
+                                                    <i class="fa-solid fa-magnifying-glass"></i> IA
+                                                </button>
+                                            {% endif %}
+                                            <!-- Popover do tooltip -->
+                                            <div class="ia-popover hidden absolute z-50 left-0 top-7 w-72 bg-[#151829] border border-violet-500/30 rounded-xl shadow-2xl p-3 text-xs">
+                                                <div class="ia-popover-content text-slate-300">
+                                                    <div class="flex items-center gap-2 text-violet-400 font-bold mb-2">
+                                                        <i class="fa-solid fa-robot"></i>
+                                                        <span>Análise de IA</span>
+                                                        <span class="ml-auto text-[9px] text-slate-500 font-normal">{{ item.domain }}</span>
+                                                    </div>
+                                                    <div class="ia-result">
+                                                        {% if item.ai_analysis %}
+                                                            <div class="space-y-1.5">
+                                                                {% if item.ai_analysis.is_cdn %}
+                                                                <p class="flex items-start gap-1.5"><i class="fa-solid fa-box-archive text-cyan-400 mt-0.5 flex-shrink-0"></i><span><strong class="text-white">CDN de:</strong> {{ item.ai_analysis.cdn_of|default:"infraestrutura de suporte" }}</span></p>
+                                                                {% endif %}
+                                                                <p class="flex items-start gap-1.5">
+                                                                    <i class="fa-solid fa-star mt-0.5 flex-shrink-0
+                                                                        {% if item.ai_analysis.importance == 'high' %}text-emerald-400
+                                                                        {% elif item.ai_analysis.importance == 'low' %}text-slate-500
+                                                                        {% else %}text-amber-400{% endif %}"></i>
+                                                                    <span><strong class="text-white">Importância:</strong>
+                                                                        {% if item.ai_analysis.importance == 'high' %}Alta{% elif item.ai_analysis.importance == 'low' %}Baixa{% else %}Média{% endif %}
+                                                                    </span>
+                                                                </p>
+                                                                <p class="flex items-start gap-1.5">
+                                                                    <i class="fa-solid fa-circle-check mt-0.5 flex-shrink-0
+                                                                        {% if item.ai_analysis.recommendation == 'whitelist' %}text-emerald-400
+                                                                        {% elif item.ai_analysis.recommendation == 'block' %}text-red-400
+                                                                        {% else %}text-amber-400{% endif %}"></i>
+                                                                    <span><strong class="text-white">Recomendação:</strong>
+                                                                        {% if item.ai_analysis.recommendation == 'whitelist' %}Adicionar à Whitelist
+                                                                        {% elif item.ai_analysis.recommendation == 'block' %}Bloquear
+                                                                        {% else %}Monitorar{% endif %}
+                                                                    </span>
+                                                                </p>
+                                                                <p class="text-slate-400 text-[10px] border-t border-slate-700 pt-1.5 mt-1.5 italic">{{ item.ai_analysis.reason }}</p>
+                                                            </div>
+                                                        {% else %}
+                                                            <p class="text-slate-400">Clique no botão IA para analisar este domínio.</p>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                     {% if item.last_requested_url %}
                                     <a href="{{ item.last_requested_url }}" target="_blank" class="text-[10px] text-slate-500 hover:text-cyan-400 truncate block max-w-sm font-mono mt-0.5" title="{{ item.last_requested_url }}">
                                         {{ item.last_requested_url }} <i class="fa-solid fa-arrow-up-right-from-square text-[8px] ml-1"></i>
@@ -108,12 +180,20 @@
 
                         <td class="py-3.5 px-4">
                             {% if item.origin_hub %}
-                            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold flex items-center gap-1.5 w-fit">
+                            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold flex items-center gap-1.5 w-fit" title="{{ item.origin_hub.domain_pattern }}">
                                 <i class="fa-solid fa-magnifying-glass text-[9px]"></i>
                                 {{ item.origin_hub.name }}
                             </span>
                             {% else %}
-                            <span class="text-slate-500 text-[11px]">Buscador / Sublink</span>
+                            <span class="text-slate-500 text-[11px]" title="{{ item.last_requested_url }}">
+                                {% if item.last_requested_url %}
+                                    {% with parts=item.last_requested_url|slice:"0:40" %}
+                                    <i class="fa-solid fa-link text-[9px] mr-1 text-slate-600"></i>{{ parts }}
+                                    {% endwith %}
+                                {% else %}
+                                    Desconhecido
+                                {% endif %}
+                            </span>
                             {% endif %}
                         </td>
 
@@ -258,6 +338,83 @@ async function deleteSublinkRow(sublinkId, btn) {
         alert('Erro ao remover sublink.');
     } finally {
         btn.disabled = false;
+    }
+}
+
+// Fechar popovers ao clicar fora
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ia-tooltip-wrapper')) {
+        document.querySelectorAll('.ia-popover').forEach(p => p.classList.add('hidden'));
+    }
+});
+
+async function loadIaTooltip(btn) {
+    const wrapper = btn.closest('.ia-tooltip-wrapper');
+    const sublinkId = wrapper.dataset.sublinkId;
+    const popover = wrapper.querySelector('.ia-popover');
+    const resultDiv = popover.querySelector('.ia-result');
+
+    // Fecha outros popovers abertos
+    document.querySelectorAll('.ia-popover').forEach(p => {
+        if (p !== popover) p.classList.add('hidden');
+    });
+
+    // Toggle: se já está aberto e tem análise, só fecha
+    if (!popover.classList.contains('hidden') && wrapper.dataset.analyzed === 'true') {
+        popover.classList.add('hidden');
+        return;
+    }
+
+    popover.classList.remove('hidden');
+
+    // Se já tem análise carregada na página, apenas exibe (não refaz chamada)
+    if (wrapper.dataset.analyzed === 'true') return;
+
+    // Indica carregamento
+    resultDiv.innerHTML = '<div class="flex items-center gap-2 text-violet-400"><i class="fa-solid fa-spinner fa-spin"></i><span>Consultando IA...</span></div>';
+
+    try {
+        const res = await fetch(`/proxy/discovered-sublinks/${sublinkId}/analyze/`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            resultDiv.innerHTML = `<p class="text-red-400 text-[10px]"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${data.error || 'Erro desconhecido.'}</p>`;
+            return;
+        }
+
+        const a = data.analysis;
+        const recColor = a.recommendation === 'whitelist' ? 'emerald' : a.recommendation === 'block' ? 'red' : 'amber';
+        const recLabel = a.recommendation === 'whitelist' ? 'Adicionar à Whitelist' : a.recommendation === 'block' ? 'Bloquear' : 'Monitorar';
+        const impColor = a.importance === 'high' ? 'emerald' : a.importance === 'low' ? 'slate' : 'amber';
+        const impLabel = a.importance === 'high' ? 'Alta' : a.importance === 'low' ? 'Baixa' : 'Média';
+
+        resultDiv.innerHTML = `
+            <div class="space-y-1.5">
+                ${a.is_cdn ? `<p class="flex items-start gap-1.5"><i class="fa-solid fa-box-archive text-cyan-400 mt-0.5 flex-shrink-0"></i><span><strong class="text-white">CDN de:</strong> ${a.cdn_of || 'infraestrutura de suporte'}</span></p>` : ''}
+                <p class="flex items-start gap-1.5"><i class="fa-solid fa-star text-${impColor}-400 mt-0.5 flex-shrink-0"></i><span><strong class="text-white">Importância:</strong> ${impLabel}</span></p>
+                <p class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-${recColor}-400 mt-0.5 flex-shrink-0"></i><span><strong class="text-white">Recomendação:</strong> ${recLabel}</span></p>
+                <p class="text-slate-400 text-[10px] border-t border-slate-700 pt-1.5 mt-1.5 italic">${a.reason}</p>
+            </div>`;
+
+        // Atualiza o badge sem recarregar a página
+        const badgeColors = {
+            whitelist: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+            block: 'bg-red-500/15 text-red-400 border-red-500/30',
+            monitor: 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+        };
+        const badgeLabels = { whitelist: 'Liberar', block: 'Bloquear', monitor: 'Monitorar' };
+        btn.className = `ia-badge px-1.5 py-0.5 rounded-md text-[9px] font-bold border flex items-center gap-1 cursor-pointer transition-all ${badgeColors[a.recommendation] || badgeColors.monitor}`;
+        btn.innerHTML = `<i class="fa-solid fa-robot"></i> ${badgeLabels[a.recommendation] || 'Monitorar'}`;
+        wrapper.dataset.analyzed = 'true';
+
+    } catch (e) {
+        resultDiv.innerHTML = `<p class="text-red-400 text-[10px]"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Erro de conexão: ${e.message}</p>`;
     }
 }
 </script>

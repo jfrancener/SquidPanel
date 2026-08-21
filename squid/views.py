@@ -2430,12 +2430,16 @@ def discovered_sublinks_page_view(request):
     whitelists = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).order_by('-is_mandatory', 'name')
     total_count = sublinks.count()
 
+    from dashboard.models import SystemSetting
+    ai_enabled = SystemSetting.get_value('ai_integration_enabled', 'false') == 'true'
+
     return render(request, 'squid/discovered_sublinks.html', {
         'profile': profile,
         'sublinks': sublinks,
         'whitelists': whitelists,
         'query': query,
         'total_count': total_count,
+        'ai_enabled': ai_enabled,
         'active_menu': 'discovered_sublinks'
     })
 
@@ -2456,6 +2460,118 @@ def clear_discovered_sublinks_view(request):
     return redirect('discovered_sublinks')
 
 
+@login_required
+def analyze_sublink_ia_view(request, sublink_id):
+    """
+    Endpoint AJAX — Analisa um sublink descoberto via IA (9router/API OpenAI-compatible).
+    Comportamento híbrido: usa cache do banco se análise < 7 dias, senão chama a API e salva.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    from dashboard.models import SystemSetting
+    from django.utils import timezone
+    from datetime import timedelta
+    import urllib.request
+    import json as json_lib
+
+    # Verifica se a integração com IA está ativa
+    ai_enabled = SystemSetting.get_value('ai_integration_enabled', 'false')
+    if ai_enabled != 'true':
+        return JsonResponse({'error': 'Integração com IA não está ativada. Acesse Configurações → Parâmetros Gerais para ativar.'}, status=400)
+
+    ai_api_url = SystemSetting.get_value('ai_api_url', '').strip().rstrip('/')
+    ai_api_key = SystemSetting.get_value('ai_api_key', '').strip()
+    if not ai_api_url or not ai_api_key:
+        return JsonResponse({'error': 'URL ou Chave da API de IA não configuradas. Acesse Configurações → Parâmetros Gerais.'}, status=400)
+
+    sublink = get_object_or_404(DiscoveredSublink, id=sublink_id)
+
+    # Retorna cache se análise existe e foi feita há menos de 7 dias
+    if sublink.ai_analysis and sublink.ai_analyzed_at:
+        cache_age = timezone.now() - sublink.ai_analyzed_at
+        if cache_age < timedelta(days=7):
+            return JsonResponse({'success': True, 'cached': True, 'analysis': sublink.ai_analysis})
+
+    # Monta o contexto para o prompt
+    origin_name = sublink.origin_hub.name if sublink.origin_hub else 'desconhecido'
+    origin_domain = sublink.origin_hub.domain_pattern if sublink.origin_hub else 'desconhecido'
+    prompt = (
+        f"Analise o domínio '{sublink.domain}' que foi acessado através do portal/buscador '{origin_name}' ({origin_domain}). "
+        f"URL acessada: '{sublink.last_requested_url}'. "
+        f"Contexto: este é um sistema de proxy Squid em uma instituição de ensino. "
+        f"Responda SOMENTE em JSON válido com exatamente estas chaves: "
+        f"\"is_cdn\" (bool — é CDN ou infraestrutura de suporte de outro serviço?), "
+        f"\"cdn_of\" (string ou null — nome do serviço principal se is_cdn=true, ex: 'Google Scholar', 'Cloudflare', null caso contrário), "
+        f"\"importance\" (string — 'high', 'medium' ou 'low' para uso educacional), "
+        f"\"recommendation\" (string — 'whitelist', 'block' ou 'monitor'), "
+        f"\"reason\" (string — justificativa objetiva em uma frase em português)."
+    )
+
+    payload = json_lib.dumps({
+        "model": "claude-haiku-4-5",
+        "max_tokens": 300,
+        "messages": [{"role": "user", "content": prompt}]
+    }).encode('utf-8')
+
+    try:
+        req = urllib.request.Request(
+            f"{ai_api_url}/messages",
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'x-api-key': ai_api_key,
+                'anthropic-version': '2023-06-01',
+            },
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw = json_lib.loads(resp.read().decode('utf-8'))
+
+        # Extrai o conteúdo de texto da resposta (formato Anthropic Messages API)
+        content_text = ''
+        if 'content' in raw and isinstance(raw['content'], list):
+            for block in raw['content']:
+                if block.get('type') == 'text':
+                    content_text = block.get('text', '')
+                    break
+        elif 'choices' in raw:
+            # Compatibilidade OpenAI-style
+            content_text = raw['choices'][0]['message']['content']
+
+        # Extrai JSON da resposta (pode ter texto ao redor)
+        import re
+        json_match = re.search(r'\{.*\}', content_text, re.DOTALL)
+        if not json_match:
+            return JsonResponse({'error': 'Resposta da IA não continha JSON válido.', 'raw': content_text[:300]}, status=500)
+
+        analysis = json_lib.loads(json_match.group())
+        # Garante todas as chaves esperadas
+        analysis.setdefault('is_cdn', False)
+        analysis.setdefault('cdn_of', None)
+        analysis.setdefault('importance', 'medium')
+        analysis.setdefault('recommendation', 'monitor')
+        analysis.setdefault('reason', 'Sem justificativa disponível.')
+        # Registra qual modelo gerou a análise
+        analysis['model'] = raw.get('model', 'claude-haiku-4-5')
+
+        # Salva no banco
+        DiscoveredSublink.objects.filter(id=sublink.id).update(
+            ai_analysis=analysis,
+            ai_analyzed_at=timezone.now()
+        )
+
+        return JsonResponse({'success': True, 'cached': False, 'analysis': analysis})
+
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')[:500]
+        return JsonResponse({'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro ao chamar API de IA: {str(e)}'}, status=500)
 
 
 

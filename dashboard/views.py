@@ -98,6 +98,16 @@ def settings_general_view(request):
         SystemSetting.set_value('server_dns', server_dns, 'Servidores DNS de consulta')
         SystemSetting.set_value('admin_email', admin_email, 'E-mail do Administrador de TI')
 
+        # Configurações de Integração com IA
+        ai_enabled = 'true' if request.POST.get('ai_integration_enabled') == 'on' else 'false'
+        ai_api_url = request.POST.get('ai_api_url', '').strip()
+        ai_api_key = request.POST.get('ai_api_key', '').strip()
+        SystemSetting.set_value('ai_integration_enabled', ai_enabled, 'Análise de sublinks via IA ativada')
+        SystemSetting.set_value('ai_api_url', ai_api_url, 'URL base da API de IA (9router)')
+        # Só sobrescreve a chave se o usuário enviou algo (evita apagar chave ao salvar sem reeditar)
+        if ai_api_key:
+            SystemSetting.set_value('ai_api_key', ai_api_key, 'Chave de acesso da API de IA')
+
         # Sincroniza regras do Squid caso necessário
         from squid.squid_sync import apply_squid_changes
         apply_squid_changes()
@@ -110,6 +120,9 @@ def settings_general_view(request):
     server_gateway = SystemSetting.get_value('server_gateway', net_info['gateway'])
     server_dns = SystemSetting.get_value('server_dns', '10.40.88.1, 10.40.88.2, 1.1.1.1')
     admin_email = SystemSetting.get_value('admin_email', 'informatica@pij.local')
+    ai_integration_enabled = SystemSetting.get_value('ai_integration_enabled', 'false') == 'true'
+    ai_api_url = SystemSetting.get_value('ai_api_url', '')
+    ai_api_key_set = bool(SystemSetting.get_value('ai_api_key', ''))  # Apenas sinaliza se existe
 
     return render(request, 'settings/general.html', {
         'profile': profile,
@@ -118,6 +131,9 @@ def settings_general_view(request):
         'server_gateway': server_gateway,
         'server_dns': server_dns,
         'admin_email': admin_email,
+        'ai_integration_enabled': ai_integration_enabled,
+        'ai_api_url': ai_api_url,
+        'ai_api_key_set': ai_api_key_set,
         'active_menu': 'settings_general'
     })
 

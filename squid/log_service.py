@@ -197,9 +197,11 @@ def sync_logs_from_squid_file():
                             continue
                         
                         # Verifica se é um domínio de buscador ou sublink
+                        # Matching correto: exato ou subdomínio (clean_d termina com .hub_pattern)
                         origin = None
                         for hub in allowed_hubs:
-                            if hub.clean_pattern() in clean_d:
+                            hub_pat = hub.clean_pattern()
+                            if clean_d == hub_pat or clean_d.endswith('.' + hub_pat):
                                 origin = hub
                                 break
                         

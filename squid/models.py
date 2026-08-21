@@ -323,6 +323,10 @@ class DiscoveredSublink(models.Model):
     hit_count = models.PositiveIntegerField(default=1, verbose_name="Vezes Acessado")
     first_seen = models.DateTimeField(default=timezone.now, verbose_name="Primeiro Acesso")
     last_seen = models.DateTimeField(auto_now=True, verbose_name="Último Acesso")
+    ai_analysis = models.JSONField(null=True, blank=True, verbose_name="Análise de IA")
+    # Estrutura: {"is_cdn": bool, "cdn_of": str|null, "importance": "high"|"medium"|"low",
+    #              "recommendation": "whitelist"|"block"|"monitor", "reason": str, "model": str}
+    ai_analyzed_at = models.DateTimeField(null=True, blank=True, verbose_name="Data da Análise de IA")
 
     class Meta:
         verbose_name = "Sublink Descoberto / Acessado"
