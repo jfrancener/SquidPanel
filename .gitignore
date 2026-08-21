@@ -1,4 +1,8 @@
 db.sqlite3
+*.sqlite3-journal
+*.db-journal
+full_prod_data.json
+*.json.dump
 *.pyc
 **/__pycache__/
 __pycache__/
@@ -7,6 +11,13 @@ venv/
 .deploy_config.json
 .vscode/
 *.log
+staticfiles/
+
+# Certificados e chaves
+*.crt
+*.cer
+*.key
+*.pem
 
 # Pastas locais de utilitários e scripts operacionais
 scratch/
