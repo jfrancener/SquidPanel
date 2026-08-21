@@ -2486,6 +2486,7 @@ def analyze_sublink_ia_view(request, sublink_id):
 
     ai_api_url = SystemSetting.get_value('ai_api_url', '').strip().rstrip('/')
     ai_api_key = SystemSetting.get_value('ai_api_key', '').strip()
+    ai_model_name = SystemSetting.get_value('ai_model_name', 'claude-haiku-4-5').strip()
     if not ai_api_url or not ai_api_key:
         return JsonResponse({'error': 'URL ou Chave da API de IA não configuradas. Acesse Configurações → Parâmetros Gerais.'}, status=400)
 
@@ -2513,37 +2514,64 @@ def analyze_sublink_ia_view(request, sublink_id):
     )
 
     payload = json_lib.dumps({
-        "model": "claude-haiku-4-5",
-        "max_tokens": 300,
+        "model": ai_model_name,
+        "max_tokens": 400,
+        "stream": False,
         "messages": [{"role": "user", "content": prompt}]
     }).encode('utf-8')
 
     try:
+        # Tenta endpoint OpenAI-compatible primeiro (/chat/completions)
+        endpoint = f"{ai_api_url}/chat/completions" if not ai_api_url.endswith('/chat/completions') else ai_api_url
         req = urllib.request.Request(
-            f"{ai_api_url}/messages",
+            endpoint,
             data=payload,
             headers={
                 'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (compatible; SquidPanel/1.0)',
+                'Authorization': f'Bearer {ai_api_key}',
                 'x-api-key': ai_api_key,
                 'anthropic-version': '2023-06-01',
             },
             method='POST'
         )
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            raw = json_lib.loads(resp.read().decode('utf-8'))
 
-        # Extrai o conteúdo de texto da resposta (formato Anthropic Messages API)
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            raw_body = resp.read().decode('utf-8')
+
+        # Parser flexível: JSON direto ou stream SSE (data: {...})
         content_text = ''
-        if 'content' in raw and isinstance(raw['content'], list):
-            for block in raw['content']:
-                if block.get('type') == 'text':
-                    content_text = block.get('text', '')
-                    break
-        elif 'choices' in raw:
-            # Compatibilidade OpenAI-style
-            content_text = raw['choices'][0]['message']['content']
+        raw_model = ai_model_name
 
-        # Extrai JSON da resposta (pode ter texto ao redor)
+        if raw_body.strip().startswith('{'):
+            try:
+                raw_json = json_lib.loads(raw_body)
+                raw_model = raw_json.get('model', ai_model_name)
+                if 'choices' in raw_json and raw_json['choices']:
+                    content_text = raw_json['choices'][0].get('message', {}).get('content', '')
+                elif 'content' in raw_json and isinstance(raw_json['content'], list):
+                    content_text = "".join([c.get('text', '') for c in raw_json['content'] if c.get('type') == 'text'])
+            except Exception:
+                content_text = raw_body
+        else:
+            # Resposta em formato Server-Sent Events (SSE)
+            for line in raw_body.splitlines():
+                line = line.strip()
+                if line.startswith('data:'):
+                    chunk_str = line[5:].strip()
+                    if chunk_str and chunk_str != '[DONE]':
+                        try:
+                            chunk = json_lib.loads(chunk_str)
+                            raw_model = chunk.get('model', raw_model)
+                            if 'choices' in chunk and chunk['choices']:
+                                delta = chunk['choices'][0].get('delta', {})
+                                content_text += delta.get('content', '')
+                            elif chunk.get('type') == 'content_block_delta':
+                                content_text += chunk.get('delta', {}).get('text', '')
+                        except Exception:
+                            pass
+
+        # Extrai JSON da resposta (pode conter markdown ou texto auxiliar)
         import re
         json_match = re.search(r'\{.*\}', content_text, re.DOTALL)
         if not json_match:
@@ -2556,8 +2584,7 @@ def analyze_sublink_ia_view(request, sublink_id):
         analysis.setdefault('importance', 'medium')
         analysis.setdefault('recommendation', 'monitor')
         analysis.setdefault('reason', 'Sem justificativa disponível.')
-        # Registra qual modelo gerou a análise
-        analysis['model'] = raw.get('model', 'claude-haiku-4-5')
+        analysis['model'] = raw_model
 
         # Salva no banco
         DiscoveredSublink.objects.filter(id=sublink.id).update(

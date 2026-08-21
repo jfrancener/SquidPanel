@@ -102,8 +102,10 @@ def settings_general_view(request):
         ai_enabled = 'true' if request.POST.get('ai_integration_enabled') == 'on' else 'false'
         ai_api_url = request.POST.get('ai_api_url', '').strip()
         ai_api_key = request.POST.get('ai_api_key', '').strip()
+        ai_model_name = request.POST.get('ai_model_name', '').strip()
         SystemSetting.set_value('ai_integration_enabled', ai_enabled, 'Análise de sublinks via IA ativada')
         SystemSetting.set_value('ai_api_url', ai_api_url, 'URL base da API de IA (9router)')
+        SystemSetting.set_value('ai_model_name', ai_model_name or 'claude-haiku-4-5', 'Nome do modelo (combo) da API de IA')
         # Só sobrescreve a chave se o usuário enviou algo (evita apagar chave ao salvar sem reeditar)
         if ai_api_key:
             SystemSetting.set_value('ai_api_key', ai_api_key, 'Chave de acesso da API de IA')
@@ -122,6 +124,7 @@ def settings_general_view(request):
     admin_email = SystemSetting.get_value('admin_email', 'informatica@pij.local')
     ai_integration_enabled = SystemSetting.get_value('ai_integration_enabled', 'false') == 'true'
     ai_api_url = SystemSetting.get_value('ai_api_url', '')
+    ai_model_name = SystemSetting.get_value('ai_model_name', 'claude-haiku-4-5')
     ai_api_key_set = bool(SystemSetting.get_value('ai_api_key', ''))  # Apenas sinaliza se existe
 
     return render(request, 'settings/general.html', {
@@ -133,6 +136,7 @@ def settings_general_view(request):
         'admin_email': admin_email,
         'ai_integration_enabled': ai_integration_enabled,
         'ai_api_url': ai_api_url,
+        'ai_model_name': ai_model_name,
         'ai_api_key_set': ai_api_key_set,
         'active_menu': 'settings_general'
     })
