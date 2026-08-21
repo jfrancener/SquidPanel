@@ -2383,8 +2383,19 @@ def promote_sublink_to_whitelist_view(request):
             apply_squid_changes()
             messages.success(request, f"Domínio '{cleaned}' adicionado permanentemente à Whitelist '{target_wl.name}' e sincronizado no Squid!")
 
+        # Remove do catálogo de sublinks descobertos já que foi oficializado na Whitelist
+        clean_raw = domain.strip().lower().lstrip('.')
+        DiscoveredSublink.objects.filter(
+            models.Q(domain=clean_raw) | models.Q(domain=cleaned) | models.Q(domain=f".{clean_raw}")
+        ).delete()
+
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': True, 'domain': cleaned, 'whitelist': target_wl.name})
+
+        # Redireciona de volta para a página de sublinks se referer indicar, senão para whitelists
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'discovered-sublinks' in referer:
+            return redirect('discovered_sublinks')
 
     return redirect('whitelists')
 

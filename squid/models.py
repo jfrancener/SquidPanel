@@ -338,11 +338,16 @@ class DiscoveredSublink(models.Model):
 
     @property
     def is_in_whitelist(self):
-        """Verifica se este domínio já está cadastrado em alguma Whitelist ativa"""
-        clean = self.domain.lstrip('.')
-        return DomainItem.objects.filter(
+        """Verifica se este domínio ou seu domínio pai já está cadastrado em alguma Whitelist ativa"""
+        clean = self.domain.strip().lower().lstrip('.')
+        active_wl_domains = DomainItem.objects.filter(
             proxy_list__list_type='WHITELIST',
-            proxy_list__is_active=True
-        ).filter(
-            models.Q(domain=clean) | models.Q(domain=f".{clean}")
-        ).exists()
+            proxy_list__is_active=True,
+            is_active=True
+        ).values_list('domain', flat=True)
+
+        for wl_d in active_wl_domains:
+            base = wl_d.strip().lower().lstrip('.')
+            if clean == base or clean.endswith('.' + base):
+                return True
+        return False

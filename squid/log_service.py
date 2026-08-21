@@ -184,28 +184,49 @@ def sync_logs_from_squid_file():
         if new_logs:
             AccessLog.objects.bulk_create(new_logs)
 
-            # Identifica e cataloga acessos permitidos em salas com Whitelist que não são domínios diretos do portal
+            # Identifica e cataloga acessos permitidos em salas com Whitelist exclusivamente via Buscadores/Portais (Referer Hubs)
             try:
                 whitelist_ports = {p.port_number for p in port_map.values() if p.current_status == 'WHITELIST'}
                 allowed_hubs = list(AllowedRefererHub.objects.filter(is_active=True))
-                
+
+                # Carrega todos os domínios base cadastrados em Whitelists ativas
+                active_wl_bases = set()
+                for d in DomainItem.objects.filter(
+                    proxy_list__list_type='WHITELIST',
+                    proxy_list__is_active=True,
+                    is_active=True
+                ).values_list('domain', flat=True):
+                    active_wl_bases.add(d.strip().lower().lstrip('.'))
+
                 for log in new_logs:
                     if log.action == 'ALLOWED' and log.port_number in whitelist_ports:
-                        clean_d = log.domain.strip().lower().split(':')[0]
+                        clean_d = log.domain.strip().lower().split(':')[0].lstrip('.')
                         # Ignora IPs locais, portas internas e o próprio servidor SquidPanel
                         if not clean_d or clean_d.startswith('10.') or clean_d.startswith('192.168.') or clean_d.startswith('127.'):
                             continue
-                        
-                        # Verifica se é um domínio de buscador ou sublink
-                        # Matching correto: exato ou subdomínio (clean_d termina com .hub_pattern)
+
+                        # 1. Se o domínio ou qualquer subdomínio dele já está coberto por uma Whitelist, NÃO cataloga como sublink
+                        is_in_wl = False
+                        for base in active_wl_bases:
+                            if clean_d == base or clean_d.endswith('.' + base):
+                                is_in_wl = True
+                                break
+                        if is_in_wl:
+                            continue
+
+                        # 2. Identifica se o acesso veio de um Buscador/Portal cadastrado (AllowedRefererHub)
                         origin = None
                         for hub in allowed_hubs:
                             hub_pat = hub.clean_pattern()
-                            if clean_d == hub_pat or clean_d.endswith('.' + hub_pat):
+                            if hub_pat and (clean_d == hub_pat or clean_d.endswith('.' + hub_pat)):
                                 origin = hub
                                 break
-                        
-                        # Atualiza ou cria o registro de sublink descoberto
+
+                        # Se não foi originado de um Buscador/Hub cadastrado, não cataloga
+                        if not origin:
+                            continue
+
+                        # 3. Atualiza ou cria o registro de sublink descoberto
                         sublink, created = DiscoveredSublink.objects.get_or_create(
                             domain=clean_d,
                             defaults={
@@ -218,6 +239,7 @@ def sync_logs_from_squid_file():
                             DiscoveredSublink.objects.filter(id=sublink.id).update(
                                 hit_count=models.F('hit_count') + 1,
                                 last_seen=timezone.now(),
+                                origin_hub=origin if not sublink.origin_hub else sublink.origin_hub,
                                 last_requested_url=log.full_url[:500] if log.full_url else sublink.last_requested_url
                             )
             except Exception as e_sub:
