@@ -510,10 +510,14 @@ def blacklists_view(request):
     total_lists = lists.count()
     total_domains = DomainItem.objects.filter(proxy_list__list_type='BLACKLIST', is_active=True).count()
     all_groups = ProxyGroup.objects.filter(is_active=True)
+    all_ports = ProxyPort.objects.filter(is_active=True).order_by('port_number')
+    all_whitelists = ProxyList.objects.filter(list_type='WHITELIST', is_active=True).order_by('name')
 
     return render(request, 'squid/lists_index.html', {
         'profile': profile,
         'lists': lists,
+        'all_whitelists': all_whitelists,
+        'all_blacklists': lists,
         'list_type': 'BLACKLIST',
         'title': 'Blacklists (Sites Bloqueados)',
         'type_label': 'Blacklist',
@@ -522,6 +526,7 @@ def blacklists_view(request):
         'total_lists': total_lists,
         'total_domains': total_domains,
         'all_groups': all_groups,
+        'all_ports': all_ports,
         'active_menu': 'blacklists'
     })
 
@@ -3006,6 +3011,342 @@ def analyze_blocked_logs_ia_view(request):
             'total_found': len(candidate_domains),
             'cdns': cdns,
             'domains': domains,
+            'blacklisted': blacklisted,
+        })
+
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')[:500]
+        return JsonResponse({'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro ao processar análise com IA: {str(e)}'}, status=500)
+
+
+@login_required
+def analyze_allowed_logs_ia_view(request):
+    """
+    Endpoint AJAX — Busca logs liberados (ALLOWED) das salas selecionadas, agrupa por domínio,
+    consulta se já estão em Blacklists ou Ocultados e envia para a IA identificar ameaças,
+    jogos, redes sociais, streaming ou sites impróprios que deveriam ser adicionados à Blacklist.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    from dashboard.models import SystemSetting
+    from .models import AccessLog, DomainItem, HiddenDomain
+    import urllib.request
+    import json as json_lib
+
+    # 1. Valida configurações de IA
+    ai_enabled = SystemSetting.get_value('ai_integration_enabled', 'false')
+    if ai_enabled != 'true':
+        return JsonResponse({
+            'error': 'Integração com IA não está ativada. Acesse Configurações → Parâmetros Gerais para ativar.'
+        }, status=400)
+
+    ai_api_url = SystemSetting.get_value('ai_api_url', '').strip().rstrip('/')
+    ai_api_key = SystemSetting.get_value('ai_api_key', '').strip()
+    ai_model_name = SystemSetting.get_value('ai_model_name', 'claude-haiku-4-5').strip()
+    if not ai_api_url or not ai_api_key:
+        return JsonResponse({
+            'error': 'URL ou Chave da API de IA não configuradas. Acesse Configurações → Parâmetros Gerais.'
+        }, status=400)
+
+    # 2. Obtém salas/portas selecionadas
+    port_ids = request.POST.getlist('ports')
+    time_range = request.POST.get('time_range', 'today')  # '1h', 'today', '24h', '48h', '7d', 'all'
+
+    # Sincroniza logs recentes antes de consultar
+    sync_logs_from_squid_file()
+
+    # 3. Filtra logs permitidos (ALLOWED)
+    logs_qs = AccessLog.objects.filter(
+        action='ALLOWED'
+    ).exclude(
+        models.Q(http_status__icontains='DENIED') |
+        models.Q(http_status__contains='/403') |
+        models.Q(http_status__contains='/401')
+    )
+
+    if port_ids:
+        logs_qs = logs_qs.filter(port_id__in=port_ids)
+
+    # Filtro temporal
+    now = timezone.now()
+    if time_range == '1h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=1))
+    elif time_range == 'today':
+        logs_qs = logs_qs.filter(timestamp__date=now.date())
+    elif time_range == '24h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=24))
+    elif time_range == '48h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=48))
+    elif time_range == '7d':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(days=7))
+
+    # 4. Agrupa e obtém contagem por domínio
+    from django.db.models import Count, Max
+    allowed_domains_summary = logs_qs.values('domain').annotate(
+        hit_count=Count('id'),
+        last_seen=Max('timestamp')
+    ).order_by('-hit_count')
+
+    if not allowed_domains_summary:
+        return JsonResponse({
+            'success': True,
+            'message': 'Nenhum log liberado encontrado para as salas e período selecionados.',
+            'threats': [],
+            'safe': [],
+            'cdns': [],
+            'blacklisted': [],
+            'total_analyzed': 0
+        })
+
+    # 5. Obtém todos os domínios já cadastrados em Blacklists
+    blacklisted_raw = list(DomainItem.objects.filter(
+        proxy_list__list_type='BLACKLIST',
+        proxy_list__is_active=True
+    ).select_related('proxy_list').values_list('domain', 'proxy_list__name'))
+
+    blacklisted_dict = {}
+    for d, list_name in blacklisted_raw:
+        clean = d.strip().lower()
+        if clean:
+            bare = clean.lstrip('.')
+            blacklisted_dict[clean] = list_name
+            blacklisted_dict[bare] = list_name
+            blacklisted_dict[f".{bare}"] = list_name
+
+    def get_blacklist_info(domain_str):
+        clean_d = domain_str.strip().lower()
+        bare_d = clean_d.lstrip('.')
+        if clean_d in blacklisted_dict:
+            return blacklisted_dict[clean_d]
+        if bare_d in blacklisted_dict:
+            return blacklisted_dict[bare_d]
+        if f".{bare_d}" in blacklisted_dict:
+            return blacklisted_dict[f".{bare_d}"]
+        parts = bare_d.split('.')
+        for i in range(1, len(parts)):
+            parent = '.'.join(parts[i:])
+            if parent in blacklisted_dict:
+                return blacklisted_dict[parent]
+            if f".{parent}" in blacklisted_dict:
+                return blacklisted_dict[f".{parent}"]
+        return None
+
+    # Dicionário de Domínios Ocultos/Silenciados (HiddenDomain)
+    hidden_domains_list = list(HiddenDomain.objects.all().values('id', 'domain'))
+    hidden_dict = {}
+    for h in hidden_domains_list:
+        clean_h = h['domain'].strip().lower().lstrip('.')
+        if clean_h:
+            hidden_dict[clean_h] = h['id']
+
+    def get_hidden_info(domain_str):
+        clean_d = domain_str.strip().lower().lstrip('.')
+        if clean_d in hidden_dict:
+            return hidden_dict[clean_d]
+        parts = clean_d.split('.')
+        for i in range(1, len(parts)):
+            parent = '.'.join(parts[i:])
+            if parent in hidden_dict:
+                return hidden_dict[parent]
+        return None
+
+    # 6. Filtra domínios válidos para enviar à IA
+    candidate_domains = []
+    domain_stats = {}
+
+    for item in allowed_domains_summary:
+        d = item['domain']
+        if not d or d == '-' or d == 'error':
+            continue
+        clean_d = d.strip().lower().lstrip('.')
+        # Ignora IPs locais, broadcast e domínio local
+        if clean_d.startswith(('10.', '192.168.', '172.', '127.')) or clean_d.endswith('.local') or clean_d == 'localhost':
+            continue
+
+        hidden_id = get_hidden_info(d)
+        is_hidden = bool(hidden_id)
+        bl_name = get_blacklist_info(d)
+
+        candidate_domains.append(d)
+        domain_stats[d] = {
+            'hit_count': item['hit_count'],
+            'last_seen': item['last_seen'].strftime('%d/%m/%Y %H:%M') if item['last_seen'] else '-',
+            'in_blacklist': bool(bl_name),
+            'blacklist_name': bl_name,
+            'is_hidden': is_hidden,
+            'hidden_id': hidden_id
+        }
+
+    if not candidate_domains:
+        return JsonResponse({
+            'success': True,
+            'message': 'Nenhum domínio externo liberado encontrado nos logs para o período selecionado.',
+            'threats': [],
+            'safe': [],
+            'cdns': [],
+            'blacklisted': [],
+            'total_analyzed': 0
+        })
+
+    # Limita aos 50 domínios mais acessados
+    domains_to_send = candidate_domains[:50]
+
+    # 7. Prompt especializado para a IA
+    domains_formatted = "\n".join([f"- {d} ({domain_stats[d]['hit_count']} acessos)" for d in domains_to_send])
+    prompt = (
+        "Você é um especialista em segurança de redes e proxy Squid para instituições de ensino e empresas.\n"
+        "Analise a lista de domínios LIBERADOS (ALLOWED) abaixo e audite cada um procurando possíveis riscos, "
+        "sites impróprios, desvios de finalidade ou conteúdos que deveriam ser bloqueados em uma Blacklist escolar/corporativa.\n\n"
+        "Classifique cada domínio em uma destas categorias:\n"
+        "- 'threat_or_leisure': Jogos, apostas/bets, redes sociais, streaming de entretenimento (TikTok, Netflix, etc), proxies/VPNs, pirataria, conteúdo adulto, malware/phishing ou desvio de finalidade pedagógica.\n"
+        "- 'safe_edu': Sites legítimos de estudo, portais de governo/justiça, pesquisa, ferramentas de trabalho, portais acadêmicos e corporativos autorizados.\n"
+        "- 'cdn_infra': CDNs, servidores de assets, fontes, telemetria técnica legítima ou APIs de suporte.\n\n"
+        "Responda SOMENTE em JSON válido com exatamente esta estrutura:\n"
+        "{\n"
+        '  "results": [\n'
+        "    {\n"
+        '      "domain": "nome.do.dominio",\n'
+        '      "category": "threat_or_leisure | safe_edu | cdn_infra",\n'
+        '      "risk_level": "high | medium | low",\n'
+        '      "recommendation": "block | monitor | safe",\n'
+        '      "reason": "Explicação concisa em português sobre a finalidade do site e por que bloquear ou manter liberado"\n'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        f"Domínios liberados para auditar:\n{domains_formatted}"
+    )
+
+    payload = json_lib.dumps({
+        "model": ai_model_name,
+        "max_tokens": 3000,
+        "stream": False,
+        "messages": [
+            {"role": "system", "content": "Você é um auditor de segurança de rede especializado em políticas de acesso para escolas e órgãos públicos."},
+            {"role": "user", "content": prompt}
+        ]
+    }).encode('utf-8')
+
+    try:
+        endpoint = f"{ai_api_url}/chat/completions" if not ai_api_url.endswith('/chat/completions') else ai_api_url
+        req_ai = urllib.request.Request(
+            endpoint,
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (compatible; SquidPanel/1.0)',
+                'Authorization': f'Bearer {ai_api_key}',
+                'x-api-key': ai_api_key,
+                'anthropic-version': '2023-06-01',
+            },
+            method='POST'
+        )
+
+        with urllib.request.urlopen(req_ai, timeout=45) as resp_ai:
+            raw_body = resp_ai.read().decode('utf-8')
+
+        content_text = ''
+        if raw_body.strip().startswith('{'):
+            try:
+                raw_json = json_lib.loads(raw_body)
+                if 'choices' in raw_json and raw_json['choices']:
+                    content_text = raw_json['choices'][0].get('message', {}).get('content', '')
+                elif 'content' in raw_json and isinstance(raw_json['content'], list):
+                    content_text = "".join([c.get('text', '') for c in raw_json['content'] if c.get('type') == 'text'])
+            except Exception:
+                content_text = raw_body
+        else:
+            for line in raw_body.splitlines():
+                line = line.strip()
+                if line.startswith('data:'):
+                    chunk_str = line[5:].strip()
+                    if chunk_str and chunk_str != '[DONE]':
+                        try:
+                            chunk = json_lib.loads(chunk_str)
+                            if 'choices' in chunk and chunk['choices']:
+                                delta = chunk['choices'][0].get('delta', {})
+                                content_text += delta.get('content', '')
+                            elif chunk.get('type') == 'content_block_delta':
+                                content_text += chunk.get('delta', {}).get('text', '')
+                        except Exception:
+                            pass
+
+        import re
+        json_match = re.search(r'\{.*\}', content_text, re.DOTALL)
+        if not json_match:
+            return JsonResponse({'error': 'Resposta da IA não continha JSON válido.', 'raw': content_text[:400]}, status=500)
+
+        ai_data = json_lib.loads(json_match.group())
+        results = ai_data.get('results', [])
+
+        threats = []
+        safe = []
+        cdns = []
+        blacklisted = []
+
+        for r in results:
+            dom = r.get('domain', '')
+            stats = domain_stats.get(dom, {'hit_count': 1, 'last_seen': '-', 'in_blacklist': False, 'blacklist_name': None, 'is_hidden': False, 'hidden_id': None})
+            item_data = {
+                'domain': dom,
+                'category': r.get('category', 'safe_edu'),
+                'risk_level': r.get('risk_level', 'low'),
+                'recommendation': r.get('recommendation', 'safe'),
+                'reason': r.get('reason', ''),
+                'hit_count': stats['hit_count'],
+                'last_seen': stats['last_seen'],
+                'in_blacklist': stats['in_blacklist'],
+                'blacklist_name': stats['blacklist_name'],
+                'is_hidden': stats.get('is_hidden', False),
+                'hidden_id': stats.get('hidden_id', None),
+            }
+
+            if stats['in_blacklist']:
+                blacklisted.append(item_data)
+            elif r.get('category') == 'threat_or_leisure' or r.get('recommendation') == 'block':
+                threats.append(item_data)
+            elif r.get('category') == 'cdn_infra':
+                cdns.append(item_data)
+            else:
+                safe.append(item_data)
+
+        # Trata itens não retornados pela IA
+        returned_domains = {r.get('domain') for r in results}
+        for d in domains_to_send:
+            if d not in returned_domains:
+                stats = domain_stats.get(d, {'hit_count': 1, 'last_seen': '-', 'in_blacklist': False, 'blacklist_name': None, 'is_hidden': False, 'hidden_id': None})
+                item_data = {
+                    'domain': d,
+                    'category': 'safe_edu',
+                    'risk_level': 'low',
+                    'recommendation': 'safe',
+                    'reason': 'Não classificado pela IA.',
+                    'hit_count': stats['hit_count'],
+                    'last_seen': stats['last_seen'],
+                    'in_blacklist': stats['in_blacklist'],
+                    'blacklist_name': stats['blacklist_name'],
+                    'is_hidden': stats.get('is_hidden', False),
+                    'hidden_id': stats.get('hidden_id', None),
+                }
+                if stats['in_blacklist']:
+                    blacklisted.append(item_data)
+                else:
+                    safe.append(item_data)
+
+        return JsonResponse({
+            'success': True,
+            'model': ai_model_name,
+            'total_analyzed': len(domains_to_send),
+            'total_found': len(candidate_domains),
+            'threats': threats,
+            'safe': safe,
+            'cdns': cdns,
             'blacklisted': blacklisted,
         })
 
