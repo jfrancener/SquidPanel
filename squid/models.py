@@ -103,16 +103,16 @@ class AccessLog(models.Model):
     ]
 
     timestamp = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Data / Hora")
-    client_ip = models.CharField(max_length=45, verbose_name="IP do Cliente")
+    client_ip = models.CharField(max_length=45, db_index=True, verbose_name="IP do Cliente")
     hostname = models.CharField(max_length=100, blank=True, db_index=True, verbose_name="Hostname do Equipamento")
     port_number = models.PositiveIntegerField(db_index=True, verbose_name="Porta Proxy")
     port = models.ForeignKey('dashboard.ProxyPort', on_delete=models.SET_NULL, null=True, blank=True, related_name='access_logs')
     group = models.ForeignKey('dashboard.ProxyGroup', on_delete=models.SET_NULL, null=True, blank=True, related_name='access_logs')
-    
+
     method = models.CharField(max_length=15, default='CONNECT', verbose_name="Método")
     domain = models.CharField(max_length=255, db_index=True, verbose_name="Domínio Requisitado")
     full_url = models.CharField(max_length=1000, blank=True, verbose_name="URL Completa")
-    
+
     http_status = models.CharField(max_length=50, default='TCP_TUNNEL/200', verbose_name="Código / Status Squid")
     action = models.CharField(max_length=20, choices=ACTION_CHOICES, default='ALLOWED', verbose_name="Ação")
     bytes_sent = models.BigIntegerField(default=0, verbose_name="Bytes Trafegados")
@@ -128,6 +128,7 @@ class AccessLog(models.Model):
             models.Index(fields=['domain']),
             models.Index(fields=['action']),
             models.Index(fields=['hostname']),
+            models.Index(fields=['client_ip']),
         ]
 
     def __str__(self):

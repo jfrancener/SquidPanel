@@ -26,11 +26,22 @@
             </p>
         </div>
 
-        <!-- Botão Abrir Modal Nova Lista -->
-        <button onclick="document.getElementById('modal-new-list').classList.remove('hidden')" class="px-4 py-2.5 {% if list_type == 'WHITELIST' %}bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/20{% else %}bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-rose-500/20{% endif %} text-white rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 transition-all transform hover:-translate-y-0.5">
-            <i class="fa-solid fa-plus"></i>
-            <span>Nova {{ type_label }}</span>
-        </button>
+        <!-- Ações do Header -->
+        <div class="flex items-center gap-2 flex-wrap">
+            {% if list_type == 'WHITELIST' %}
+            <!-- Botão de Análise de Logs Bloqueados com IA -->
+            <button onclick="openAiAnalysisModal()" class="px-4 py-2.5 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 transition-all transform hover:-translate-y-0.5" title="Analisar logs bloqueados com IA para identificar domínios e CDNs necessários">
+                <i class="fa-solid fa-robot text-violet-400"></i>
+                <span>Análise de Logs Bloqueados (IA)</span>
+            </button>
+            {% endif %}
+
+            <!-- Botão Abrir Modal Nova Lista -->
+            <button onclick="document.getElementById('modal-new-list').classList.remove('hidden')" class="px-4 py-2.5 {% if list_type == 'WHITELIST' %}bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/20{% else %}bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-rose-500/20{% endif %} text-white rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 transition-all transform hover:-translate-y-0.5">
+                <i class="fa-solid fa-plus"></i>
+                <span>Nova {{ type_label }}</span>
+            </button>
+        </div>
     </div>
 
     <!-- Estatísticas Rápidas -->
@@ -702,4 +713,734 @@ async function toggleRefererHub(hubId, btn) {
 
     </div>
 </div>
+
+{% if list_type == 'WHITELIST' %}
+<!-- ========================================== -->
+<!-- MODAL: CONFIGURAÇÃO DA ANÁLISE DE LOGS (IA) -->
+<!-- ========================================== -->
+<div id="modal-ai-analysis-config" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-violet-500/30 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-fade-in">
+
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-violet-500/20 text-violet-400 border border-violet-500/30 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-white">Analisar Logs Bloqueados com IA</h3>
+                    <p class="text-[11px] text-slate-400">Classifica domínios e separa CDNs necessárias automaticamente</p>
+                </div>
+            </div>
+            <button onclick="closeAiAnalysisModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-ai-analysis" onsubmit="runAiAnalysis(event)" class="p-6 space-y-4 text-xs">
+            {% csrf_token %}
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">
+                    Período dos Logs:
+                </label>
+                <select name="time_range" id="ai-time-range" class="w-full bg-[#0f121e] border border-slate-700 text-white rounded-xl p-3 focus:border-violet-500 outline-none">
+                    <option value="today" selected>Hoje (Recomendado)</option>
+                    <option value="1h">Última 1 hora</option>
+                    <option value="7d">Últimos 7 dias</option>
+                    <option value="all">Todo o Histórico</option>
+                </select>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-white">
+                        Salas / Portas para Analisar:
+                    </label>
+                    <button type="button" onclick="toggleAllRooms(this)" class="text-[10px] text-violet-400 hover:text-violet-300 font-semibold">
+                        Marcar / Desmarcar Todas
+                    </button>
+                </div>
+                <div class="space-y-2 bg-[#0f121e] p-3 rounded-xl border border-slate-800 max-h-48 overflow-y-auto" id="ai-room-checkboxes">
+                    {% for p in all_ports %}
+                    <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                        <span class="text-slate-300 font-mono text-[11px]">{{ p.port_number }} - {{ p.name }}</span>
+                        <input type="checkbox" name="ports" value="{{ p.id }}" checked class="w-4 h-4 rounded bg-[#181c30] border-slate-700 text-violet-600 focus:ring-violet-500 cursor-pointer room-checkbox">
+                    </label>
+                    {% empty %}
+                    <span class="text-slate-500 italic block text-center py-2">Nenhuma sala cadastrada.</span>
+                    {% endfor %}
+                </div>
+                <p class="text-[10px] text-slate-500 mt-1">Domínios já presentes em qualquer Whitelist ativa serão ignorados automaticamente.</p>
+            </div>
+
+            <div id="ai-config-error" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs"></div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="closeAiAnalysisModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-submit-ai-analysis" class="px-5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-violet-500/20 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Iniciar Análise</span>
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: RESULTADOS DA ANÁLISE COM IA -->
+<!-- ========================================== -->
+<div id="modal-ai-results" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-violet-500/30 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
+
+        <!-- Header -->
+        <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-violet-500/20 text-violet-400 border border-violet-500/30 flex items-center justify-center text-lg shadow-lg">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm font-bold text-white">Relatório de Análise IA</h3>
+                        <span id="ai-model-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-violet-500/20 text-violet-300 border border-violet-500/30"></span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-0.5">
+                        <span id="ai-summary-text">Domínios bloqueados classificados e separados por categoria</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="openAiAnalysisModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Nova Análise</span>
+                </button>
+                <button onclick="closeAiResultsModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Conteúdo dos Resultados (Scrollável) -->
+        <div class="p-6 overflow-y-auto flex-1 space-y-6 text-xs">
+
+            <!-- Cards de Contadores -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="glass-card p-3.5 rounded-xl border border-slate-800 bg-[#0f121e] cursor-pointer hover:border-slate-700 transition-all" onclick="setAiCategoryFilter('ALL')">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 block mb-1">Total Analisado</span>
+                    <span id="ai-stat-total" class="text-xl font-bold text-white font-mono">0</span>
+                </div>
+                <div class="glass-card p-3.5 rounded-xl border border-violet-500/30 bg-violet-950/20 cursor-pointer hover:border-violet-400 transition-all" onclick="setAiCategoryFilter('CDNS')">
+                    <span class="text-[10px] uppercase font-bold text-violet-400 block mb-1">CDNs & Infra</span>
+                    <span id="ai-stat-cdns" class="text-xl font-bold text-violet-300 font-mono">0</span>
+                </div>
+                <div class="glass-card p-3.5 rounded-xl border border-cyan-500/30 bg-cyan-950/20 cursor-pointer hover:border-cyan-400 transition-all" onclick="setAiCategoryFilter('DOMAINS')">
+                    <span class="text-[10px] uppercase font-bold text-cyan-400 block mb-1">Domínios & Portais</span>
+                    <span id="ai-stat-domains" class="text-xl font-bold text-cyan-300 font-mono">0</span>
+                </div>
+                <div class="glass-card p-3.5 rounded-xl border border-rose-500/30 bg-rose-950/20 cursor-pointer hover:border-rose-400 transition-all" onclick="setAiCategoryFilter('BLACKLISTED')">
+                    <span class="text-[10px] uppercase font-bold text-rose-400 block mb-1">Na Blacklist</span>
+                    <span id="ai-stat-blacklisted" class="text-xl font-bold text-rose-300 font-mono">0</span>
+                </div>
+            </div>
+
+            <!-- Barra de Filtros Rápidos & Busca Interna -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#0e111f] border border-slate-800">
+                <!-- Botões de Categoria -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <button type="button" onclick="setAiCategoryFilter('ALL')" id="btn-filter-cat-all" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow">
+                        Todos
+                    </button>
+                    <button type="button" onclick="setAiCategoryFilter('CDNS')" id="btn-filter-cat-cdns" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-violet-300 hover:bg-slate-800 flex items-center gap-1">
+                        <i class="fa-solid fa-network-wired text-[10px] text-violet-400"></i>
+                        <span>Apenas CDNs</span>
+                    </button>
+                    <button type="button" onclick="setAiCategoryFilter('DOMAINS')" id="btn-filter-cat-domains" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-cyan-300 hover:bg-slate-800 flex items-center gap-1">
+                        <i class="fa-solid fa-globe text-[10px] text-cyan-400"></i>
+                        <span>Apenas Domínios</span>
+                    </button>
+                    <button type="button" onclick="setAiCategoryFilter('BLACKLISTED')" id="btn-filter-cat-bl" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-slate-800 flex items-center gap-1">
+                        <i class="fa-solid fa-ban text-[10px] text-rose-400"></i>
+                        <span>Na Blacklist</span>
+                    </button>
+                </div>
+
+                <!-- Busca de Domínio no Relatório -->
+                <div class="relative flex-1 max-w-xs">
+                    <input type="text" id="ai-filter-search" oninput="filterAiReportList()" placeholder="Filtrar nesta lista..." class="w-full bg-[#15192c] border border-slate-700 text-white text-xs rounded-xl pl-8 pr-3 py-1.5 focus:border-violet-500 outline-none">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-500 text-[10px]"></i>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 1: CDNs e Infraestrutura Encontradas -->
+            <div id="section-ai-cdns" class="space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <h4 class="text-xs font-bold text-violet-300 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-network-wired text-violet-400"></i>
+                        <span>CDNs & Infraestrutura Técnica</span>
+                        <span id="ai-cdn-count-badge" class="px-2 py-0.5 rounded-full text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 font-mono">0</span>
+                    </h4>
+                    <span class="text-[10px] text-slate-500">Servidores de apoio, assets, fontes e bibliotecas</span>
+                </div>
+
+                <div id="ai-cdns-container" class="space-y-2">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+            <!-- SEÇÃO 2: Domínios Principais -->
+            <div id="section-ai-domains" class="space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <h4 class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-globe text-cyan-400"></i>
+                        <span>Domínios & Serviços Principais</span>
+                        <span id="ai-domain-count-badge" class="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">0</span>
+                    </h4>
+                    <span class="text-[10px] text-slate-500">Portais, sites de estudo, plataformas e aplicações</span>
+                </div>
+
+                <div id="ai-domains-container" class="space-y-2">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+            <!-- SEÇÃO 3: Domínios Presentes na Blacklist -->
+            <div id="section-ai-blacklisted" class="space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-rose-500/30">
+                    <h4 class="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+                        <span>Domínios Bloqueados na Blacklist</span>
+                        <span id="ai-bl-count-badge" class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono">0</span>
+                    </h4>
+                    <span class="text-[10px] text-slate-400">Estes itens já estão em uma lista de bloqueio. A IA indica se vale liberar na Whitelist ou manter bloqueado.</span>
+                </div>
+
+                <div id="ai-blacklisted-container" class="space-y-2">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+        </div>
+
+        <div class="p-4 border-t border-slate-800 bg-[#121422] flex justify-end">
+            <button type="button" onclick="closeAiResultsModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold">
+                Fechar Relatório
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADICIONAR DOMÍNIO À LISTA SELECIONADA -->
+<!-- ========================================== -->
+<div id="modal-ai-add-to-list" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm hidden">
+    <div class="glass-box bg-[#151829] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in">
+
+        <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-[#121422]">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-shield-plus text-emerald-400"></i>
+                <span>Adicionar a uma Lista</span>
+            </h3>
+            <button onclick="closeAiAddModal()" class="text-slate-400 hover:text-white text-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="form-ai-add-to-list" onsubmit="submitAiAddToList(event)" class="p-6 space-y-4 text-xs">
+            {% csrf_token %}
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Domínio Selecionado:</label>
+                <input type="text" id="ai-target-domain" name="domain" required class="w-full bg-[#0d101a] border border-slate-700 text-cyan-300 font-mono text-xs rounded-xl p-3 outline-none font-bold">
+            </div>
+
+            <!-- Opção de Ponto Wildcard no Início (.dominio.com) -->
+            <div class="p-3 bg-[#0e111f] rounded-xl border border-slate-800">
+                <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input type="checkbox" id="ai-include-subdomains" onchange="toggleAiDomainDotPrefix(this)" class="mt-0.5 w-4 h-4 rounded bg-[#181c30] border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer">
+                    <div>
+                        <span class="text-xs font-bold text-slate-200 block">Abranger todos os subdomínios (<code class="text-emerald-400">.dominio.com</code>)</span>
+                        <span class="text-[10px] text-slate-400 block mt-0.5">Adiciona ponto no início para que qualquer subdomínio (ex: <i>auth.site.com</i>) seja contemplado automaticamente.</span>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Alternador Whitelist / Blacklist -->
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Tipo de Lista:</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" id="btn-select-wl" onclick="switchAiListType('WHITELIST')" class="py-2 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white border border-emerald-500/30 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-shield-check"></i>
+                        <span>Whitelist</span>
+                    </button>
+                    <button type="button" id="btn-select-bl" onclick="switchAiListType('BLACKLIST')" class="py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-400 border border-slate-700 hover:text-white flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-ban"></i>
+                        <span>Blacklist</span>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Lista de Destino <span class="text-red-400">*</span></label>
+                <select id="ai-target-list-select" name="list_id" required class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-emerald-500 outline-none">
+                    <!-- Preenchido via JS -->
+                </select>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-white mb-1.5">Observação:</label>
+                <input type="text" id="ai-target-desc" name="description" placeholder="ex: Classificado via IA" class="w-full bg-[#0f121e] border border-slate-700 text-white text-xs rounded-xl p-3 focus:border-emerald-500 outline-none">
+            </div>
+
+            <div id="ai-add-feedback" class="text-xs min-h-[16px]"></div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button type="button" onclick="closeAiAddModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-confirm-ai-add" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20">
+                    Salvar na Lista
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<script>
+// ==========================================
+// ANÁLISE DE LOGS COM IA
+// ==========================================
+const availableWhitelists = [
+    {% for l in lists %}
+    { id: {{ l.id }}, name: "{{ l.name|escapejs }}", is_mandatory: {{ l.is_mandatory|lower }} },
+    {% endfor %}
+];
+
+const availableBlacklists = [
+    {% for bl in all_blacklists %}
+    { id: {{ bl.id }}, name: "{{ bl.name|escapejs }}" },
+    {% endfor %}
+];
+
+function openAiAnalysisModal() {
+    document.getElementById('ai-config-error').classList.add('hidden');
+    document.getElementById('modal-ai-analysis-config').classList.remove('hidden');
+}
+
+function closeAiAnalysisModal() {
+    document.getElementById('modal-ai-analysis-config').classList.add('hidden');
+}
+
+function closeAiResultsModal() {
+    document.getElementById('modal-ai-results').classList.add('hidden');
+}
+
+function toggleAllRooms(btn) {
+    const checkboxes = document.querySelectorAll('.room-checkbox');
+    const allChecked = Array.from(checkboxes).every(c => c.checked);
+    checkboxes.forEach(c => c.checked = !allChecked);
+}
+
+async function runAiAnalysis(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-ai-analysis');
+    const errorDiv = document.getElementById('ai-config-error');
+    const form = document.getElementById('form-ai-analysis');
+
+    errorDiv.classList.add('hidden');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Consultando IA...</span>';
+
+    const formData = new FormData(form);
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+        const res = await fetch('/proxy/logs/analyze-blocked-ia/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+            const errText = await res.text();
+            let errMsg = `Erro HTTP ${res.status}`;
+            try {
+                const parsed = JSON.parse(errText);
+                if (parsed.error) errMsg = parsed.error;
+            } catch(e) {
+                if (errText && errText.length < 300) errMsg = errText;
+            }
+            errorDiv.textContent = errMsg;
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        const data = await res.json();
+
+        if (data.success) {
+            closeAiAnalysisModal();
+            renderAiResults(data);
+        } else {
+            errorDiv.textContent = data.error || 'Erro ao processar análise.';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            errorDiv.textContent = 'Tempo limite esgotado ao aguardar resposta da IA (60s). Tente selecionar um período menor ou menos salas.';
+        } else {
+            errorDiv.textContent = 'Falha na comunicação com o servidor: ' + (err.message || err);
+        }
+        errorDiv.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span>Iniciar Análise</span>';
+    }
+}
+
+let aiLastData = null;
+let currentCategoryFilter = 'ALL';
+
+function renderAiResults(data) {
+    aiLastData = data;
+    currentCategoryFilter = 'ALL';
+    document.getElementById('ai-filter-search').value = '';
+
+    document.getElementById('ai-stat-total').textContent = data.total_analyzed || 0;
+    document.getElementById('ai-stat-cdns').textContent = (data.cdns || []).length;
+    document.getElementById('ai-stat-domains').textContent = (data.domains || []).length;
+    document.getElementById('ai-stat-blacklisted').textContent = (data.blacklisted || []).length;
+
+    document.getElementById('ai-cdn-count-badge').textContent = (data.cdns || []).length;
+    document.getElementById('ai-domain-count-badge').textContent = (data.domains || []).length;
+    document.getElementById('ai-bl-count-badge').textContent = (data.blacklisted || []).length;
+
+    if (data.model) {
+        document.getElementById('ai-model-badge').textContent = data.model;
+        document.getElementById('ai-model-badge').classList.remove('hidden');
+    }
+
+    applyAiFilters();
+    document.getElementById('modal-ai-results').classList.remove('hidden');
+}
+
+function setAiCategoryFilter(cat) {
+    currentCategoryFilter = cat;
+
+    const btnAll = document.getElementById('btn-filter-cat-all');
+    const btnCdns = document.getElementById('btn-filter-cat-cdns');
+    const btnDomains = document.getElementById('btn-filter-cat-domains');
+    const btnBl = document.getElementById('btn-filter-cat-bl');
+
+    [btnAll, btnCdns, btnDomains, btnBl].forEach(b => {
+        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1';
+    });
+
+    if (cat === 'ALL') {
+        btnAll.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white shadow';
+    } else if (cat === 'CDNS') {
+        btnCdns.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-violet-600 text-white shadow flex items-center gap-1';
+    } else if (cat === 'DOMAINS') {
+        btnDomains.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-cyan-600 text-white shadow flex items-center gap-1';
+    } else if (cat === 'BLACKLISTED') {
+        btnBl.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-rose-600 text-white shadow flex items-center gap-1';
+    }
+
+    applyAiFilters();
+}
+
+function filterAiReportList() {
+    applyAiFilters();
+}
+
+function applyAiFilters() {
+    if (!aiLastData) return;
+
+    const query = (document.getElementById('ai-filter-search').value || '').trim().toLowerCase();
+
+    const secCdns = document.getElementById('section-ai-cdns');
+    const secDomains = document.getElementById('section-ai-domains');
+    const secBl = document.getElementById('section-ai-blacklisted');
+
+    const cdnContainer = document.getElementById('ai-cdns-container');
+    const domainContainer = document.getElementById('ai-domains-container');
+    const blContainer = document.getElementById('ai-blacklisted-container');
+
+    // Filtra CDNs
+    const filteredCdns = (aiLastData.cdns || []).filter(item => {
+        if (query && !item.domain.toLowerCase().includes(query) && !(item.cdn_of || '').toLowerCase().includes(query) && !(item.reason || '').toLowerCase().includes(query)) {
+            return false;
+        }
+        return true;
+    });
+
+    // Filtra Domínios
+    const filteredDomains = (aiLastData.domains || []).filter(item => {
+        if (query && !item.domain.toLowerCase().includes(query) && !(item.reason || '').toLowerCase().includes(query)) {
+            return false;
+        }
+        return true;
+    });
+
+    // Filtra Blacklisted
+    const filteredBl = (aiLastData.blacklisted || []).filter(item => {
+        if (query && !item.domain.toLowerCase().includes(query) && !(item.blacklist_name || '').toLowerCase().includes(query) && !(item.reason || '').toLowerCase().includes(query)) {
+            return false;
+        }
+        return true;
+    });
+
+    // Visibilidade das Seções
+    if (currentCategoryFilter === 'CDNS') {
+        secCdns.classList.remove('hidden');
+        secDomains.classList.add('hidden');
+        secBl.classList.add('hidden');
+    } else if (currentCategoryFilter === 'DOMAINS') {
+        secCdns.classList.add('hidden');
+        secDomains.classList.remove('hidden');
+        secBl.classList.add('hidden');
+    } else if (currentCategoryFilter === 'BLACKLISTED') {
+        secCdns.classList.add('hidden');
+        secDomains.classList.add('hidden');
+        secBl.classList.remove('hidden');
+    } else {
+        secCdns.classList.remove('hidden');
+        secDomains.classList.remove('hidden');
+        secBl.classList.remove('hidden');
+    }
+
+    // Renderiza CDNs
+    if (filteredCdns.length === 0) {
+        cdnContainer.innerHTML = '<div class="p-3 text-slate-500 italic bg-slate-900/40 rounded-xl border border-dashed border-slate-800 text-center">Nenhuma CDN encontrada para os filtros selecionados.</div>';
+    } else {
+        cdnContainer.innerHTML = filteredCdns.map(item => renderAiItemCard(item, true)).join('');
+    }
+
+    // Renderiza Domínios
+    if (filteredDomains.length === 0) {
+        domainContainer.innerHTML = '<div class="p-3 text-slate-500 italic bg-slate-900/40 rounded-xl border border-dashed border-slate-800 text-center">Nenhum domínio encontrado para os filtros selecionados.</div>';
+    } else {
+        domainContainer.innerHTML = filteredDomains.map(item => renderAiItemCard(item, false)).join('');
+    }
+
+    // Renderiza Blacklisted
+    if (filteredBl.length === 0) {
+        blContainer.innerHTML = '<div class="p-3 text-slate-500 italic bg-slate-900/40 rounded-xl border border-dashed border-slate-800 text-center">Nenhum domínio da lista de bloqueio encontrado nos logs analisados.</div>';
+    } else {
+        blContainer.innerHTML = filteredBl.map(item => renderAiBlacklistItemCard(item)).join('');
+    }
+}
+
+function renderAiItemCard(item, isCdn) {
+    let recBadge = '';
+    if (item.recommendation === 'whitelist') {
+        recBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"><i class="fa-solid fa-check text-[9px]"></i> Liberar</span>';
+    } else if (item.recommendation === 'block') {
+        recBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1"><i class="fa-solid fa-ban text-[9px]"></i> Bloquear</span>';
+    } else {
+        recBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i class="fa-solid fa-eye text-[9px]"></i> Avaliar</span>';
+    }
+
+    let impBadge = '';
+    if (item.importance === 'high') {
+        impBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 font-mono">Alta</span>';
+    } else if (item.importance === 'medium') {
+        impBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 font-mono">Média</span>';
+    } else {
+        impBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-400 font-mono">Baixa</span>';
+    }
+
+    const cdnInfo = item.cdn_of ? `<span class="px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[10px] font-semibold">CDN de: <b>${escapeHtml(item.cdn_of)}</b></span>` : '';
+
+    return `
+        <div class="p-3.5 rounded-xl bg-[#0f121e] border border-slate-800 hover:border-slate-700 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group">
+            <div class="space-y-1.5 flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-mono font-bold text-white text-xs tracking-wide">${escapeHtml(item.domain)}</span>
+                    ${recBadge}
+                    ${impBadge}
+                    ${cdnInfo}
+                    <span class="text-[10px] text-slate-500 font-mono">${item.block_count} bloqueio(s)</span>
+                </div>
+                <p class="text-[11px] text-slate-400 leading-relaxed">${escapeHtml(item.reason || 'Sem descrição.')}</p>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+                <button onclick="openAiAddModal('${escapeHtml(item.domain)}', '${item.recommendation === 'block' ? 'BLACKLIST' : 'WHITELIST'}', '${escapeHtml(item.reason || '')}')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md flex items-center gap-1.5 transition-all">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Adicionar</span>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderAiBlacklistItemCard(item) {
+    let recBadge = '';
+    if (item.recommendation === 'whitelist') {
+        recBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation text-amber-400 text-[9px]"></i> IA Recomenda Liberar</span>';
+    } else {
+        recBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1"><i class="fa-solid fa-ban text-[9px]"></i> Manter Bloqueado</span>';
+    }
+
+    const blTag = `<span class="px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-semibold"><i class="fa-solid fa-ban text-[9px] mr-1"></i> Na Lista: <b>${escapeHtml(item.blacklist_name || 'Blacklist')}</b></span>`;
+
+    return `
+        <div class="p-3.5 rounded-xl bg-[#160d14] border border-rose-500/30 hover:border-rose-500/50 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group">
+            <div class="space-y-1.5 flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-mono font-bold text-rose-200 text-xs tracking-wide">${escapeHtml(item.domain)}</span>
+                    ${blTag}
+                    ${recBadge}
+                    <span class="text-[10px] text-slate-500 font-mono">${item.block_count} bloqueio(s)</span>
+                </div>
+                <p class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(item.reason || 'Sem justificativa.')}</p>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+                <button onclick="openAiAddModal('${escapeHtml(item.domain)}', 'WHITELIST', '${escapeHtml(item.reason || '')}')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md flex items-center gap-1.5 transition-all" title="Adicionar à Whitelist (sobrepõe o bloqueio)">
+                    <i class="fa-solid fa-shield-plus"></i>
+                    <span>+ Whitelist</span>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+let currentAddListType = 'WHITELIST';
+let rawTargetDomain = '';
+
+function openAiAddModal(domain, defaultType, reason) {
+    rawTargetDomain = domain.replace(/^\./, '');
+    document.getElementById('ai-target-domain').value = domain;
+    document.getElementById('ai-target-desc').value = reason ? `IA: ${reason}` : 'Adicionado via Análise IA';
+    document.getElementById('ai-add-feedback').innerHTML = '';
+
+    const chkSub = document.getElementById('ai-include-subdomains');
+    chkSub.checked = domain.startsWith('.');
+
+    switchAiListType(defaultType || 'WHITELIST');
+    document.getElementById('modal-ai-add-to-list').classList.remove('hidden');
+}
+
+function toggleAiDomainDotPrefix(checkbox) {
+    const input = document.getElementById('ai-target-domain');
+    const bare = rawTargetDomain || input.value.replace(/^\./, '');
+    if (checkbox.checked) {
+        input.value = '.' + bare;
+    } else {
+        input.value = bare;
+    }
+}
+
+function closeAiAddModal() {
+    document.getElementById('modal-ai-add-to-list').classList.add('hidden');
+}
+
+function switchAiListType(type) {
+    currentAddListType = type;
+    const btnWl = document.getElementById('btn-select-wl');
+    const btnBl = document.getElementById('btn-select-bl');
+    const select = document.getElementById('ai-target-list-select');
+    const submitBtn = document.getElementById('btn-confirm-ai-add');
+
+    select.innerHTML = '';
+
+    if (type === 'WHITELIST') {
+        btnWl.className = 'py-2 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white border border-emerald-500/30 flex items-center justify-center gap-1.5';
+        btnBl.className = 'py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-400 border border-slate-700 hover:text-white flex items-center justify-center gap-1.5';
+        submitBtn.className = 'px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20';
+
+        availableWhitelists.forEach(wl => {
+            const opt = document.createElement('option');
+            opt.value = wl.id;
+            opt.textContent = `🛡️ ${wl.name}${wl.is_mandatory ? ' (Obrigatória)' : ''}`;
+            select.appendChild(opt);
+        });
+    } else {
+        btnBl.className = 'py-2 rounded-xl text-xs font-bold transition-all bg-rose-600 text-white border border-rose-500/30 flex items-center justify-center gap-1.5';
+        btnWl.className = 'py-2 rounded-xl text-xs font-bold transition-all bg-slate-800 text-slate-400 border border-slate-700 hover:text-white flex items-center justify-center gap-1.5';
+        submitBtn.className = 'px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20';
+
+        if (availableBlacklists.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = "";
+            opt.textContent = "Nenhuma Blacklist cadastrada";
+            select.appendChild(opt);
+        } else {
+            availableBlacklists.forEach(bl => {
+                const opt = document.createElement('option');
+                opt.value = bl.id;
+                opt.textContent = `🚫 ${bl.name}`;
+                select.appendChild(opt);
+            });
+        }
+    }
+}
+
+async function submitAiAddToList(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-confirm-ai-add');
+    const feedback = document.getElementById('ai-add-feedback');
+    const domain = document.getElementById('ai-target-domain').value;
+    const listId = document.getElementById('ai-target-list-select').value;
+    const desc = document.getElementById('ai-target-desc').value;
+
+    if (!listId) {
+        feedback.innerHTML = '<span class="text-rose-400">Por favor, selecione uma lista de destino.</span>';
+        return;
+    }
+
+    btn.disabled = true;
+    feedback.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Salvando...</span>';
+
+    const formData = new URLSearchParams();
+    formData.append('domain', domain);
+    formData.append('list_id', listId);
+    formData.append('description', desc);
+
+    try {
+        const res = await fetch('/proxy/logs/add-to-list/', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            feedback.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check"></i> ${data.message}</span>`;
+            setTimeout(() => {
+                closeAiAddModal();
+                btn.disabled = false;
+            }, 1200);
+        } else {
+            feedback.innerHTML = `<span class="text-rose-400 font-semibold"><i class="fa-solid fa-circle-xmark"></i> ${data.error}</span>`;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        feedback.innerHTML = '<span class="text-rose-400">Erro na requisição.</span>';
+        btn.disabled = false;
+    }
+}
+</script>
+{% endif %}
 {% endblock %}

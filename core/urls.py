@@ -31,8 +31,13 @@ urlpatterns = [
     path('adminsp/settings/export/config/xml/', dashboard_views.export_config_xml_view, name='export_config_xml'),
     path('adminsp/settings/export/logs/txt/', dashboard_views.export_logs_txt_view, name='export_logs_txt'),
     path('adminsp/api/system-metrics/', dashboard_views.system_metrics_api_view, name='api_system_metrics'),
+    path('api/system-metrics/', dashboard_views.system_metrics_api_view),
+    path('api/webhook/tactical/', squid_views.tactical_webhook_view, name='api_tactical_webhook'),
     path('adminsp/api/deploy/', dashboard_views.auto_deploy_api_view, name='api_auto_deploy'),
     path('adminsp/api/check-update/', dashboard_views.check_system_update_api_view, name='api_check_system_update'),
+    path('adminsp/api/domain-lookup/', dashboard_views.domain_search_lookup_api_view, name='api_domain_search_lookup'),
+    path('adminsp/api/domain-quick-delete/', dashboard_views.domain_quick_delete_api_view, name='api_domain_quick_delete'),
+    path('adminsp/api/domain-quick-move/', dashboard_views.domain_quick_move_api_view, name='api_domain_quick_move'),
 
     # App Squid (Proxy, Whitelists e Regras)
     path('proxy/', include('squid.urls')),

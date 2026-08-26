@@ -26,7 +26,8 @@ def get_cpu_metrics():
 
     if HAS_PSUTIL:
         try:
-            cpu_percent = psutil.cpu_percent(interval=None)
+            # interval=0.1 garante medição real no primeiro acesso do worker
+            cpu_percent = psutil.cpu_percent(interval=0.1)
         except Exception:
             pass
     else:

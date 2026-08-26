@@ -1,4 +1,5 @@
-import os
+from django.views.decorators.csrf import csrf_exempt
+import json
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -467,10 +468,12 @@ def whitelists_view(request):
     all_ports = ProxyPort.objects.filter(is_active=True).order_by('port_number')
     referer_hubs = AllowedRefererHub.objects.all().prefetch_related('ports').order_by('name')
     discovered_sublinks = DiscoveredSublink.objects.select_related('origin_hub').order_by('-hit_count', '-last_seen')[:100]
+    all_blacklists = ProxyList.objects.filter(list_type='BLACKLIST', is_active=True).order_by('name')
 
     return render(request, 'squid/lists_index.html', {
         'profile': profile,
         'lists': lists,
+        'all_blacklists': all_blacklists,
         'list_type': 'WHITELIST',
         'title': 'Whitelists (Sites Permitidos)',
         'type_label': 'Whitelist',
@@ -1599,17 +1602,60 @@ def sync_ad_devices_view(request):
         return HttpResponseForbidden("Apenas Administradores podem sincronizar o Active Directory.")
 
     from .ad_sync import sync_devices_from_ad
-    count, msg = sync_devices_from_ad()
+    from .tactical_sync import sync_devices_from_tactical
+    count_t, msg_t = sync_devices_from_tactical()
+    count_a, msg_a = sync_devices_from_ad()
+    total_count = count_t + count_a
+    combined_msg = f"{msg_t} | {msg_a}"
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'success': count > 0 or 'concluída' in msg.lower(), 'message': msg, 'count': count})
+        return JsonResponse({'success': True, 'message': combined_msg, 'count': total_count})
 
-    if count > 0 or 'concluída' in msg.lower():
-        messages.success(request, f"🖥️ {msg}")
-    else:
-        messages.error(request, f"Erro na sincronização AD: {msg}")
-
+    messages.success(request, f"🖥️ {combined_msg}")
     return redirect(request.META.get('HTTP_REFERER', 'logs'))
+
+
+@csrf_exempt
+def tactical_webhook_view(request):
+    """
+    Webhook público protegido por token para receber atualizações em tempo real do Tactical RMM
+    quando um agente conectar, mudar de IP ou ligar na rede.
+    POST /proxy/api/webhook/tactical/
+    Headers: X-Webhook-Token: <token> ou ?token=<token>
+    Body: {"hostname": "PIJ-CEJA-03", "ip": "10.40.91.142", "site": "CEJA"}
+    """
+    from .tactical_sync import get_tactical_config, process_webhook_agent_update
+    config = get_tactical_config()
+    expected_token = config.get('webhook_token', 'sp-tactical-secure-token-2026')
+
+    received_token = request.headers.get('X-Webhook-Token') or request.GET.get('token')
+    if not received_token or received_token.strip() != expected_token.strip():
+        return JsonResponse({'success': False, 'error': 'Token inválido ou não fornecido.'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método HTTP não permitido. Use POST.'}, status=405)
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        data = request.POST.dict()
+
+    if not data:
+        return JsonResponse({'success': False, 'error': 'Corpo da requisição vazio.'}, status=400)
+
+    # Se for uma lista de agentes
+    if isinstance(data, list):
+        successes = 0
+        for item in data:
+            ok, _ = process_webhook_agent_update(item)
+            if ok:
+                successes += 1
+        return JsonResponse({'success': True, 'message': f'{successes} agentes atualizados com sucesso.'})
+
+    ok, msg = process_webhook_agent_update(data)
+    if ok:
+        return JsonResponse({'success': True, 'message': msg})
+    return JsonResponse({'success': False, 'error': msg}, status=400)
 
 
 def pac_by_port_view(request, port_number):
@@ -2610,6 +2656,331 @@ def analyze_sublink_ia_view(request, sublink_id):
         return JsonResponse({'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=500)
     except Exception as e:
         return JsonResponse({'error': f'Erro ao chamar API de IA: {str(e)}'}, status=500)
+
+
+@login_required
+def analyze_blocked_logs_ia_view(request):
+    """
+    Endpoint AJAX — Busca logs bloqueados das salas selecionadas, filtra para manter 1 domínio único,
+    remove os que já estão liberados em alguma Whitelist e envia a lista para a IA configurada.
+    Retorna relatório classificando e separando CDNs de domínios comuns.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return HttpResponseForbidden("Acesso negado.")
+
+    from dashboard.models import SystemSetting
+    from .models import AccessLog, DomainItem
+    import urllib.request
+    import json as json_lib
+
+    # 1. Valida configurações de IA
+    ai_enabled = SystemSetting.get_value('ai_integration_enabled', 'false')
+    if ai_enabled != 'true':
+        return JsonResponse({
+            'error': 'Integração com IA não está ativada. Acesse Configurações → Parâmetros Gerais para ativar.'
+        }, status=400)
+
+    ai_api_url = SystemSetting.get_value('ai_api_url', '').strip().rstrip('/')
+    ai_api_key = SystemSetting.get_value('ai_api_key', '').strip()
+    ai_model_name = SystemSetting.get_value('ai_model_name', 'claude-haiku-4-5').strip()
+    if not ai_api_url or not ai_api_key:
+        return JsonResponse({
+            'error': 'URL ou Chave da API de IA não configuradas. Acesse Configurações → Parâmetros Gerais.'
+        }, status=400)
+
+    # 2. Obtém salas/portas selecionadas
+    port_ids = request.POST.getlist('ports')
+    time_range = request.POST.get('time_range', 'today')  # '1h', 'today', '7d', 'all'
+
+    # Sincroniza logs recentes antes de consultar
+    sync_logs_from_squid_file()
+
+    # 3. Filtra logs bloqueados
+    logs_qs = AccessLog.objects.filter(
+        models.Q(action='BLOCKED') |
+        models.Q(http_status__icontains='DENIED') |
+        models.Q(http_status__contains='/403') |
+        models.Q(http_status__contains='/401')
+    )
+
+    if port_ids:
+        logs_qs = logs_qs.filter(port_id__in=port_ids)
+
+    # Filtro temporal
+    now = timezone.now()
+    if time_range == '1h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=1))
+    elif time_range == 'today':
+        logs_qs = logs_qs.filter(timestamp__date=now.date())
+    elif time_range == '7d':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(days=7))
+
+    # 4. Agrupa e obtém contagem por domínio
+    from django.db.models import Count, Max
+    blocked_domains_summary = logs_qs.values('domain').annotate(
+        block_count=Count('id'),
+        last_seen=Max('timestamp')
+    ).order_by('-block_count')
+
+    if not blocked_domains_summary:
+        return JsonResponse({
+            'success': True,
+            'message': 'Nenhum log bloqueado encontrado para as salas e período selecionados.',
+            'cdns': [],
+            'domains': [],
+            'total_analyzed': 0
+        })
+
+    # 5. Obtém todos os domínios liberados em Whitelists e bloqueados em Blacklists
+    whitelisted_raw = list(DomainItem.objects.filter(
+        proxy_list__list_type='WHITELIST',
+        proxy_list__is_active=True
+    ).values_list('domain', flat=True))
+
+    blacklisted_raw = list(DomainItem.objects.filter(
+        proxy_list__list_type='BLACKLIST',
+        proxy_list__is_active=True
+    ).select_related('proxy_list').values_list('domain', 'proxy_list__name'))
+
+    # Dicionário de Blacklist: domínio limpo -> nome da lista
+    blacklisted_dict = {}
+    for d, list_name in blacklisted_raw:
+        clean = d.strip().lower()
+        if clean:
+            # Armazena tanto com ponto quanto sem ponto
+            bare = clean.lstrip('.')
+            blacklisted_dict[clean] = list_name
+            blacklisted_dict[bare] = list_name
+            blacklisted_dict[f".{bare}"] = list_name
+
+    # Conjunto de Whitelist: armazena formas limpas (com e sem ponto)
+    whitelisted_set = set()
+    for d in whitelisted_raw:
+        clean = d.strip().lower()
+        if clean:
+            bare = clean.lstrip('.')
+            whitelisted_set.add(clean)
+            whitelisted_set.add(bare)
+            whitelisted_set.add(f".{bare}")
+
+    def is_in_whitelist(domain_str):
+        clean_d = domain_str.strip().lower()
+        bare_d = clean_d.lstrip('.')
+        # 1. Checagem direta (exata, com ou sem ponto)
+        if clean_d in whitelisted_set or bare_d in whitelisted_set or f".{bare_d}" in whitelisted_set:
+            return True
+        # 2. Checagem hierárquica de subdomínios (ex: self.events.data.microsoft.com -> microsoft.com)
+        parts = bare_d.split('.')
+        for i in range(1, len(parts)):
+            parent = '.'.join(parts[i:])
+            if parent in whitelisted_set or f".{parent}" in whitelisted_set:
+                return True
+        return False
+
+    def get_blacklist_info(domain_str):
+        clean_d = domain_str.strip().lower()
+        bare_d = clean_d.lstrip('.')
+        if clean_d in blacklisted_dict:
+            return blacklisted_dict[clean_d]
+        if bare_d in blacklisted_dict:
+            return blacklisted_dict[bare_d]
+        if f".{bare_d}" in blacklisted_dict:
+            return blacklisted_dict[f".{bare_d}"]
+        parts = bare_d.split('.')
+        for i in range(1, len(parts)):
+            parent = '.'.join(parts[i:])
+            if parent in blacklisted_dict:
+                return blacklisted_dict[parent]
+            if f".{parent}" in blacklisted_dict:
+                return blacklisted_dict[f".{parent}"]
+        return None
+
+    # 6. Filtra domínios que NÃO estão na whitelist e limita para a IA
+    candidate_domains = []
+    domain_stats = {}
+    for item in blocked_domains_summary:
+        d = item['domain']
+        if not d or d == '-':
+            continue
+        if not is_in_whitelist(d):
+            candidate_domains.append(d)
+            bl_name = get_blacklist_info(d)
+            domain_stats[d] = {
+                'block_count': item['block_count'],
+                'last_seen': item['last_seen'].strftime('%d/%m/%Y %H:%M') if item['last_seen'] else '-',
+                'in_blacklist': bool(bl_name),
+                'blacklist_name': bl_name
+            }
+
+    if not candidate_domains:
+        return JsonResponse({
+            'success': True,
+            'message': 'Todos os domínios bloqueados encontrados já estão cadastrados na Whitelist (ou em seus domínios principais).',
+            'cdns': [],
+            'domains': [],
+            'blacklisted': [],
+            'total_analyzed': 0
+        })
+
+    # Limita a 50 domínios para manter resposta rápida e dentro do limite de tokens
+    domains_to_send = candidate_domains[:50]
+
+    # 7. Prepara o prompt para a IA
+    domains_formatted = "\n".join([f"- {d} ({domain_stats[d]['block_count']} bloqueios)" for d in domains_to_send])
+    prompt = (
+        "Você é um especialista em segurança de rede e proxy Squid para instituições de ensino.\n"
+        "Analise a lista de domínios bloqueados abaixo e classifique cada um deles.\n"
+        "Separe explicitamente o que é CDN/infraestrutura técnica (servidores de assets, fontes, APIs de apoio, telemetria) "
+        "de domínios e serviços principais (sites educacionais, portais, redes sociais, jogos, etc).\n\n"
+        "Responda SOMENTE em JSON válido com exatamente esta estrutura:\n"
+        "{\n"
+        '  "results": [\n'
+        "    {\n"
+        '      "domain": "nome.do.dominio",\n'
+        '      "is_cdn": true,\n'
+        '      "cdn_of": "Nome do serviço principal ou provedor (ex: Cloudflare, Google, Microsoft, null se não for CDN)",\n'
+        '      "importance": "high",\n'
+        '      "recommendation": "whitelist",\n'
+        '      "reason": "Justificativa objetiva e clara em uma frase em português."\n'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Valores válidos:\n"
+        "- is_cdn: boolean (true para CDNs, repositórios de pacotes, APIs de suporte, CDNs de vídeo/imagem, assets; false para sites/portais)\n"
+        "- importance: 'high' (essencial para funcionamento do site/didático), 'medium' (relevante), 'low' (ruído, telemetria, não essencial)\n"
+        "- recommendation: 'whitelist' (recomendado liberar), 'block' (manter bloqueado), 'monitor' (analisar com cautela)\n\n"
+        f"Domínios para analisar:\n{domains_formatted}"
+    )
+
+    payload = json_lib.dumps({
+        "model": ai_model_name,
+        "max_tokens": 3000,
+        "stream": False,
+        "messages": [{"role": "user", "content": prompt}]
+    }).encode('utf-8')
+
+    try:
+        endpoint = f"{ai_api_url}/chat/completions" if not ai_api_url.endswith('/chat/completions') else ai_api_url
+        req = urllib.request.Request(
+            endpoint,
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (compatible; SquidPanel/1.0)',
+                'Authorization': f'Bearer {ai_api_key}',
+                'x-api-key': ai_api_key,
+                'anthropic-version': '2023-06-01',
+            },
+            method='POST'
+        )
+
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            raw_body = resp.read().decode('utf-8')
+
+        content_text = ''
+        if raw_body.strip().startswith('{'):
+            try:
+                raw_json = json_lib.loads(raw_body)
+                if 'choices' in raw_json and raw_json['choices']:
+                    content_text = raw_json['choices'][0].get('message', {}).get('content', '')
+                elif 'content' in raw_json and isinstance(raw_json['content'], list):
+                    content_text = "".join([c.get('text', '') for c in raw_json['content'] if c.get('type') == 'text'])
+            except Exception:
+                content_text = raw_body
+        else:
+            for line in raw_body.splitlines():
+                line = line.strip()
+                if line.startswith('data:'):
+                    chunk_str = line[5:].strip()
+                    if chunk_str and chunk_str != '[DONE]':
+                        try:
+                            chunk = json_lib.loads(chunk_str)
+                            if 'choices' in chunk and chunk['choices']:
+                                delta = chunk['choices'][0].get('delta', {})
+                                content_text += delta.get('content', '')
+                            elif chunk.get('type') == 'content_block_delta':
+                                content_text += chunk.get('delta', {}).get('text', '')
+                        except Exception:
+                            pass
+
+        # Extrai o JSON da resposta
+        import re
+        json_match = re.search(r'\{.*\}', content_text, re.DOTALL)
+        if not json_match:
+            return JsonResponse({'error': 'Resposta da IA não continha JSON válido.', 'raw': content_text[:400]}, status=500)
+
+        ai_data = json_lib.loads(json_match.group())
+        results = ai_data.get('results', [])
+
+        # Enriquece cada item com os dados de bloqueio e separa CDNs, Domínios e Blacklisted
+        cdns = []
+        domains = []
+        blacklisted = []
+
+        for r in results:
+            dom = r.get('domain', '')
+            stats = domain_stats.get(dom, {'block_count': 1, 'last_seen': '-', 'in_blacklist': False, 'blacklist_name': None})
+            item_data = {
+                'domain': dom,
+                'is_cdn': r.get('is_cdn', False),
+                'cdn_of': r.get('cdn_of'),
+                'importance': r.get('importance', 'medium'),
+                'recommendation': r.get('recommendation', 'monitor'),
+                'reason': r.get('reason', ''),
+                'block_count': stats['block_count'],
+                'last_seen': stats['last_seen'],
+                'in_blacklist': stats['in_blacklist'],
+                'blacklist_name': stats['blacklist_name'],
+            }
+
+            if stats['in_blacklist']:
+                blacklisted.append(item_data)
+            elif r.get('is_cdn'):
+                cdns.append(item_data)
+            else:
+                domains.append(item_data)
+
+        # Se houver domínios enviados que a IA não retornou na lista, adiciona como não categorizado
+        returned_domains = {r.get('domain') for r in results}
+        for d in domains_to_send:
+            if d not in returned_domains:
+                stats = domain_stats.get(d, {'block_count': 1, 'last_seen': '-', 'in_blacklist': False, 'blacklist_name': None})
+                item_data = {
+                    'domain': d,
+                    'is_cdn': False,
+                    'cdn_of': None,
+                    'importance': 'medium',
+                    'recommendation': 'monitor',
+                    'reason': 'Não classificado pela IA.',
+                    'block_count': stats['block_count'],
+                    'last_seen': stats['last_seen'],
+                    'in_blacklist': stats['in_blacklist'],
+                    'blacklist_name': stats['blacklist_name'],
+                }
+                if stats['in_blacklist']:
+                    blacklisted.append(item_data)
+                else:
+                    domains.append(item_data)
+
+        return JsonResponse({
+            'success': True,
+            'model': ai_model_name,
+            'total_analyzed': len(domains_to_send),
+            'total_found': len(candidate_domains),
+            'cdns': cdns,
+            'domains': domains,
+            'blacklisted': blacklisted,
+        })
+
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')[:500]
+        return JsonResponse({'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro ao processar análise com IA: {str(e)}'}, status=500)
 
 
 

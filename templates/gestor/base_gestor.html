@@ -74,51 +74,57 @@
     <!-- ========================================== -->
     <!-- 1. SIDEBAR LATERAL DO GESTOR -->
     <!-- ========================================== -->
-    <aside class="w-64 bg-[#141726] border-r border-slate-800/80 flex flex-col flex-shrink-0 z-30 transition-all duration-300">
-        
+    <aside id="main-sidebar" class="w-64 bg-[#141726] border-r border-slate-800/80 flex flex-col flex-shrink-0 z-30 transition-all duration-300">
+
         <!-- Header do Menu Lateral -->
-        <div class="h-16 px-5 flex items-center gap-3 border-b border-slate-800/80 bg-[#121422]">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-                <i class="fa-solid fa-graduation-cap text-base"></i>
-            </div>
-            <div>
-                <h1 class="text-base font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300">
-                    Squid<span class="text-indigo-400">Panel</span>
-                </h1>
-                <div class="flex items-center gap-1.5 mt-0.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span class="text-[10px] font-medium text-emerald-400/90 tracking-wide uppercase">Painel do Gestor</span>
+        <div class="h-16 px-4 flex items-center justify-between border-b border-slate-800/80 bg-[#121422]">
+            <div class="flex items-center gap-3 overflow-hidden">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 flex-shrink-0">
+                    <i class="fa-solid fa-graduation-cap text-base"></i>
+                </div>
+                <div class="sidebar-text transition-all duration-200">
+                    <h1 class="text-base font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300 whitespace-nowrap">
+                        Squid<span class="text-indigo-400">Panel</span>
+                    </h1>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span class="text-[10px] font-medium text-emerald-400/90 tracking-wide uppercase whitespace-nowrap">Painel do Gestor</span>
+                    </div>
                 </div>
             </div>
+            <!-- Botão de Recolher/Expandir -->
+            <button id="sidebar-toggle" onclick="toggleSidebar()" class="w-7 h-7 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all flex-shrink-0" title="Recolher/Expandir menu">
+                <i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left text-xs"></i>
+            </button>
         </div>
 
         <!-- Links de Navegação Lateral -->
         <div class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-            
+
             <div>
-                <span class="px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Salas de Aula</span>
+                <span class="sidebar-label px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Salas de Aula</span>
                 <nav class="space-y-1">
                     <!-- Dashboard -->
-                    <a href="{% url 'gestor_dashboard' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all {% if active_menu == 'dashboard' %}bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 shadow-sm font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
-                        <i class="fa-solid fa-chalkboard-user w-4 text-center text-sm {% if active_menu == 'dashboard' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
-                        <span>Controle de Salas</span>
+                    <a href="{% url 'gestor_dashboard' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all {% if active_menu == 'dashboard' %}bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 shadow-sm font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" title="Controle de Salas">
+                        <i class="fa-solid fa-chalkboard-user w-4 text-center text-sm flex-shrink-0 {% if active_menu == 'dashboard' %}text-indigo-400{% else %}text-slate-500{% endif %}"></i>
+                        <span class="sidebar-text whitespace-nowrap">Controle de Salas</span>
                     </a>
 
                     <!-- Agendamentos -->
-                    <a href="{% url 'gestor_schedules' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all {% if active_menu == 'schedules' %}bg-indigo-600/20 text-cyan-300 border border-cyan-500/30 shadow-sm font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
-                        <i class="fa-solid fa-calendar-days w-4 text-center text-sm {% if active_menu == 'schedules' %}text-cyan-400{% else %}text-slate-500{% endif %}"></i>
-                        <span>Agendamentos</span>
+                    <a href="{% url 'gestor_schedules' %}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all {% if active_menu == 'schedules' %}bg-indigo-600/20 text-cyan-300 border border-cyan-500/30 shadow-sm font-semibold{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" title="Agendamentos">
+                        <i class="fa-solid fa-calendar-days w-4 text-center text-sm flex-shrink-0 {% if active_menu == 'schedules' %}text-cyan-400{% else %}text-slate-500{% endif %}"></i>
+                        <span class="sidebar-text whitespace-nowrap">Agendamentos</span>
                     </a>
                 </nav>
             </div>
 
             {% if profile.is_admin %}
             <div>
-                <span class="px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Administração</span>
+                <span class="sidebar-label px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Administração</span>
                 <nav class="space-y-1">
-                    <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all">
-                        <i class="fa-solid fa-shield-halved w-4 text-center text-sm text-slate-500"></i>
-                        <span>Painel Geral TI</span>
+                    <a href="{% url 'dashboard' %}" class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all" title="Painel Geral TI">
+                        <i class="fa-solid fa-shield-halved w-4 text-center text-sm flex-shrink-0 text-slate-500"></i>
+                        <span class="sidebar-text whitespace-nowrap">Painel Geral TI</span>
                     </a>
                 </nav>
             </div>
@@ -127,7 +133,7 @@
         </div>
 
         <!-- Rodapé do Menu Lateral -->
-        <div class="p-3 border-t border-slate-800/80 bg-[#121422]">
+        <div id="sidebar-footer" class="p-3 border-t border-slate-800/80 bg-[#121422]">
             <div class="px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800/60 flex items-center justify-between text-xs">
                 <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -223,6 +229,67 @@
     <div id="gestor-toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md pointer-events-none"></div>
 
     <script>
+    // ==========================================
+    // CONTROLE DA SIDEBAR RECOLHÍVEL
+    // ==========================================
+    function toggleSidebar() {
+        const sidebar = document.getElementById('main-sidebar');
+        const icon = document.getElementById('sidebar-toggle-icon');
+        if (!sidebar) return;
+
+        const isCollapsed = sidebar.classList.contains('w-16');
+
+        if (isCollapsed) {
+            // Expandir
+            sidebar.classList.remove('w-16');
+            sidebar.classList.add('w-64');
+            if (icon) {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-left');
+            }
+            document.querySelectorAll('.sidebar-text, .sidebar-label').forEach(el => {
+                el.classList.remove('hidden');
+            });
+            const footer = document.getElementById('sidebar-footer');
+            if (footer) footer.classList.remove('hidden');
+            localStorage.setItem('sidebar-collapsed', 'false');
+        } else {
+            // Recolher
+            sidebar.classList.remove('w-64');
+            sidebar.classList.add('w-16');
+            if (icon) {
+                icon.classList.remove('fa-chevron-left');
+                icon.classList.add('fa-chevron-right');
+            }
+            document.querySelectorAll('.sidebar-text, .sidebar-label').forEach(el => {
+                el.classList.add('hidden');
+            });
+            const footer = document.getElementById('sidebar-footer');
+            if (footer) footer.classList.add('hidden');
+            localStorage.setItem('sidebar-collapsed', 'true');
+        }
+    }
+
+    // Restaura estado salvo no localStorage
+    (function initSidebar() {
+        if (localStorage.getItem('sidebar-collapsed') === 'true') {
+            const sidebar = document.getElementById('main-sidebar');
+            const icon = document.getElementById('sidebar-toggle-icon');
+            if (!sidebar) return;
+            sidebar.classList.remove('w-64');
+            sidebar.classList.add('w-16');
+            if (icon) {
+                icon.classList.remove('fa-chevron-left');
+                icon.classList.add('fa-chevron-right');
+            }
+            document.querySelectorAll('.sidebar-text, .sidebar-label').forEach(el => {
+                el.classList.add('hidden');
+            });
+            const footer = document.getElementById('sidebar-footer');
+            if (footer) footer.classList.add('hidden');
+        }
+    })();
+
     // Helper para obter CSRF Token
     function getCookie(name) {
         let cookieValue = null;

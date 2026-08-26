@@ -130,11 +130,13 @@ def parse_squid_log_line(line, port_map, device_map=None):
         return None
 
 
-def sync_logs_from_squid_file():
+def sync_logs_from_squid_file(chunk_size=2000):
     """
     Lê incrementalmente as novas linhas completas do arquivo /var/log/squid/access.log
-    e insere os registros reais no banco de dados com seus respectivos hostnames.
+    e insere os registros no banco de dados em lotes (chunks) constantes para evitar
+    picos de consumo de memória RAM e sobrecarga no PostgreSQL.
     """
+    import gc
     log_file_path = get_squid_log_path()
     if not os.path.exists(log_file_path):
         return 0
@@ -159,12 +161,29 @@ def sync_logs_from_squid_file():
     if current_size < last_offset:
         last_offset = 0
 
-    new_logs = []
     valid_offset = last_offset
+    total_processed = 0
+
+    # Pré-carrega metadados de sublinks apenas se houver portas em WHITELIST
+    whitelist_ports = {p.port_number for p in port_map.values() if p.current_status == 'WHITELIST'}
+    allowed_hubs = list(AllowedRefererHub.objects.filter(is_active=True)) if whitelist_ports else []
+
+    active_wl_bases = set()
+    if whitelist_ports and allowed_hubs:
+        for d in DomainItem.objects.filter(
+            proxy_list__list_type='WHITELIST',
+            proxy_list__is_active=True,
+            is_active=True
+        ).values_list('domain', flat=True):
+            active_wl_bases.add(d.strip().lower().lstrip('.'))
+
+    discovered_sublinks_batch = {}
 
     try:
         with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
             f.seek(last_offset)
+
+            chunk_logs = []
             while True:
                 line_start_pos = f.tell()
                 line = f.readline()
@@ -175,80 +194,74 @@ def sync_logs_from_squid_file():
                     # Linha incompleta sendo escrita pelo Squid, recua para tentar no próximo polling
                     f.seek(line_start_pos)
                     break
-                
+
                 valid_offset = f.tell()
                 parsed_log = parse_squid_log_line(line, port_map, device_map)
                 if parsed_log:
-                    new_logs.append(parsed_log)
+                    chunk_logs.append(parsed_log)
 
-        if new_logs:
-            AccessLog.objects.bulk_create(new_logs)
+                    # Coleta sublinks em memória para agregação
+                    if whitelist_ports and allowed_hubs and parsed_log.action == 'ALLOWED' and parsed_log.port_number in whitelist_ports:
+                        clean_d = parsed_log.domain.strip().lower().split(':')[0].lstrip('.')
+                        if clean_d and not clean_d.startswith(('10.', '192.168.', '127.')):
+                            is_in_wl = any(clean_d == base or clean_d.endswith('.' + base) for base in active_wl_bases)
+                            if not is_in_wl:
+                                for hub in allowed_hubs:
+                                    hub_pat = hub.clean_pattern()
+                                    if hub_pat and (clean_d == hub_pat or clean_d.endswith('.' + hub_pat)):
+                                        if clean_d not in discovered_sublinks_batch:
+                                            discovered_sublinks_batch[clean_d] = {
+                                                'hub': hub,
+                                                'url': parsed_log.full_url[:500] if parsed_log.full_url else f"https://{clean_d}",
+                                                'hits': 0
+                                            }
+                                        discovered_sublinks_batch[clean_d]['hits'] += 1
+                                        break
 
-            # Identifica e cataloga acessos permitidos em salas com Whitelist exclusivamente via Buscadores/Portais (Referer Hubs)
-            try:
-                whitelist_ports = {p.port_number for p in port_map.values() if p.current_status == 'WHITELIST'}
-                allowed_hubs = list(AllowedRefererHub.objects.filter(is_active=True))
+                # Quando atinge o tamanho do lote, grava no banco e libera a memória
+                if len(chunk_logs) >= chunk_size:
+                    AccessLog.objects.bulk_create(chunk_logs, batch_size=1000)
+                    total_processed += len(chunk_logs)
+                    chunk_logs.clear()
+                    SystemSetting.set_value('squid_log_file_offset', str(valid_offset), 'Offset do arquivo access.log')
 
-                # Carrega todos os domínios base cadastrados em Whitelists ativas
-                active_wl_bases = set()
-                for d in DomainItem.objects.filter(
-                    proxy_list__list_type='WHITELIST',
-                    proxy_list__is_active=True,
-                    is_active=True
-                ).values_list('domain', flat=True):
-                    active_wl_bases.add(d.strip().lower().lstrip('.'))
+            # Grava os itens restantes do último lote
+            if chunk_logs:
+                AccessLog.objects.bulk_create(chunk_logs, batch_size=1000)
+                total_processed += len(chunk_logs)
+                chunk_logs.clear()
 
-                for log in new_logs:
-                    if log.action == 'ALLOWED' and log.port_number in whitelist_ports:
-                        clean_d = log.domain.strip().lower().split(':')[0].lstrip('.')
-                        # Ignora IPs locais, portas internas e o próprio servidor SquidPanel
-                        if not clean_d or clean_d.startswith('10.') or clean_d.startswith('192.168.') or clean_d.startswith('127.'):
-                            continue
-
-                        # 1. Se o domínio ou qualquer subdomínio dele já está coberto por uma Whitelist, NÃO cataloga como sublink
-                        is_in_wl = False
-                        for base in active_wl_bases:
-                            if clean_d == base or clean_d.endswith('.' + base):
-                                is_in_wl = True
-                                break
-                        if is_in_wl:
-                            continue
-
-                        # 2. Identifica se o acesso veio de um Buscador/Portal cadastrado (AllowedRefererHub)
-                        origin = None
-                        for hub in allowed_hubs:
-                            hub_pat = hub.clean_pattern()
-                            if hub_pat and (clean_d == hub_pat or clean_d.endswith('.' + hub_pat)):
-                                origin = hub
-                                break
-
-                        # Se não foi originado de um Buscador/Hub cadastrado, não cataloga
-                        if not origin:
-                            continue
-
-                        # 3. Atualiza ou cria o registro de sublink descoberto
-                        sublink, created = DiscoveredSublink.objects.get_or_create(
-                            domain=clean_d,
-                            defaults={
-                                'origin_hub': origin,
-                                'last_requested_url': log.full_url[:500] if log.full_url else f"https://{clean_d}",
-                                'hit_count': 1
-                            }
-                        )
-                        if not created:
-                            DiscoveredSublink.objects.filter(id=sublink.id).update(
-                                hit_count=models.F('hit_count') + 1,
-                                last_seen=timezone.now(),
-                                origin_hub=origin if not sublink.origin_hub else sublink.origin_hub,
-                                last_requested_url=log.full_url[:500] if log.full_url else sublink.last_requested_url
-                            )
-            except Exception as e_sub:
-                pass
-
+        # Salva o offset final
         SystemSetting.set_value('squid_log_file_offset', str(valid_offset), 'Offset do arquivo access.log')
-        return len(new_logs)
+
+        # Atualiza sublinks descobertos agregados
+        if discovered_sublinks_batch:
+            from django.db.models import F
+            now = timezone.now()
+            for d_name, d_data in discovered_sublinks_batch.items():
+                sub, created = DiscoveredSublink.objects.get_or_create(
+                    domain=d_name,
+                    defaults={
+                        'origin_hub': d_data['hub'],
+                        'last_requested_url': d_data['url'],
+                        'hit_count': d_data['hits']
+                    }
+                )
+                if not created:
+                    DiscoveredSublink.objects.filter(id=sub.id).update(
+                        hit_count=F('hit_count') + d_data['hits'],
+                        last_seen=now,
+                        origin_hub=d_data['hub'] if not sub.origin_hub else sub.origin_hub,
+                        last_requested_url=d_data['url'] or sub.last_requested_url
+                    )
+
+        del chunk_logs
+        del discovered_sublinks_batch
+        gc.collect()
+
+        return total_processed
     except Exception as e:
         print(f"Erro ao ler access.log do Squid: {e}")
-        return 0
+        return total_processed
 
 

@@ -98,6 +98,16 @@ def settings_general_view(request):
         SystemSetting.set_value('server_dns', server_dns, 'Servidores DNS de consulta')
         SystemSetting.set_value('admin_email', admin_email, 'E-mail do Administrador de TI')
 
+        # Configurações do Tactical RMM
+        tactical_api_url = request.POST.get('tactical_api_url', '').strip()
+        tactical_api_key = request.POST.get('tactical_api_key', '').strip()
+        tactical_webhook_token = request.POST.get('tactical_webhook_token', '').strip()
+        SystemSetting.set_value('tactical_api_url', tactical_api_url or 'https://api.ftech.srv.br/agents/', 'URL da API do Tactical RMM')
+        if tactical_api_key:
+            SystemSetting.set_value('tactical_api_key', tactical_api_key, 'Chave de Acesso API do Tactical RMM')
+        if tactical_webhook_token:
+            SystemSetting.set_value('tactical_webhook_token', tactical_webhook_token, 'Token secreto do Webhook Tactical RMM')
+
         # Configurações de Integração com IA
         ai_enabled = 'true' if request.POST.get('ai_integration_enabled') == 'on' else 'false'
         ai_api_url = request.POST.get('ai_api_url', '').strip()
@@ -122,6 +132,12 @@ def settings_general_view(request):
     server_gateway = SystemSetting.get_value('server_gateway', net_info['gateway'])
     server_dns = SystemSetting.get_value('server_dns', '10.40.88.1, 10.40.88.2, 1.1.1.1')
     admin_email = SystemSetting.get_value('admin_email', 'informatica@pij.local')
+    tactical_api_url = SystemSetting.get_value('tactical_api_url', 'https://api.ftech.srv.br/agents/')
+    tactical_api_key_set = bool(SystemSetting.get_value('tactical_api_key', ''))
+    tactical_webhook_token = SystemSetting.get_value('tactical_webhook_token', 'sp-tactical-secure-token-2026')
+    tactical_last_sync = SystemSetting.get_value('tactical_last_sync', 'Nunca')
+    tactical_total_synced = SystemSetting.get_value('tactical_total_synced_devices', '0')
+
     ai_integration_enabled = SystemSetting.get_value('ai_integration_enabled', 'false') == 'true'
     ai_api_url = SystemSetting.get_value('ai_api_url', '')
     ai_model_name = SystemSetting.get_value('ai_model_name', 'claude-haiku-4-5')
@@ -134,6 +150,11 @@ def settings_general_view(request):
         'server_gateway': server_gateway,
         'server_dns': server_dns,
         'admin_email': admin_email,
+        'tactical_api_url': tactical_api_url,
+        'tactical_api_key_set': tactical_api_key_set,
+        'tactical_webhook_token': tactical_webhook_token,
+        'tactical_last_sync': tactical_last_sync,
+        'tactical_total_synced': tactical_total_synced,
         'ai_integration_enabled': ai_integration_enabled,
         'ai_api_url': ai_api_url,
         'ai_model_name': ai_model_name,
@@ -489,6 +510,173 @@ def check_system_update_api_view(request):
             'error': str(e),
             'message': 'Não foi possível verificar atualizações no momento.'
         })
+
+
+@login_required
+def domain_search_lookup_api_view(request):
+    """
+    API para busca dinâmica de domínios na Dashboard:
+    Retorna onde o domínio (e subdomínios/domínio pai) está cadastrado (Whitelists e Blacklists),
+    grupos vinculados, e a lista de todas as ProxyLists disponíveis para mover/transferir.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado.'}, status=403)
+
+    term = request.GET.get('q', '').strip().lower()
+    if not term:
+        return JsonResponse({'success': True, 'results': [], 'total': 0, 'available_lists': []})
+
+    import urllib.parse
+    if term.startswith('http://') or term.startswith('https://'):
+        parsed = urllib.parse.urlparse(term)
+        term = parsed.netloc or parsed.path
+    if ':' in term:
+        term = term.split(':')[0]
+    term = term.strip().lstrip('.')
+
+    from squid.models import DomainItem, ProxyList
+
+    # Monta filtros para cobrir tanto o termo pesquisado, quanto se pesquisou um subdomínio (ex: player.vimeo.com acha vimeo.com)
+    parts = term.split('.')
+    suffixes = ['.'.join(parts[i:]) for i in range(len(parts))]
+
+    q_filter = models.Q(domain__icontains=term)
+    for s in suffixes:
+        if len(s) > 3 and '.' in s:
+            q_filter |= models.Q(domain=s) | models.Q(domain='.' + s)
+
+    items = DomainItem.objects.filter(q_filter).select_related('proxy_list').order_by('domain')
+
+    results = []
+    for item in items:
+        groups_wl = list(item.proxy_list.applied_groups_whitelist.filter(is_active=True).values_list('name', flat=True))
+        groups_bl = list(item.proxy_list.applied_groups_blacklist.filter(is_active=True).values_list('name', flat=True))
+        applied_groups = groups_wl if item.proxy_list.list_type == 'WHITELIST' else groups_bl
+
+        results.append({
+            'id': item.id,
+            'domain': item.domain,
+            'list_id': item.proxy_list.id,
+            'list_name': item.proxy_list.name,
+            'list_type': item.proxy_list.list_type,
+            'is_mandatory': item.proxy_list.is_mandatory,
+            'description': item.description or '',
+            'groups': applied_groups,
+            'created_at': item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else '-'
+        })
+
+    # Lista de todas as ProxyLists para popular os selects/modais de mover
+    all_lists = []
+    for pl in ProxyList.objects.filter(is_active=True).order_by('list_type', 'name'):
+        all_lists.append({
+            'id': pl.id,
+            'name': pl.name,
+            'list_type': pl.list_type,
+            'is_mandatory': pl.is_mandatory,
+        })
+
+    return JsonResponse({
+        'success': True,
+        'query': term,
+        'results': results,
+        'total': len(results),
+        'available_lists': all_lists
+    })
+
+
+@login_required
+def domain_quick_delete_api_view(request):
+    """
+    API para exclusão rápida de um domínio via AJAX na Dashboard com recarregamento opcional de regras.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método inválido.'}, status=405)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado.'}, status=403)
+
+    domain_id = request.POST.get('domain_id')
+    if not domain_id:
+        return JsonResponse({'success': False, 'error': 'ID do domínio não informado.'}, status=400)
+
+    from squid.models import DomainItem
+    from squid.squid_sync import apply_squid_changes
+
+    domain_item = DomainItem.objects.filter(id=domain_id).first()
+    if not domain_item:
+        return JsonResponse({'success': False, 'error': 'Domínio não encontrado.'}, status=404)
+
+    dom_name = domain_item.domain
+    list_name = domain_item.proxy_list.name
+    list_type = domain_item.proxy_list.list_type
+    domain_item.delete()
+
+    # Aplica no Squid
+    apply_squid_changes()
+
+    return JsonResponse({
+        'success': True,
+        'message': f"Domínio '{dom_name}' removido com sucesso de '{list_name}' ({list_type})."
+    })
+
+
+@login_required
+def domain_quick_move_api_view(request):
+    """
+    API para mover/transferir rapidamente um domínio entre listas (ex: mover da Blacklist para Whitelist ou entre grupos).
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método inválido.'}, status=405)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.is_manager:
+        return JsonResponse({'success': False, 'error': 'Acesso negado.'}, status=403)
+
+    domain_id = request.POST.get('domain_id')
+    target_list_id = request.POST.get('target_list_id')
+
+    if not domain_id or not target_list_id:
+        return JsonResponse({'success': False, 'error': 'Parâmetros incompletos.'}, status=400)
+
+    from squid.models import DomainItem, ProxyList
+    from squid.squid_sync import apply_squid_changes
+
+    domain_item = DomainItem.objects.filter(id=domain_id).select_related('proxy_list').first()
+    target_list = ProxyList.objects.filter(id=target_list_id, is_active=True).first()
+
+    if not domain_item or not target_list:
+        return JsonResponse({'success': False, 'error': 'Domínio ou lista de destino inválida.'}, status=404)
+
+    orig_list_name = domain_item.proxy_list.name
+    cleaned_domain = domain_item.domain
+
+    if domain_item.proxy_list.id == target_list.id:
+        return JsonResponse({'success': False, 'error': 'A lista de destino é a mesma lista atual.'})
+
+    # Verificar se já existe na lista de destino
+    existing = target_list.domains.filter(domain=cleaned_domain).first()
+    if existing:
+        domain_item.delete()
+        apply_squid_changes()
+        return JsonResponse({
+            'success': True,
+            'message': f"O domínio '{cleaned_domain}' já existia em '{target_list.name}' e foi removido da lista anterior '{orig_list_name}'."
+        })
+
+    # Move para a nova lista
+    domain_item.proxy_list = target_list
+    domain_item.save()
+
+    # Aplica no Squid
+    apply_squid_changes()
+
+    return JsonResponse({
+        'success': True,
+        'message': f"Domínio '{cleaned_domain}' movido de '{orig_list_name}' para '{target_list.name}' com sucesso!"
+    })
+
 
 
 

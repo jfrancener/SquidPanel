@@ -367,7 +367,7 @@ def generate_squid_config_and_lists():
     # ACLs de Domínios Obrigatórios
     conf_lines.append("# --- ACL de Whitelist Obrigatoria do Sistema ---")
     conf_lines.append(f'acl mandatory_whitelist dstdomain "{mandatory_file_path}"')
-    conf_lines.append('acl websocket_bypass_ssl dstdomain .whatsapp.com .whatsapp.net .web.whatsapp.com .wa.me .teams.microsoft.com\n')
+    conf_lines.append('acl websocket_bypass_ssl dstdomain .whatsapp.com .whatsapp.net .web.whatsapp.com .wa.me .teams.microsoft.com .jus.br\n')
 
     # ACLs de Domínios por Grupo
     conf_lines.append("# --- ACLs de Whitelists e Blacklists por Grupo ---")

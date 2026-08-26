@@ -207,6 +207,157 @@
 
     </div>
 
+    <!-- Ferramenta de Pesquisa e Diagnóstico Rápido de Domínios (Whitelist / Blacklist / Mover / Excluir) -->
+    <div class="glass-panel rounded-2xl border border-slate-800/90 shadow-2xl p-5 bg-gradient-to-b from-[#151930] to-[#0d1020] space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-magnifying-glass-chart text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <span>Pesquisa & Diagnóstico Rápido de Domínios</span>
+                        <span class="px-2 py-0.5 rounded-lg bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 font-mono text-[10px] font-bold">
+                            Live Lookup
+                        </span>
+                    </h2>
+                    <p class="text-[11px] text-slate-400 mt-0.5">
+                        Consulte se um domínio ou seus subdomínios estão em Whitelists ou Blacklists, remova ou transfira de lista com 1 clique.
+                    </p>
+                </div>
+            </div>
+            <div class="text-[11px] text-slate-500 font-mono hidden sm:block">
+                <i class="fa-solid fa-shield-halved text-cyan-400 mr-1"></i> SquidPanel Policy Inspector
+            </div>
+        </div>
+
+        <!-- Barra de Busca -->
+        <div class="relative">
+            <div class="relative flex items-center">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-globe"></i>
+                </div>
+                <input type="text"
+                       id="domain-search-input"
+                       placeholder="Digite um domínio ou termo para verificar (ex: vimeo.com, youtube, adobe.io, unicesumar)..."
+                       class="w-full pl-10 pr-24 py-3 bg-slate-900/90 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono">
+                <div class="absolute inset-y-0 right-1.5 flex items-center gap-1.5">
+                    <button type="button"
+                            id="btn-clear-domain-search"
+                            class="hidden px-2.5 py-1 text-xs text-slate-400 hover:text-white transition-all">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <button type="button"
+                            id="btn-execute-domain-search"
+                            class="px-4 py-1.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-bold rounded-lg shadow-md hover:shadow-cyan-500/20 transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                        <span>Pesquisar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Área de Resultados Dinâmicos -->
+        <div id="domain-search-results-box" class="hidden space-y-3 pt-2">
+            <!-- Header do Resultado -->
+            <div class="flex justify-between items-center text-xs px-1">
+                <span class="text-slate-400">
+                    Resultados para <strong class="text-white font-mono" id="search-query-display"></strong>:
+                    <span id="search-total-count" class="ml-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold font-mono text-[10px]">0</span>
+                </span>
+                <span id="search-status-feedback" class="text-[11px] text-slate-400"></span>
+            </div>
+
+            <!-- Tabela / Cards de Resultados -->
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-[#0c0e1a]/80">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-800 bg-slate-900/70 text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                            <th class="py-2.5 px-4">Domínio Cadastrado</th>
+                            <th class="py-2.5 px-4">Tipo de Política</th>
+                            <th class="py-2.5 px-4">Lista de Origem</th>
+                            <th class="py-2.5 px-4">Grupos / Salas Afetadas</th>
+                            <th class="py-2.5 px-4 text-right">Ações Rápidas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="domain-search-results-tbody" class="divide-y divide-slate-800/60 font-mono">
+                        <!-- Itens renderizados via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Estado Vazio / Nenhum resultado -->
+            <div id="domain-search-empty-state" class="hidden p-6 text-center space-y-2 rounded-xl border border-dashed border-slate-800 bg-slate-900/30">
+                <i class="fa-solid fa-shield-slash text-2xl text-slate-600"></i>
+                <p class="text-xs text-slate-400 font-medium">Nenhum registro encontrado nas listas ativas de Whitelist ou Blacklist para este termo.</p>
+                <p class="text-[11px] text-slate-500 font-sans">O domínio não está explicitamente cadastrado no painel.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Mover / Alterar Lista de Domínio -->
+    <div id="modal-move-domain" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden">
+        <div class="bg-[#121528] border border-slate-700/80 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-in fade-in zoom-in duration-150">
+            <div class="flex justify-between items-start pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                        <i class="fa-solid fa-arrows-turn-to-dots text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Transferir / Mover Domínio</h3>
+                        <p class="text-[11px] text-slate-400">Altere a categoria ou mude entre Whitelist e Blacklist</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeMoveDomainModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Domínio Alvo</label>
+                    <div class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl font-mono text-xs text-cyan-300 font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-globe text-slate-500"></i>
+                        <span id="modal-move-domain-display">-</span>
+                    </div>
+                    <input type="hidden" id="modal-move-domain-id" value="">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Lista Atual</label>
+                    <div class="px-3 py-1.5 bg-slate-900/60 border border-slate-800/80 rounded-xl text-xs text-slate-300 flex items-center gap-2">
+                        <span id="modal-move-current-list-badge" class="px-2 py-0.5 rounded text-[10px] font-bold"></span>
+                        <span id="modal-move-current-list-name" class="font-medium"></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="modal-move-target-select" class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Selecione a Lista de Destino
+                    </label>
+                    <select id="modal-move-target-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-medium">
+                        <!-- Opções preenchidas dinamicamente -->
+                    </select>
+                </div>
+
+                <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 flex items-start gap-2">
+                    <i class="fa-solid fa-circle-info text-xs mt-0.5 text-indigo-400"></i>
+                    <span>Ao transferir, as novas regras do Squid serão recompiladas e aplicadas imediatamente.</span>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-2 border-t border-slate-800">
+                <button type="button" onclick="closeMoveDomainModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-move-domain" onclick="confirmMoveDomain()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Confirmar Transferência</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Grid de Portas e Salas de Aula -->
     <div class="glass-panel rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl">
         <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-[#131627]/60">
@@ -292,7 +443,7 @@
 <script>
 async function refreshTelemetry() {
     try {
-        const res = await fetch('/api/system-metrics/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const res = await fetch("{% url 'api_system_metrics' %}", { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         if (!res.ok) return;
         const data = await res.json();
         
@@ -373,5 +524,289 @@ async function refreshTelemetry() {
 
 // Inicia polling de telemetria a cada 4 segundos
 setInterval(refreshTelemetry, 4000);
+
+// ========================================================
+// SCRIPT DE PESQUISA & DIAGNÓSTICO RÁPIDO DE DOMÍNIOS
+// ========================================================
+let currentAvailableLists = [];
+
+const searchInput = document.getElementById('domain-search-input');
+const btnSearch = document.getElementById('btn-execute-domain-search');
+const btnClear = document.getElementById('btn-clear-domain-search');
+const resultsBox = document.getElementById('domain-search-results-box');
+const resultsTbody = document.getElementById('domain-search-results-tbody');
+const emptyState = document.getElementById('domain-search-empty-state');
+const queryDisplay = document.getElementById('search-query-display');
+const totalCountDisplay = document.getElementById('search-total-count');
+const statusFeedback = document.getElementById('search-status-feedback');
+
+function performDomainSearch() {
+    const term = searchInput.value.trim();
+    if (!term) {
+        resultsBox.classList.add('hidden');
+        btnClear.classList.add('hidden');
+        return;
+    }
+
+    btnClear.classList.remove('hidden');
+    resultsBox.classList.remove('hidden');
+    emptyState.classList.add('hidden');
+    queryDisplay.textContent = term;
+    statusFeedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan-400 mr-1"></i> Buscando...';
+    resultsTbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 font-sans"><i class="fa-solid fa-spinner fa-spin mr-2 text-cyan-400"></i> Consultando políticas de proxy...</td></tr>`;
+
+    fetch(`/adminsp/api/domain-lookup/?q=${encodeURIComponent(term)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                statusFeedback.textContent = 'Erro ao consultar.';
+                resultsTbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-rose-400 font-sans">${data.error || 'Erro na consulta'}</td></tr>`;
+                return;
+            }
+
+            currentAvailableLists = data.available_lists || [];
+            totalCountDisplay.textContent = data.total;
+            statusFeedback.textContent = `${data.total} registro(s) encontrado(s)`;
+
+            if (data.total === 0) {
+                resultsTbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            let html = '';
+            data.results.forEach(item => {
+                const isWl = item.list_type === 'WHITELIST';
+                const typeBadge = isWl
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><i class="fa-solid fa-shield-check"></i> WHITELIST</span>`
+                    : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30"><i class="fa-solid fa-ban"></i> BLACKLIST</span>`;
+
+                const groupsHtml = item.groups && item.groups.length > 0
+                    ? item.groups.map(g => `<span class="inline-block px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] mr-1 mb-1">${g}</span>`).join('')
+                    : `<span class="text-slate-500 text-[10px] italic">Global / Todas as salas</span>`;
+
+                const moveBtnClass = isWl
+                    ? `bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30`
+                    : `bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30`;
+
+                const moveBtnText = isWl ? 'Mover / Bloquear' : 'Mover / Liberar';
+                const moveBtnIcon = isWl ? 'fa-solid fa-arrow-right-arrow-left' : 'fa-solid fa-shield-check';
+
+                html += `
+                <tr class="hover:bg-slate-800/40 transition-colors" id="domain-row-${item.id}">
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-globe text-cyan-400 text-xs"></i>
+                            <span>${escapeHtml(item.domain)}</span>
+                        </div>
+                        ${item.description ? `<p class="text-[10px] text-slate-400 font-sans mt-0.5">${escapeHtml(item.description)}</p>` : ''}
+                    </td>
+                    <td class="py-3 px-4">${typeBadge}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-slate-200 font-sans font-semibold">${escapeHtml(item.list_name)}</span>
+                        ${item.is_mandatory ? `<span class="block text-[9px] text-cyan-400 font-sans font-bold">Obrigatória</span>` : ''}
+                    </td>
+                    <td class="py-3 px-4 font-sans">${groupsHtml}</td>
+                    <td class="py-3 px-4 text-right">
+                        <div class="inline-flex items-center gap-1.5">
+                            <button type="button"
+                                    onclick="openMoveDomainModal(${item.id}, '${escapeHtml(item.domain)}', ${item.list_id}, '${escapeHtml(item.list_name)}', '${item.list_type}')"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold ${moveBtnClass} transition-all flex items-center gap-1">
+                                <i class="${moveBtnIcon} text-[11px]"></i>
+                                <span>${moveBtnText}</span>
+                            </button>
+                            <button type="button"
+                                    onclick="quickDeleteDomain(${item.id}, '${escapeHtml(item.domain)}', '${escapeHtml(item.list_name)}')"
+                                    title="Remover desta lista"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-600/15 hover:bg-red-600/30 text-red-300 border border-red-500/30 transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can text-[11px]"></i>
+                                <span>Apagar</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            });
+            resultsTbody.innerHTML = html;
+        })
+        .catch(err => {
+            console.error('Erro na pesquisa:', err);
+            statusFeedback.textContent = 'Erro de comunicação.';
+            resultsTbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-rose-400 font-sans">Falha ao buscar domínios.</td></tr>`;
+        });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/[&<>"']/g, function(m) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[m];
+    });
+}
+
+// Eventos de Busca
+if (btnSearch) btnSearch.addEventListener('click', performDomainSearch);
+if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performDomainSearch();
+        }
+    });
+}
+if (btnClear) {
+    btnClear.addEventListener('click', () => {
+        searchInput.value = '';
+        resultsBox.classList.add('hidden');
+        btnClear.classList.add('hidden');
+        searchInput.focus();
+    });
+}
+
+// Modal de Mover Domínio
+function openMoveDomainModal(domainId, domainName, currentListId, currentListName, currentListType) {
+    document.getElementById('modal-move-domain-id').value = domainId;
+    document.getElementById('modal-move-domain-display').textContent = domainName;
+
+    const badgeEl = document.getElementById('modal-move-current-list-badge');
+    const nameEl = document.getElementById('modal-move-current-list-name');
+    nameEl.textContent = currentListName;
+
+    if (currentListType === 'WHITELIST') {
+        badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        badgeEl.textContent = 'WHITELIST';
+    } else {
+        badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30';
+        badgeEl.textContent = 'BLACKLIST';
+    }
+
+    const selectEl = document.getElementById('modal-move-target-select');
+    selectEl.innerHTML = '';
+
+    // Agrupa listas por tipo para ficar organizado no select
+    const wlGroup = document.createElement('optgroup');
+    wlGroup.label = '--- WHITELISTS (PERMISSÃO / LIBERAÇÃO) ---';
+    const blGroup = document.createElement('optgroup');
+    blGroup.label = '--- BLACKLISTS (BLOQUEIO) ---';
+
+    currentAvailableLists.forEach(pl => {
+        const opt = document.createElement('option');
+        opt.value = pl.id;
+        opt.textContent = `${pl.name} ${pl.is_mandatory ? '(Obrigatória)' : ''}`;
+        if (pl.id === currentListId) {
+            opt.disabled = true;
+            opt.textContent += ' (Lista Atual)';
+        }
+        if (pl.list_type === 'WHITELIST') {
+            wlGroup.appendChild(opt);
+        } else {
+            blGroup.appendChild(opt);
+        }
+    });
+
+    selectEl.appendChild(wlGroup);
+    selectEl.appendChild(blGroup);
+
+    // Sugere a primeira lista do tipo oposto por padrão
+    const oppositeType = currentListType === 'WHITELIST' ? 'BLACKLIST' : 'WHITELIST';
+    const suggested = currentAvailableLists.find(pl => pl.list_type === oppositeType);
+    if (suggested) {
+        selectEl.value = suggested.id;
+    }
+
+    document.getElementById('modal-move-domain').classList.remove('hidden');
+}
+
+function closeMoveDomainModal() {
+    document.getElementById('modal-move-domain').classList.add('hidden');
+}
+
+function confirmMoveDomain() {
+    const domainId = document.getElementById('modal-move-domain-id').value;
+    const targetListId = document.getElementById('modal-move-target-select').value;
+    const btn = document.getElementById('btn-confirm-move-domain');
+
+    if (!domainId || !targetListId) return;
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Transferindo...`;
+
+    const formData = new FormData();
+    formData.append('domain_id', domainId);
+    formData.append('target_list_id', targetListId);
+
+    fetch('/adminsp/api/domain-quick-move/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Confirmar Transferência`;
+        closeMoveDomainModal();
+
+        if (data.success) {
+            // Recarrega a busca para refletir o novo estado
+            performDomainSearch();
+        } else {
+            alert(data.error || data.message || 'Erro ao mover domínio.');
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Confirmar Transferência`;
+        console.error('Erro:', err);
+        alert('Falha na requisição.');
+    });
+}
+
+function quickDeleteDomain(domainId, domainName, listName) {
+    if (!confirm(`Tem certeza que deseja apagar o domínio '${domainName}' da lista '${listName}'?`)) {
+        return;
+    }
+
+    const row = document.getElementById(`domain-row-${domainId}`);
+    if (row) row.style.opacity = '0.3';
+
+    const formData = new FormData();
+    formData.append('domain_id', domainId);
+
+    fetch('/adminsp/api/domain-quick-delete/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            performDomainSearch();
+        } else {
+            if (row) row.style.opacity = '1';
+            alert(data.error || data.message || 'Erro ao remover domínio.');
+        }
+    })
+    .catch(err => {
+        if (row) row.style.opacity = '1';
+        console.error('Erro:', err);
+        alert('Falha na exclusão.');
+    });
+}
+
+function getCsrfToken() {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+        const c = cookies[i].trim();
+        if (c.startsWith('csrftoken=')) {
+            return c.substring('csrftoken='.length);
+        }
+    }
+    return '';
+}
 </script>
 {% endblock %}
