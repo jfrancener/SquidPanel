@@ -1122,7 +1122,7 @@ async function runAiAnalysis(e) {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
 
         const res = await fetch(endpoint, {
             method: 'POST',
@@ -1135,32 +1135,30 @@ async function runAiAnalysis(e) {
 
         clearTimeout(timeoutId);
 
+        let data = null;
+        try {
+            data = await res.json();
+        } catch(e) {
+            data = null;
+        }
+
         if (!res.ok) {
-            const errText = await res.text();
-            let errMsg = `Erro HTTP ${res.status}`;
-            try {
-                const parsed = JSON.parse(errText);
-                if (parsed.error) errMsg = parsed.error;
-            } catch(e) {
-                if (errText && errText.length < 300) errMsg = errText;
-            }
+            let errMsg = data && data.error ? data.error : `Erro HTTP ${res.status} retornado pelo servidor.`;
             errorDiv.textContent = errMsg;
             errorDiv.classList.remove('hidden');
             return;
         }
 
-        const data = await res.json();
-
-        if (data.success) {
+        if (data && data.success) {
             closeAiAnalysisModal();
             renderAiResults(data);
         } else {
-            errorDiv.textContent = data.error || 'Erro ao processar análise.';
+            errorDiv.textContent = (data && data.error) ? data.error : 'Erro ao processar análise com IA.';
             errorDiv.classList.remove('hidden');
         }
     } catch (err) {
         if (err.name === 'AbortError') {
-            errorDiv.textContent = 'Tempo limite esgotado ao aguardar resposta da IA (60s). Tente selecionar um período menor ou menos salas.';
+            errorDiv.textContent = 'Tempo limite esgotado ao aguardar resposta da IA (120s). Tente selecionar um período menor ou menos salas.';
         } else {
             errorDiv.textContent = 'Falha na comunicação com o servidor: ' + (err.message || err);
         }
@@ -1766,5 +1764,4 @@ async function submitAiAddToList(e) {
     }
 }
 </script>
-{% endif %}
 {% endblock %}

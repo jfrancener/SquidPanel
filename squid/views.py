@@ -2923,8 +2923,8 @@ def analyze_blocked_logs_ia_view(request):
             'total_analyzed': 0
         })
 
-    # Limita a 50 domínios para manter resposta rápida e dentro do limite de tokens
-    domains_to_send = candidate_domains[:50]
+    # Limita aos 30 domínios mais bloqueados para resposta ultrarrápida da IA
+    domains_to_send = candidate_domains[:30]
 
     # 7. Prepara o prompt para a IA
     domains_formatted = "\n".join([f"- {d} ({domain_stats[d]['block_count']} bloqueios)" for d in domains_to_send])
@@ -3073,9 +3073,9 @@ def analyze_blocked_logs_ia_view(request):
 
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')[:500]
-        return JsonResponse({'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=500)
+        return JsonResponse({'success': False, 'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=400)
     except Exception as e:
-        return JsonResponse({'error': f'Erro ao processar análise com IA: {str(e)}'}, status=500)
+        return JsonResponse({'success': False, 'error': f'Erro ao processar análise com IA: {str(e)}'}, status=400)
 
 
 @login_required
@@ -3252,8 +3252,8 @@ def analyze_allowed_logs_ia_view(request):
             'total_analyzed': 0
         })
 
-    # Limita aos 50 domínios mais acessados
-    domains_to_send = candidate_domains[:50]
+    # Limita aos 30 domínios mais acessados para resposta ultrarrápida da IA
+    domains_to_send = candidate_domains[:30]
 
     # 7. Prompt especializado para a IA
     domains_formatted = "\n".join([f"- {d} ({domain_stats[d]['hit_count']} acessos)" for d in domains_to_send])
@@ -3404,9 +3404,9 @@ def analyze_allowed_logs_ia_view(request):
 
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')[:500]
-        return JsonResponse({'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=500)
+        return JsonResponse({'success': False, 'error': f'Erro HTTP {e.code} da API de IA: {body}'}, status=400)
     except Exception as e:
-        return JsonResponse({'error': f'Erro ao processar análise com IA: {str(e)}'}, status=500)
+        return JsonResponse({'success': False, 'error': f'Erro ao processar análise com IA: {str(e)}'}, status=400)
 
 
 
