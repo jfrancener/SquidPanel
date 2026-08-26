@@ -2716,6 +2716,10 @@ def analyze_blocked_logs_ia_view(request):
         logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=1))
     elif time_range == 'today':
         logs_qs = logs_qs.filter(timestamp__date=now.date())
+    elif time_range == '24h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=24))
+    elif time_range == '48h':
+        logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(hours=48))
     elif time_range == '7d':
         logs_qs = logs_qs.filter(timestamp__gte=now - timedelta(days=7))
 
