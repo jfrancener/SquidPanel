@@ -2692,10 +2692,9 @@ def analyze_blocked_logs_ia_view(request):
             'error': 'URL ou Chave da API de IA não configuradas. Acesse Configurações → Parâmetros Gerais.'
         }, status=400)
 
-    # 2. Obtém salas/portas selecionadas e opção de ocultos
+    # 2. Obtém salas/portas selecionadas
     port_ids = request.POST.getlist('ports')
     time_range = request.POST.get('time_range', 'today')  # '1h', 'today', '24h', '48h', '7d', 'all'
-    include_hidden = request.POST.get('include_hidden', 'false').lower() in ['true', '1', 'on']
 
     # Sincroniza logs recentes antes de consultar
     sync_logs_from_squid_file()
@@ -2823,10 +2822,9 @@ def analyze_blocked_logs_ia_view(request):
                 return hidden_dict[parent]
         return None
 
-    # 6. Filtra domínios que NÃO estão na whitelist e limita para a IA
+    # 6. Filtra domínios que NÃO estão na whitelist e anota status de oculto/blacklist
     candidate_domains = []
     domain_stats = {}
-    hidden_skipped_count = 0
 
     for item in blocked_domains_summary:
         d = item['domain']
@@ -2835,14 +2833,9 @@ def analyze_blocked_logs_ia_view(request):
         if not is_in_whitelist(d):
             hidden_id = get_hidden_info(d)
             is_hidden = bool(hidden_id)
-
-            # Se o usuário optou por não incluir ocultos e o domínio está oculto, ignora da lista enviada para a IA
-            if is_hidden and not include_hidden:
-                hidden_skipped_count += 1
-                continue
+            bl_name = get_blacklist_info(d)
 
             candidate_domains.append(d)
-            bl_name = get_blacklist_info(d)
             domain_stats[d] = {
                 'block_count': item['block_count'],
                 'last_seen': item['last_seen'].strftime('%d/%m/%Y %H:%M') if item['last_seen'] else '-',
@@ -2853,19 +2846,13 @@ def analyze_blocked_logs_ia_view(request):
             }
 
     if not candidate_domains:
-        msg = 'Todos os domínios bloqueados encontrados já estão liberados na Whitelist'
-        if hidden_skipped_count > 0:
-            msg += f' ou foram ocultados pelo usuário ({hidden_skipped_count} silenciados).'
-        else:
-            msg += '.'
         return JsonResponse({
             'success': True,
-            'message': msg,
+            'message': 'Todos os domínios bloqueados encontrados já estão cadastrados na Whitelist (ou em seus domínios principais).',
             'cdns': [],
             'domains': [],
             'blacklisted': [],
-            'total_analyzed': 0,
-            'hidden_count': hidden_skipped_count
+            'total_analyzed': 0
         })
 
     # Limita a 50 domínios para manter resposta rápida e dentro do limite de tokens
@@ -3017,7 +3004,6 @@ def analyze_blocked_logs_ia_view(request):
             'model': ai_model_name,
             'total_analyzed': len(domains_to_send),
             'total_found': len(candidate_domains),
-            'hidden_skipped': hidden_skipped_count,
             'cdns': cdns,
             'domains': domains,
             'blacklisted': blacklisted,
