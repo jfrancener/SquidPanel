@@ -2663,6 +2663,69 @@ def analyze_sublink_ia_view(request, sublink_id):
         return JsonResponse({'error': f'Erro ao chamar API de IA: {str(e)}'}, status=500)
 
 
+def extract_ai_json_results(content_text):
+    """
+    Extrai e decodifica com tolerância a falhas o JSON retornado por diferentes provedores de IA (OpenAI, 9router, Anthropic).
+    Lida com blocos de markdown ```json, JSON solto no texto ou objetos incompletos.
+    """
+    import re
+    import json as json_lib
+
+    if not content_text or not content_text.strip():
+        return []
+
+    text = content_text.strip()
+
+    # 1. Remove blocos markdown ```json ... ```
+    if '```' in text:
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
+        if match:
+            text = match.group(1).strip()
+
+    # 2. Tenta parse direto
+    try:
+        data = json_lib.loads(text)
+        if isinstance(data, dict):
+            if 'results' in data and isinstance(data['results'], list):
+                return data['results']
+            if 'domains' in data and isinstance(data['domains'], list):
+                return data['domains']
+            return [data]
+        elif isinstance(data, list):
+            return data
+    except Exception:
+        pass
+
+    # 3. Tenta localizar padrão {"results": [...]}
+    match_obj = re.search(r'\{[\s\S]*"results"\s*:\s*(\[[\s\S]*?\])[\s\S]*\}', text)
+    if match_obj:
+        try:
+            return json_lib.loads(match_obj.group(1))
+        except Exception:
+            pass
+
+    # 4. Tenta localizar qualquer array [...]
+    match_arr = re.search(r'\[\s*\{[\s\S]*\}\s*\]', text)
+    if match_arr:
+        try:
+            return json_lib.loads(match_arr.group(0))
+        except Exception:
+            pass
+
+    # 5. Tenta localizar o primeiro objeto {...}
+    match_single = re.search(r'\{[\s\S]*\}', text)
+    if match_single:
+        try:
+            data = json_lib.loads(match_single.group(0))
+            if isinstance(data, dict) and 'results' in data:
+                return data['results']
+            return [data]
+        except Exception:
+            pass
+
+    return []
+
+
 @login_required
 def analyze_blocked_logs_ia_view(request):
     """
@@ -2941,14 +3004,8 @@ def analyze_blocked_logs_ia_view(request):
                         except Exception:
                             pass
 
-        # Extrai o JSON da resposta
-        import re
-        json_match = re.search(r'\{.*\}', content_text, re.DOTALL)
-        if not json_match:
-            return JsonResponse({'error': 'Resposta da IA não continha JSON válido.', 'raw': content_text[:400]}, status=500)
-
-        ai_data = json_lib.loads(json_match.group())
-        results = ai_data.get('results', [])
+        # Extrai o JSON da resposta com tolerância a formatos diversos
+        results = extract_ai_json_results(content_text)
 
         # Enriquece cada item com os dados de bloqueio e separa CDNs, Domínios e Blacklisted
         cdns = []
@@ -3277,13 +3334,8 @@ def analyze_allowed_logs_ia_view(request):
                         except Exception:
                             pass
 
-        import re
-        json_match = re.search(r'\{.*\}', content_text, re.DOTALL)
-        if not json_match:
-            return JsonResponse({'error': 'Resposta da IA não continha JSON válido.', 'raw': content_text[:400]}, status=500)
-
-        ai_data = json_lib.loads(json_match.group())
-        results = ai_data.get('results', [])
+        # Extrai o JSON da resposta com tolerância a formatos diversos
+        results = extract_ai_json_results(content_text)
 
         threats = []
         safe = []
