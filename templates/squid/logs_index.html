@@ -289,9 +289,10 @@
                                 <td class="p-3.5 pl-6">
                                     <div class="flex items-center gap-2">
                                         <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                                        <span class="font-bold text-white tracking-wide font-mono text-xs">
-                                            {{ item.domain }}
-                                        </span>
+                                        <a href="https://{{ item.domain }}" target="_blank" rel="noopener noreferrer" class="font-bold text-white hover:text-cyan-400 tracking-wide font-mono text-xs hover:underline inline-flex items-center gap-1.5 transition-colors group/link" title="Abrir {{ item.domain }} em uma nova aba">
+                                            <span>{{ item.domain }}</span>
+                                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-500 group-hover/link:text-cyan-400 opacity-60 group-hover/link:opacity-100 transition-all"></i>
+                                        </a>
                                     </div>
                                 </td>
 
@@ -411,11 +412,12 @@
                                 <!-- Domínio -->
                                 <td class="p-3.5">
                                     <div class="flex items-center gap-2 max-w-md">
-                                        <span class="font-bold text-white tracking-wide font-mono text-[12px] truncate" title="{{ log.full_url }}">
-                                            {{ log.domain }}
-                                        </span>
+                                        <a href="{% if log.full_url and '://' in log.full_url %}{{ log.full_url }}{% else %}https://{{ log.domain }}{% endif %}" target="_blank" rel="noopener noreferrer" class="font-bold text-white hover:text-cyan-400 tracking-wide font-mono text-[12px] truncate hover:underline inline-flex items-center gap-1.5 transition-colors group/link" title="Abrir {% if log.full_url and '://' in log.full_url %}{{ log.full_url }}{% else %}{{ log.domain }}{% endif %} em uma nova aba">
+                                            <span class="truncate">{{ log.domain }}</span>
+                                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-500 group-hover/link:text-cyan-400 opacity-60 group-hover/link:opacity-100 transition-all flex-shrink-0"></i>
+                                        </a>
                                         {% if log.method != 'CONNECT' %}
-                                        <span class="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-400 font-mono uppercase">
+                                        <span class="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-400 font-mono uppercase flex-shrink-0">
                                             {{ log.method }}
                                         </span>
                                         {% endif %}
@@ -1400,9 +1402,14 @@ async function fetchLiveLogs() {
                     ? `<span onclick="setLiveHostnameFilter('${l.hostname.replace(/'/g, "\\'")}')" class="px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 hover:text-white font-bold border border-cyan-500/25 hover:border-cyan-400 text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-all shadow-sm group" title="Filtrar Live Stream por ${l.hostname}"><i class="fa-solid fa-desktop text-[10px] text-cyan-400 group-hover:scale-110 transition-transform"></i>${l.hostname}</span> <span onclick="setLiveHostnameFilter('${l.client_ip}')" class="text-slate-500 hover:text-cyan-300 font-mono text-[10px] cursor-pointer hover:underline transition-colors" title="Filtrar Live Stream por IP ${l.client_ip}">(${l.client_ip})</span>`
                     : `<span onclick="setLiveHostnameFilter('${l.client_ip}')" class="text-slate-400 hover:text-cyan-300 font-mono text-[11px] cursor-pointer hover:underline px-1 py-0.5 rounded hover:bg-slate-800 transition-all" title="Filtrar Live Stream por IP ${l.client_ip}">${l.client_ip}</span>`;
 
-                const urlDisplay = (l.full_url && l.full_url.includes('/') && !l.full_url.endsWith(':443'))
-                    ? `<span class="text-white font-bold font-mono tracking-wide text-xs truncate max-w-lg" title="${l.full_url}">${l.full_url}</span>`
-                    : `<span class="text-white font-bold font-mono tracking-wide text-xs truncate max-w-lg" title="${l.full_url || l.domain}">${l.domain}</span>`;
+                const targetHref = (l.full_url && l.full_url.startsWith('http'))
+                    ? l.full_url
+                    : `https://${l.domain}`;
+                const rawUrlText = (l.full_url && l.full_url.includes('/') && !l.full_url.endsWith(':443'))
+                    ? l.full_url
+                    : (l.full_url || l.domain);
+
+                const urlDisplay = `<a href="${targetHref}" target="_blank" rel="noopener noreferrer" class="text-white hover:text-cyan-400 font-bold font-mono tracking-wide text-xs truncate max-w-lg hover:underline inline-flex items-center gap-1.5 transition-colors group/link" title="Abrir ${rawUrlText} em uma nova aba"><span class="truncate">${rawUrlText}</span><i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-500 group-hover/link:text-cyan-400 opacity-60 group-hover/link:opacity-100 transition-all flex-shrink-0"></i></a>`;
 
                 row.innerHTML = `
                     <div class="flex flex-wrap items-center gap-2.5">
